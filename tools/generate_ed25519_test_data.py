@@ -166,8 +166,23 @@ def main() -> None:
     print_test_data(data)
     if save:
         import json
+        # Convert large integers to strings to preserve precision for Rust/JSON parsers
+        def convert_large_ints(obj):
+            if isinstance(obj, dict):
+                return {k: convert_large_ints(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_large_ints(item) for item in obj]
+            elif isinstance(obj, int):
+                # Convert integers > 2^53 (JavaScript safe integer limit) to strings
+                # to avoid JSON parsers converting them to floats
+                if obj > 9007199254740992:  # 2^53
+                    return str(obj)
+                return obj
+            return obj
+        
+        data_safe = convert_large_ints(data)
         with open("ed25519_test_data.json", "w") as f:
-            json.dump(data, f, indent=2, default=str)
+            json.dump(data_safe, f, indent=2)
         print("\n✅ Saved to ed25519_test_data.json")
 
 
