@@ -1,15 +1,42 @@
 # Rust
 rust/target/
+**/*.rs.bk
 
 # Cairo
 cairo/target/
+cairo/**/*.sierra.json
+
+# Python
+**/.venv/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+.Python
+**/pip-log.txt
+**/pip-delete-this-directory.txt
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
 # IDE
 .idea/
 .vscode/
 *.swp
+*.swo
+*~
 
-# Context bundles
+# Context bundles (generated)
 *-context-*.txt
+
+# Build artifacts
 /target
-generate-context.sh
