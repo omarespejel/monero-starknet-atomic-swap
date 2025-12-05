@@ -70,24 +70,19 @@ pub fn generate_dleq_proof(
 
 /// Get the second generator point Y for DLEQ proofs.
 ///
-/// This uses a deterministic hash-to-curve approach following RFC 8032.
-/// The point Y must be fixed and known to both prover and verifier.
+/// CRITICAL: Must match Cairo's `get_dleq_second_generator()` exactly!
 ///
-/// Uses SHA-512 hash-to-curve for Ed25519 with domain separator "DLEQ_SECOND_BASE_V1".
+/// Currently uses `2·G` as placeholder to match Cairo's implementation.
+/// This ensures Rust-generated proofs verify correctly in Cairo.
+///
+/// TODO: Once Python tool generates hash-to-curve constant for Cairo,
+/// update both Rust and Cairo to use the same hash-to-curve point.
+///
+/// Production path: Use hash-to-curve("DLEQ_SECOND_BASE_V1") → Edwards → Weierstrass → u384 limbs
 fn get_second_generator() -> EdwardsPoint {
-    // Hash-to-curve using SHA-512 (Ed25519 standard)
-    // Domain separator ensures deterministic generation
-    let mut hasher = Sha512::new();
-    hasher.update(b"DLEQ_SECOND_BASE_V1");
-    let hash = hasher.finalize();
-    
-    // Use hash as scalar seed (reduce mod curve order)
-    let mut scalar_bytes = [0u8; 32];
-    scalar_bytes.copy_from_slice(&hash[..32]);
-    let scalar = Scalar::from_bytes_mod_order(scalar_bytes);
-    
-    // Compute Y = scalar·G
-    ED25519_BASEPOINT_POINT * scalar
+    // Current implementation: Y = 2·G (matches Cairo placeholder)
+    // This ensures compatibility between Rust proof generation and Cairo verification
+    ED25519_BASEPOINT_POINT * Scalar::from(2u64)
 }
 
 /// Generate a deterministic nonce k for DLEQ proof generation.
