@@ -94,9 +94,33 @@ mod tests {
 
     #[test]
     fn test_wrong_secret_fails() {
-        let expected_hash = array![1_u32, 2_u32, 3_u32, 4_u32, 5_u32, 6_u32, 7_u32, 8_u32].span();
-        let dispatcher = deploy_with(expected_hash, 0_u64, 0.try_into().unwrap(), u256 { low: 0, high: 0 });
+        let expected_hash = array![3606997102_u32, 3756602050_u32, 1811765011_u32, 1576844653_u32, 61256116_u32, 2110839708_u32, 540553134_u32, 3341226206_u32].span();
+        let x_limbs = (0x460f72719199c63ec398673f, 0xf27a4af146a52a7dbdeb4cfb, 0x5f9c70ec759789a0, 0x0);
+        let y_limbs = (0x6b43e318a2a02d8241549109, 0x40e30afa4cce98c21e473980, 0x5e243e1eed1aa575, 0x0);
+        let hint = array![
+            0x460f72719199c63ec398673f,
+            0xf27a4af146a52a7dbdeb4cfb,
+            0x5f9c70ec759789a0,
+            0x0,
+            0x6b43e318a2a02d8241549109,
+            0x40e30afa4cce98c21e473980,
+            0x5e243e1eed1aa575,
+            0x0,
+            0x10b51d41eab43e36d3ac30cda9707f92,
+            0x110538332d2eae09bf756dfd87431ded7
+        ].span();
+        let dispatcher = deploy_with_full(
+            expected_hash,
+            0_u64,
+            0.try_into().unwrap(),
+            u256 { low: 0, high: 0 },
+            x_limbs,
+            y_limbs,
+            (0, 0),
+            hint,
+        );
 
+        // wrong secret → hash check fails before MSM
         let wrong_secret = "wrong_secret";
         let success = dispatcher.verify_and_unlock(wrong_secret);
         assert(!success, 'wrong secret');
@@ -106,14 +130,51 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_cannot_unlock_twice() {
-        let secret_input: ByteArray = "unlock_me";
-        let hash_words = compute_sha256_byte_array(@secret_input);
-        let [h0, h1, h2, h3, h4, h5, h6, h7] = hash_words;
-        let expected_hash = array![h0, h1, h2, h3, h4, h5, h6, h7].span();
-        let dispatcher = deploy_with(expected_hash, 0_u64, 0.try_into().unwrap(), u256 { low: 0, high: 0 });
+        let mut secret_input: ByteArray = Default::default();
+        secret_input.append_byte(0x09_u8); secret_input.append_byte(0x9d_u8);
+        secret_input.append_byte(0xd9_u8); secret_input.append_byte(0xb7_u8);
+        secret_input.append_byte(0x3e_u8); secret_input.append_byte(0x2e_u8);
+        secret_input.append_byte(0x84_u8); secret_input.append_byte(0xdb_u8);
+        secret_input.append_byte(0x47_u8); secret_input.append_byte(0x2b_u8);
+        secret_input.append_byte(0x34_u8); secret_input.append_byte(0x2d_u8);
+        secret_input.append_byte(0xc3_u8); secret_input.append_byte(0xab_u8);
+        secret_input.append_byte(0x05_u8); secret_input.append_byte(0x20_u8);
+        secret_input.append_byte(0xf6_u8); secret_input.append_byte(0x54_u8);
+        secret_input.append_byte(0xfd_u8); secret_input.append_byte(0x8a_u8);
+        secret_input.append_byte(0x81_u8); secret_input.append_byte(0xd6_u8);
+        secret_input.append_byte(0x44_u8); secret_input.append_byte(0x18_u8);
+        secret_input.append_byte(0x04_u8); secret_input.append_byte(0x77_u8);
+        secret_input.append_byte(0x73_u8); secret_input.append_byte(0x0a_u8);
+        secret_input.append_byte(0x90_u8); secret_input.append_byte(0xaf_u8);
+        secret_input.append_byte(0x89_u8); secret_input.append_byte(0x00_u8);
+
+        let expected_hash = array![3606997102_u32, 3756602050_u32, 1811765011_u32, 1576844653_u32, 61256116_u32, 2110839708_u32, 540553134_u32, 3341226206_u32].span();
+        let x_limbs = (0x460f72719199c63ec398673f, 0xf27a4af146a52a7dbdeb4cfb, 0x5f9c70ec759789a0, 0x0);
+        let y_limbs = (0x6b43e318a2a02d8241549109, 0x40e30afa4cce98c21e473980, 0x5e243e1eed1aa575, 0x0);
+        let hint = array![
+            0x460f72719199c63ec398673f,
+            0xf27a4af146a52a7dbdeb4cfb,
+            0x5f9c70ec759789a0,
+            0x0,
+            0x6b43e318a2a02d8241549109,
+            0x40e30afa4cce98c21e473980,
+            0x5e243e1eed1aa575,
+            0x0,
+            0x10b51d41eab43e36d3ac30cda9707f92,
+            0x110538332d2eae09bf756dfd87431ded7
+        ].span();
+        let dispatcher = deploy_with_full(
+            expected_hash,
+            0_u64,
+            0.try_into().unwrap(),
+            u256 { low: 0, high: 0 },
+            x_limbs,
+            y_limbs,
+            (0, 0),
+            hint,
+        );
 
         assert(dispatcher.verify_and_unlock(secret_input), 'first ok');
-        // Second attempt should panic.
         dispatcher.verify_and_unlock("unlock_me");
     }
 
@@ -201,8 +262,31 @@ mod tests {
     #[test]
     fn test_refund_after_expiry() {
         // lock_until = 0 to allow immediate refund without time travel
-        let expected_hash = array![1_u32, 2_u32, 3_u32, 4_u32, 5_u32, 6_u32, 7_u32, 8_u32].span();
-        let dispatcher = deploy_with(expected_hash, 0_u64, 0.try_into().unwrap(), u256 { low: 0, high: 0 });
+        let expected_hash = array![3606997102_u32, 3756602050_u32, 1811765011_u32, 1576844653_u32, 61256116_u32, 2110839708_u32, 540553134_u32, 3341226206_u32].span();
+        let x_limbs = (0x460f72719199c63ec398673f, 0xf27a4af146a52a7dbdeb4cfb, 0x5f9c70ec759789a0, 0x0);
+        let y_limbs = (0x6b43e318a2a02d8241549109, 0x40e30afa4cce98c21e473980, 0x5e243e1eed1aa575, 0x0);
+        let hint = array![
+            0x460f72719199c63ec398673f,
+            0xf27a4af146a52a7dbdeb4cfb,
+            0x5f9c70ec759789a0,
+            0x0,
+            0x6b43e318a2a02d8241549109,
+            0x40e30afa4cce98c21e473980,
+            0x5e243e1eed1aa575,
+            0x0,
+            0x10b51d41eab43e36d3ac30cda9707f92,
+            0x110538332d2eae09bf756dfd87431ded7
+        ].span();
+        let dispatcher = deploy_with_full(
+            expected_hash,
+            0_u64,
+            0.try_into().unwrap(),
+            u256 { low: 0, high: 0 },
+            x_limbs,
+            y_limbs,
+            (0, 0),
+            hint,
+        );
         let success = dispatcher.refund();
         assert(success, 'refund');
     }
@@ -315,38 +399,84 @@ mod tests {
         dispatcher.verify_and_unlock(secret_input);
     }
 
-    fn deploy_with(
-        expected_hash: Span<u32>,
-        lock_until: u64,
-        token: ContractAddress,
-        amount: u256,
-    ) -> IAtomicLockDispatcher {
-        let declare_res = declare("AtomicLock");
-        let contract = declare_res.unwrap().contract_class();
+    #[test]
+    #[should_panic(expected: ('Zero adaptor point rejected',))]
+    fn test_constructor_rejects_zero_point() {
+        let expected_hash = array![1_u32, 2_u32, 3_u32, 4_u32, 5_u32, 6_u32, 7_u32, 8_u32].span();
+        let zero_point = (0, 0, 0, 0);
+        let hint = array![0, 0, 0, 0, 0, 0, 0, 0, 0, 0].span();
+        deploy_with_full(
+            expected_hash,
+            0_u64,
+            0.try_into().unwrap(),
+            u256 { low: 0, high: 0 },
+            zero_point,
+            zero_point,
+            (0, 0),
+            hint,
+        );
+    }
 
-        let mut calldata = ArrayTrait::new();
-        expected_hash.serialize(ref calldata);
-        Serde::serialize(@lock_until, ref calldata);
-        Serde::serialize(@token, ref calldata);
-        Serde::serialize(@amount, ref calldata);
-        // adaptor_point (x/y limbs)
-        Serde::serialize(@0, ref calldata);
-        Serde::serialize(@0, ref calldata);
-        Serde::serialize(@0, ref calldata);
-        Serde::serialize(@0, ref calldata);
-        Serde::serialize(@0, ref calldata);
-        Serde::serialize(@0, ref calldata);
-        Serde::serialize(@0, ref calldata);
-        Serde::serialize(@0, ref calldata);
-        // DLEQ placeholders
-        Serde::serialize(@0, ref calldata);
-        Serde::serialize(@0, ref calldata);
-        // fake_glv_hint[10]
-        Serde::serialize(@array![0, 0, 0, 0, 0, 0, 0, 0, 0, 0].span(), ref calldata);
+    #[test]
+    #[should_panic(expected: ('Hint must be 10 felts',))]
+    fn test_constructor_rejects_wrong_hint_length() {
+        let expected_hash = array![1_u32, 2_u32, 3_u32, 4_u32, 5_u32, 6_u32, 7_u32, 8_u32].span();
+        let x_limbs = (0x460f72719199c63ec398673f, 0xf27a4af146a52a7dbdeb4cfb, 0x5f9c70ec759789a0, 0x0);
+        let y_limbs = (0x6b43e318a2a02d8241549109, 0x40e30afa4cce98c21e473980, 0x5e243e1eed1aa575, 0x0);
+        let bad_hint = array![1, 2, 3, 4, 5].span();
+        deploy_with_full(
+            expected_hash,
+            0_u64,
+            0.try_into().unwrap(),
+            u256 { low: 0, high: 0 },
+            x_limbs,
+            y_limbs,
+            (0, 0),
+            bad_hint,
+        );
+    }
 
-        let deploy_res = contract.deploy(@calldata);
-        let (addr, _) = deploy_res.unwrap();
-        IAtomicLockDispatcher { contract_address: addr }
+    #[test]
+    #[should_panic(expected: ('Hint Q mismatch adaptor',))]
+    fn test_constructor_rejects_mismatched_hint() {
+        let expected_hash = array![1_u32, 2_u32, 3_u32, 4_u32, 5_u32, 6_u32, 7_u32, 8_u32].span();
+        let x_limbs = (0x460f72719199c63ec398673f, 0xf27a4af146a52a7dbdeb4cfb, 0x5f9c70ec759789a0, 0x0);
+        let y_limbs = (0x6b43e318a2a02d8241549109, 0x40e30afa4cce98c21e473980, 0x5e243e1eed1aa575, 0x0);
+        let bad_hint = array![
+            0x1111111111111111, 0x2222222222222222, 0x3333333333333333, 0x0,
+            0x4444444444444444, 0x5555555555555555, 0x6666666666666666, 0x0,
+            0x10b51d41eab43e36d3ac30cda9707f92,
+            0x110538332d2eae09bf756dfd87431ded7
+        ].span();
+        deploy_with_full(
+            expected_hash,
+            0_u64,
+            0.try_into().unwrap(),
+            u256 { low: 0, high: 0 },
+            x_limbs,
+            y_limbs,
+            (0, 0),
+            bad_hint,
+        );
+    }
+
+    #[test]
+    #[should_panic(expected: ('Small order point rejected',))]
+    fn test_constructor_rejects_small_order_point() {
+        let expected_hash = array![1_u32, 2_u32, 3_u32, 4_u32, 5_u32, 6_u32, 7_u32, 8_u32].span();
+        let small_order_x = (0, 0, 0, 0);
+        let small_order_y = (1, 0, 0, 0);
+        let hint = array![0, 0, 0, 0, 1, 0, 0, 0, 1, 1].span();
+        deploy_with_full(
+            expected_hash,
+            0_u64,
+            0.try_into().unwrap(),
+            u256 { low: 0, high: 0 },
+            small_order_x,
+            small_order_y,
+            (0, 0),
+            hint,
+        );
     }
 
     /// Helper for future tests that need real adaptor point and hint values from Rust.

@@ -1,7 +1,16 @@
-/// Atomic Lock Contract for XMR-Starknet Swaps
+/// # AtomicLock Contract - Phase 1 Complete
 ///
-/// Stores a SHA-256 hash and unlocks when the correct preimage is provided.
-/// Supports a timelock-based refund and optional ERC20 token payout.
+/// Starknet contract for XMR↔️Starknet swaps with Garaga MSM verification on
+/// Ed25519 (Weierstrass form, curve_index=4).
+///
+/// Hard invariants:
+/// - Constructor: adaptor point must be non-zero, on-curve, not small-order; FakeGLV
+///   hint must be 10 felts [Qx4, Qy4, s1, s2] matching the adaptor point with s1/s2
+///   non-zero.
+/// - verify_and_unlock: mandatory MSM assert on SHA-256(secret) reduced scalar;
+///   cannot be bypassed.
+///
+/// Future: add DLEQ verification and Edwards/Weierstrass conversion.
 #[starknet::interface]
 pub trait IAtomicLock<TContractState> {
     /// Verify the secret and unlock the contract (one-time only).
@@ -36,7 +45,6 @@ pub mod AtomicLock {
     use core::integer::u256;
     use core::num::traits::Zero;
     use core::sha256::compute_sha256_byte_array;
-    use core::panic_with_felt252;
     use starknet::contract_address::ContractAddress;
     use starknet::get_contract_address;
     use starknet::get_block_timestamp;
@@ -44,6 +52,7 @@ pub mod AtomicLock {
     use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
     use super::{IERC20Dispatcher, IERC20DispatcherTrait};
     use garaga::definitions::{deserialize_u384, G1Point, G1PointZero, get_G};
+    use garaga::definitions::types::u384;
     use garaga::ec_ops::{ec_safe_add, msm_g1, G1PointTrait};
 
     const ED25519_ORDER: u256 = u256 {
@@ -125,6 +134,11 @@ pub mod AtomicLock {
         pub const NOT_EXPIRED: felt252 = 'Lock not expired';
         pub const NOT_DEPOSITOR: felt252 = 'Not depositor';
         pub const TOKEN_TRANSFER_FAILED: felt252 = 'Token transfer failed';
+        pub const ZERO_ADAPTOR_POINT: felt252 = 'Zero adaptor point rejected';
+        pub const INVALID_HINT_LENGTH: felt252 = 'Hint must be 10 felts';
+        pub const HINT_Q_MISMATCH: felt252 = 'Hint Q mismatch adaptor';
+        pub const ZERO_HINT_SCALARS: felt252 = 'Hint s1/s2 cannot be zero';
+        pub const SMALL_ORDER_POINT: felt252 = 'Small order point rejected';
     }
 
     #[constructor]
@@ -147,7 +161,43 @@ pub mod AtomicLock {
         fake_glv_hint: Span<felt252>,
     ) {
         assert(hash_words.len() == 8, Errors::INVALID_HASH_LENGTH);
-        assert(fake_glv_hint.len() == 10, 'fake_glv_hint must be 10 felts');
+        assert(fake_glv_hint.len() == 10, Errors::INVALID_HINT_LENGTH);
+
+        // Validate adaptor point not zero.
+        let x_is_zero =
+            adaptor_point_x0 == 0 && adaptor_point_x1 == 0 && adaptor_point_x2 == 0 && adaptor_point_x3 == 0;
+        let y_is_zero =
+            adaptor_point_y0 == 0 && adaptor_point_y1 == 0 && adaptor_point_y2 == 0 && adaptor_point_y3 == 0;
+        assert(!x_is_zero && !y_is_zero, Errors::ZERO_ADAPTOR_POINT);
+
+        // Reconstruct point and validate curve/small-order.
+        let point = G1Point {
+            x: u384 { limb0: adaptor_point_x0, limb1: adaptor_point_x1, limb2: adaptor_point_x2, limb3: adaptor_point_x3 },
+            y: u384 { limb0: adaptor_point_y0, limb1: adaptor_point_y1, limb2: adaptor_point_y2, limb3: adaptor_point_y3 },
+        };
+        point.assert_on_curve_excluding_infinity(4);
+        assert(!is_small_order_ed25519(point), Errors::SMALL_ORDER_POINT);
+
+        // Validate hint shape and match to adaptor point.
+        let hint_q = G1Point {
+            x: u384 {
+                limb0: *fake_glv_hint.at(0),
+                limb1: *fake_glv_hint.at(1),
+                limb2: *fake_glv_hint.at(2),
+                limb3: *fake_glv_hint.at(3),
+            },
+            y: u384 {
+                limb0: *fake_glv_hint.at(4),
+                limb1: *fake_glv_hint.at(5),
+                limb2: *fake_glv_hint.at(6),
+                limb3: *fake_glv_hint.at(7),
+            },
+        };
+        assert(hint_q == point, Errors::HINT_Q_MISMATCH);
+
+        let s1 = *fake_glv_hint.at(8);
+        let s2 = *fake_glv_hint.at(9);
+        assert(s1 != 0 && s2 != 0, Errors::ZERO_HINT_SCALARS);
 
         self.h0.write(*hash_words.at(0));
         self.h1.write(*hash_words.at(1));
@@ -260,21 +310,11 @@ pub mod AtomicLock {
             if h6 != self.h6.read() { return false; }
             if h7 != self.h7.read() { return false; }
 
-            // Ed25519 scalar check: t·G must equal stored adaptor point.
-            // Enforce adaptor point equality: t·G == stored adaptor point.
-            adaptor_point.assert_on_curve_excluding_infinity(4);
-            if adaptor_point.is_infinity() {
-                panic_with_felt252('adaptor point is infinity');
-            }
-            if is_small_order_ed25519(adaptor_point) {
-                panic_with_felt252('small order point rejected');
-            }
+            // Mandatory MSM check: t·G must equal stored adaptor point.
             let mut scalar = hash_to_scalar_u256(h0, h1, h2, h3, h4, h5, h6, h7);
             scalar = reduce_scalar_ed25519(scalar);
             let computed = msm_g1(array![get_G(4)].span(), array![scalar].span(), 4, fake_glv_hint.span());
-            if computed != adaptor_point {
-                return false;
-            }
+            assert(computed == adaptor_point, 'MSM verification failed');
 
             // TODO: DLEQ verification (placeholder for now)
             // let dleq_ok = verify_dleq_stub();
