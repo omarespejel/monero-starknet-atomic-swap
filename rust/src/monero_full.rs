@@ -1,9 +1,22 @@
-//! Full Monero stagenet integration.
+//! Minimal Monero stagenet integration demo.
 //!
-//! This module provides complete integration for:
-//! - Transaction creation with adaptor signatures
-//! - Signature finalization
-//! - Transaction broadcasting
+//! **⚠️ WARNING**: This is a minimal adaptor-signature demo, NOT a production wallet integration.
+//!
+//! This module provides a simplified demonstration of:
+//! - Transaction creation with adaptor signatures (simplified, not full CLSAG)
+//! - Signature finalization (demo implementation)
+//! - Transaction broadcasting (basic RPC calls)
+//!
+//! **What's NOT implemented** (required for production):
+//! - Full CLSAG (Compact Linkable Spontaneous Anonymous Group signatures)
+//! - Robust key image handling
+//! - Change output management
+//! - Multi-output transaction support
+//! - Ring signature construction
+//! - Proper transaction fee calculation
+//!
+//! **For production use**: Integrate with a proper Monero wallet stack (e.g., monero-rs)
+//! that handles all the complexities of Monero transaction creation and signing.
 
 use anyhow::{Context, Result};
 use curve25519_dalek::scalar::Scalar;
@@ -63,7 +76,10 @@ impl MoneroRpcClient {
         Ok(height)
     }
 
-    /// Create a transfer transaction (simplified - requires wallet integration).
+    /// Create a transfer transaction (minimal demo - NOT production wallet integration).
+    ///
+    /// ⚠️ This is a simplified demo implementation. For production use, integrate with
+    /// a proper Monero wallet library that handles CLSAG, key images, change outputs, etc.
     pub async fn create_transfer(
         &self,
         destinations: Vec<(String, u64)>, // (address, amount)
@@ -119,6 +135,9 @@ impl MoneroRpcClient {
 }
 
 /// Finalize a Monero adaptor signature and create broadcastable transaction.
+///
+/// **⚠️ WARNING**: This is a minimal demo implementation, NOT a production wallet module.
+/// It does not handle full CLSAG, key images, change outputs, or multi-output transactions.
 pub struct MoneroTransactionBuilder {
     adaptor_sig: crate::adaptor::AdaptorSignature,
     partial_tx_data: Value,
@@ -133,8 +152,15 @@ impl MoneroTransactionBuilder {
     }
 
     /// Finalize the transaction signature using the revealed secret scalar.
+    ///
+    /// ⚠️ This is a simplified demo. A production implementation would:
+    /// 1. Extract full CLSAG ring signature components
+    /// 2. Replace adaptor signature with finalized signature
+    /// 3. Handle key images properly
+    /// 4. Reconstruct full transaction with all outputs
+    /// 5. Serialize to proper Monero transaction format
     pub fn finalize(&mut self, secret_scalar: &Scalar) -> Result<String> {
-        // Finalize the adaptor signature
+        // Finalize the adaptor signature (simplified demo)
         let finalized_sig = crate::adaptor::finalize_signature(&self.adaptor_sig, secret_scalar)
             .context("Failed to finalize signature")?;
 
@@ -146,8 +172,9 @@ impl MoneroTransactionBuilder {
         // 4. Serialize to hex
 
         // For now, return placeholder
-        println!("✅ Signature finalized successfully");
+        println!("✅ Signature finalized successfully (demo implementation)");
         println!("   Finalized signature: {:?}", finalized_sig);
+        println!("   ⚠️  This is a demo - production requires full CLSAG integration");
         
         // In production, serialize the full transaction
         Ok("finalized_tx_hex_placeholder".to_string())

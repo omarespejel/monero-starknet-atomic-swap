@@ -9,7 +9,7 @@ This project implements a **prototype implementation / reference PoC** of an ato
 
 **Current Implementation:**
 - **SHA-256 Hashlock**: Cryptographic lock on Starknet
-- **Ed25519 Adaptor Signatures**: Monero-side signature binding
+- **Ed25519 Adaptor Signatures**: Monero-side signature binding (simplified demo, not full CLSAG)
 - **Garaga MSM Verification**: Efficient on-chain Ed25519 point verification (`t·G == adaptor_point`)
 
 **Important**: The current version does **NOT** bind the hashlock and adaptor point via a cryptographic proof. DLEQ (Discrete Logarithm Equality) proofs are planned for a future version but are not yet implemented. The protocol currently relies on hashlock + MSM verification, which provides strong security guarantees but does not cryptographically prove the relationship between the hashlock and adaptor point.
@@ -27,7 +27,7 @@ This project implements a **prototype implementation / reference PoC** of an ato
 
 1. **Maker (Alice)**:
    - Generates secret scalar `t`
-   - Creates adaptor signature for Monero stagenet
+   - Creates simplified adaptor signature (demo, not full CLSAG)
    - Deploys `AtomicLock` contract on Starknet Sepolia
    - Waits for secret reveal
 
@@ -38,8 +38,10 @@ This project implements a **prototype implementation / reference PoC** of an ato
 
 3. **Maker (Alice)**:
    - Detects secret reveal via event
-   - Finalizes Monero signature using revealed `t`
-   - Broadcasts transaction on Monero stagenet
+   - Finalizes simplified Monero signature using revealed `t`
+   - Broadcasts transaction (demo implementation, not production wallet)
+
+**⚠️ Important**: The Monero integration is a **minimal adaptor-signature demo**, not a production wallet integration. It does not implement full CLSAG, key image handling, change outputs, or multi-output transactions. This is a proof-of-concept demonstration, not a drop-in module for production wallets.
 
 ## Quick Start
 
@@ -49,7 +51,7 @@ This project implements a **prototype implementation / reference PoC** of an ato
 - Cairo/Scarb (for contract compilation)
 - Python 3.10+ with `uv` (for test data generation)
 - Starknet account (for contract deployment)
-- Monero stagenet wallet (for transaction creation)
+- Monero stagenet RPC access (for demo transaction creation - not a full wallet integration)
 
 ### Building
 
@@ -163,8 +165,13 @@ cargo test --test integration_test
 
 **In Progress:**
 - ⚠️ Account signing implementation
-- ⚠️ Monero transaction serialization
+- ⚠️ Monero transaction serialization (minimal demo, not production wallet)
 - ⚠️ End-to-end testnet testing
+
+**Monero Integration Status:**
+- ⚠️ **Current**: Minimal adaptor-signature demo (simplified, not full CLSAG)
+- ⚠️ **Not Implemented**: Full CLSAG, key image handling, change outputs, multi-output transactions
+- ⚠️ **Purpose**: Proof-of-concept demonstration, not production wallet integration
 
 **Deferred:**
 - ⚠️ DLEQ proof implementation (explicitly deferred to post-audit phase)
@@ -183,7 +190,11 @@ cargo test --test integration_test
 **Known Limitations:**
 - **snforge Constructor Panics**: Constructor validation tests are marked as FAIL by snforge v0.53.0, but they correctly panic (tooling limitation)
 - **Starknet Integration**: Contract deployment and event watching require full starknet-rs integration (currently scaffolded)
-- **Monero Integration**: Transaction creation and broadcasting require monero-rs integration (currently scaffolded)
+- **Monero Integration**: Minimal adaptor-signature demo, not a production wallet integration
+  - Does not implement full CLSAG (Compact Linkable Spontaneous Anonymous Group signatures)
+  - No robust handling of key images, change outputs, or multi-output transactions
+  - This is a proof-of-concept demonstration, not a drop-in module for production wallets
+  - For production use, integrate with a proper Monero wallet stack
 - **DLEQ Proofs**: Not yet implemented (deferred to post-audit phase)
   - **Current state**: DLEQ is mentioned in protocol design but not implemented
   - **What's missing**: No cryptographic proof binding hashlock (H) and adaptor point (T)
@@ -213,8 +224,10 @@ cargo test --test integration_test
 
 **Next Steps for Full Functionality**:
 1. Implement account key loading and signing in `StarknetAccount`
-2. Complete Monero transaction serialization in `MoneroRpcClient`
+2. Complete Monero transaction serialization (or integrate with production wallet stack)
 3. Test end-to-end on Sepolia + stagenet
+
+**Note on Monero Integration**: The current implementation is a minimal demo. For production use, consider integrating with a proper Monero wallet library (e.g., monero-rs) that handles full CLSAG, key images, change outputs, and multi-output transactions.
 
 ## License
 

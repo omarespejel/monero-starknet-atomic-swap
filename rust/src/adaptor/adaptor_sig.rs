@@ -1,12 +1,24 @@
-//! Simplified adaptor signature for Monero atomic swaps.
+//! Simplified adaptor signature demo for Monero atomic swaps.
 //!
-//! This is a simplified version that demonstrates the core concept:
+//! **⚠️ WARNING**: This is a minimal proof-of-concept demonstration, NOT a production
+//! Monero wallet integration. It does not implement full CLSAG (Compact Linkable
+//! Spontaneous Anonymous Group signatures).
+//!
+//! This simplified version demonstrates the core concept:
 //! - Create an adaptor signature using base_key + adaptor_point
 //! - When adaptor_scalar `t` is revealed, finalize the signature
 //! - Extract the full spend key from the finalized signature
 //!
-//! Note: Full CLSAG implementation would be more complex, but this
-//! demonstrates that the same `t` used in Cairo works for Monero.
+//! **What's missing for production**:
+//! - Full CLSAG ring signature construction
+//! - Key image generation and verification
+//! - Change output handling
+//! - Multi-output transaction support
+//! - Proper ring member selection
+//!
+//! **For production use**: Integrate with a proper Monero wallet library that handles
+//! all CLSAG complexities. This module is a proof-of-concept demonstrating that the
+//! same `t` scalar used in Cairo's MSM verification works for Monero signature finalization.
 
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::edwards::EdwardsPoint;
