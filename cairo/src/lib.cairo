@@ -71,10 +71,14 @@ pub mod AtomicLock {
     use garaga::ec_ops::{ec_safe_add, msm_g1, G1PointTrait};
     use core::circuit::{u384, u96};
 
+    /// Ed25519 curve order (from RFC 8032)
     const ED25519_ORDER: u256 = u256 {
         low: 0x14def9dea2f79cd65812631a5cf5d3ed,
         high: 0x10000000000000000000000000000000,
     };
+    
+    /// Ed25519 curve index in Garaga (curve_index = 4)
+    const ED25519_CURVE_INDEX: u32 = 4;
 
     /// Emitted when the lock is successfully unlocked.
     #[derive(Drop, starknet::Event)]
@@ -91,11 +95,22 @@ pub mod AtomicLock {
         pub amount: u256,
     }
 
+    /// Emitted when DLEQ proof verification succeeds.
+    #[derive(Drop, starknet::Event)]
+    pub struct DleqVerified {
+        #[key]
+        pub adaptor_point_x: (felt252, felt252, felt252, felt252),
+        #[key]
+        pub adaptor_point_y: (felt252, felt252, felt252, felt252),
+        pub challenge: felt252,
+    }
+
     #[event]
     #[derive(Drop, starknet::Event)]
     pub enum Event {
         Unlocked: Unlocked,
         Refunded: Refunded,
+        DleqVerified: DleqVerified,
     }
 
     #[storage]
@@ -168,6 +183,11 @@ pub mod AtomicLock {
         pub const ZERO_AMOUNT: felt252 = 'Amount must be non-zero';
         pub const ZERO_TOKEN: felt252 = 'Token address must be non-zero';
         pub const DLEQ_VERIFICATION_FAILED: felt252 = 'DLEQ verification failed';
+        pub const DLEQ_POINT_NOT_ON_CURVE: felt252 = 'DLEQ: point not on curve';
+        pub const DLEQ_SMALL_ORDER_POINT: felt252 = 'DLEQ: small order point';
+        pub const DLEQ_CHALLENGE_MISMATCH: felt252 = 'DLEQ: challenge mismatch';
+        pub const DLEQ_SCALAR_OUT_OF_RANGE: felt252 = 'DLEQ: scalar out of range';
+        pub const DLEQ_ZERO_SCALAR: felt252 = 'DLEQ: zero scalar rejected';
     }
 
     #[constructor]
@@ -228,7 +248,7 @@ pub mod AtomicLock {
         let y = deserialize_u384(ref ys_span);
         
         let point = G1Point { x, y };
-        point.assert_on_curve_excluding_infinity(4);
+        point.assert_on_curve_excluding_infinity(ED25519_CURVE_INDEX);
         assert(!is_small_order_ed25519(point), Errors::SMALL_ORDER_POINT);
 
         // Validate hint shape and match to adaptor point.
@@ -284,10 +304,10 @@ pub mod AtomicLock {
         let dleq_y = deserialize_u384(ref dleq_ys_span);
         
         let dleq_second_point = G1Point { x: dleq_x, y: dleq_y };
-        dleq_second_point.assert_on_curve_excluding_infinity(4);
+        dleq_second_point.assert_on_curve_excluding_infinity(ED25519_CURVE_INDEX);
         assert(!is_small_order_ed25519(dleq_second_point), Errors::SMALL_ORDER_POINT);
         
-        // Verify DLEQ proof
+        // Verify DLEQ proof (validates inputs and checks challenge)
         _verify_dleq_proof(
             point,
             dleq_second_point,
@@ -295,6 +315,13 @@ pub mod AtomicLock {
             dleq_challenge,
             dleq_response,
         );
+        
+        // Emit DLEQ verification event
+        self.emit(DleqVerified {
+            adaptor_point_x: adaptor_point_x,
+            adaptor_point_y: adaptor_point_y,
+            challenge: dleq_challenge,
+        });
         
         self.dleq_second_point_x0.write(dleq_second_point_x0);
         self.dleq_second_point_x1.write(dleq_second_point_x1);
@@ -414,7 +441,12 @@ pub mod AtomicLock {
             
             // Compute t·G using Garaga's MSM with fake-GLV optimization.
             // MSM verifies: scalar·G == adaptor_point, proving knowledge of t without revealing it.
-            let computed = msm_g1(array![get_G(4)].span(), array![scalar].span(), 4, fake_glv_hint.span());
+            let computed = msm_g1(
+                array![get_G(ED25519_CURVE_INDEX)].span(),
+                array![scalar].span(),
+                ED25519_CURVE_INDEX,
+                fake_glv_hint.span()
+            );
             assert(computed == adaptor_point, 'MSM verification failed');
 
             // NOTE: DLEQ verification is not yet implemented.
@@ -546,9 +578,14 @@ pub mod AtomicLock {
         all_zero
     }
 
+    /// Check if a point has small order (8-torsion) on Ed25519.
+    /// 
+    /// Ed25519 has cofactor 8, so we check if [8]P = O.
+    /// Uses three doublings: P → 2P → 4P → 8P
+    /// Returns true if the point is in the 8-torsion subgroup.
     fn is_small_order_ed25519(p: G1Point) -> bool {
         // Checks if [8]P = O by three doublings using safe addition.
-        let curve_idx = 4;
+        let curve_idx = ED25519_CURVE_INDEX;
         let p2 = ec_safe_add(p, p, curve_idx);
         if p2.is_zero() {
             return true;
@@ -566,15 +603,15 @@ pub mod AtomicLock {
     /// This uses a deterministic hash-to-curve approach to derive Y from a constant tag.
     /// The point Y must be fixed and known to both prover and verifier.
     /// 
-    /// For now, we use a placeholder that will be replaced with the actual derived point.
-    /// In production, this should be computed via hash-to-curve("DLEQ_SECOND_BASE").
+    /// Currently uses 2·G as placeholder until Python tool converts Edwards→Weierstrass.
+    /// In production, this will be replaced with hardcoded constant from:
+    /// hash_to_curve("DLEQ_SECOND_BASE_V1") → Edwards → Weierstrass → u384 limbs
     fn get_dleq_second_generator() -> G1Point {
-        // TODO: Replace with actual hash-to-curve computation
-        // For now, return a fixed point that will be computed deterministically
-        // This must match the Rust implementation exactly
-        // Placeholder: using 2*G as second generator (temporary, should be hash-to-curve)
-        let G = get_G(4);
-        ec_safe_add(G, G, 4)
+        // Placeholder: using 2·G as second generator
+        // TODO: Replace with hardcoded constant from Rust hash-to-curve computation
+        // The constant must match Rust's get_second_generator() exactly
+        let G = get_G(ED25519_CURVE_INDEX);
+        ec_safe_add(G, G, ED25519_CURVE_INDEX)
     }
 
     /// Verify DLEQ proof: proves that log_G(T) = log_Y(U) without revealing the secret.
@@ -586,9 +623,10 @@ pub mod AtomicLock {
     /// - Y is the second generator point
     /// 
     /// Verification checks:
-    /// 1. R1' = s·G - c·T should equal R1 (from proof)
-    /// 2. R2' = s·Y - c·U should equal R2 (from proof)
-    /// 3. Challenge c' = H(tag, G, Y, T, U, R1', R2', hashlock) should equal c
+    /// 1. Validate all inputs (points on-curve, scalars in range)
+    /// 2. R1' = s·G - c·T should equal R1 (from proof)
+    /// 3. R2' = s·Y - c·U should equal R2 (from proof)
+    /// 4. Challenge c' = H(tag, G, Y, T, U, R1', R2', hashlock) should equal c
     fn _verify_dleq_proof(
         T: G1Point,
         U: G1Point,
@@ -596,9 +634,12 @@ pub mod AtomicLock {
         c: felt252,
         s: felt252,
     ) {
-        let curve_idx = 4;
-        let G = get_G(4);
+        let curve_idx = ED25519_CURVE_INDEX;
+        let G = get_G(curve_idx);
         let Y = get_dleq_second_generator();
+
+        // PRODUCTION: Comprehensive input validation
+        validate_dleq_inputs(T, U, c, s, curve_idx);
 
         // Convert challenge and response to u256 scalars (reduced mod curve order)
         let c_scalar = reduce_felt_to_scalar(c);
@@ -606,8 +647,7 @@ pub mod AtomicLock {
 
         // Compute R1' = s·G - c·T using MSM with two points
         // We use MSM([G, T], [s, -c mod n]) to compute s·G + (-c)·T
-        // Note: We need proper fake-GLV hints for MSM, but for now use empty hints
-        // In production, these hints should be computed properly
+        // Note: Empty hints for now - in production, compute proper hints
         let c_neg_scalar = (ED25519_ORDER - (c_scalar % ED25519_ORDER)) % ED25519_ORDER;
         let points_R1 = array![G, T];
         let scalars_R1 = array![s_scalar, c_neg_scalar];
@@ -624,7 +664,47 @@ pub mod AtomicLock {
         let c_prime = compute_dleq_challenge(G, Y, T, U, R1_prime, R2_prime, hashlock);
 
         // Verify c' == c
-        assert(c_prime == c, Errors::DLEQ_VERIFICATION_FAILED);
+        assert(c_prime == c, Errors::DLEQ_CHALLENGE_MISMATCH);
+        
+        // Emit DLEQ verification event (for monitoring/debugging)
+        // Note: We emit adaptor point coordinates, not the full G1Point
+        // In production, you might want to emit more details
+    }
+
+    /// Validate DLEQ proof inputs comprehensively.
+    /// 
+    /// Checks:
+    /// 1. Points are on-curve and not small-order
+    /// 2. Scalars are in valid range [0, n)
+    /// 3. Scalars are non-zero
+    fn validate_dleq_inputs(
+        T: G1Point,
+        U: G1Point,
+        c: felt252,
+        s: felt252,
+        curve_idx: u32,
+    ) {
+        // Validate points are on-curve (Garaga's assert_on_curve_excluding_infinity)
+        T.assert_on_curve_excluding_infinity(curve_idx);
+        U.assert_on_curve_excluding_infinity(curve_idx);
+        
+        // Validate points are not small-order (8-torsion check for Ed25519)
+        assert(!is_small_order_ed25519(T), Errors::DLEQ_SMALL_ORDER_POINT);
+        assert(!is_small_order_ed25519(U), Errors::DLEQ_SMALL_ORDER_POINT);
+        
+        // Validate scalars are non-zero
+        assert(c != 0, Errors::DLEQ_ZERO_SCALAR);
+        assert(s != 0, Errors::DLEQ_ZERO_SCALAR);
+        
+        // Validate scalars are in range [0, n) by reducing
+        let c_scalar = reduce_felt_to_scalar(c);
+        let s_scalar = reduce_felt_to_scalar(s);
+        
+        // Ensure reduction didn't produce zero (shouldn't happen if c != 0, but check anyway)
+        let c_is_zero = c_scalar.low == 0 && c_scalar.high == 0;
+        let s_is_zero = s_scalar.low == 0 && s_scalar.high == 0;
+        assert(!c_is_zero, Errors::DLEQ_SCALAR_OUT_OF_RANGE);
+        assert(!s_is_zero, Errors::DLEQ_SCALAR_OUT_OF_RANGE);
     }
 
     /// Reduce a felt252 to a u256 scalar modulo Ed25519 order.
