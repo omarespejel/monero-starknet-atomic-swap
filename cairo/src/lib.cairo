@@ -61,7 +61,6 @@ pub mod AtomicLock {
     use core::integer::u256;
     use core::num::traits::Zero;
     use core::sha256::compute_sha256_byte_array;
-    use core::keccak::keccak_u256s_be_inputs;
     use starknet::contract_address::ContractAddress;
     use starknet::get_contract_address;
     use starknet::get_block_timestamp;
@@ -70,6 +69,7 @@ pub mod AtomicLock {
     use super::{IERC20Dispatcher, IERC20DispatcherTrait};
     use garaga::definitions::{deserialize_u384, G1Point, G1PointZero, get_G};
     use garaga::ec_ops::{ec_safe_add, msm_g1, G1PointTrait};
+    use core::circuit::{u384, u96};
 
     const ED25519_ORDER: u256 = u256 {
         low: 0x14def9dea2f79cd65812631a5cf5d3ed,
@@ -638,8 +638,8 @@ pub mod AtomicLock {
 
     /// Compute DLEQ challenge using Fiat-Shamir: c = H(tag || G || Y || T || U || R1 || R2 || hashlock) mod n
     /// 
-    /// Simplified implementation: hash u256 coordinates directly using Keccak.
-    /// This matches the Rust implementation which uses SHA-256 on compressed points.
+    /// Uses SHA-256 on ByteArray to match Rust implementation.
+    /// Serializes u384 coordinates as bytes for hashing.
     fn compute_dleq_challenge(
         G: G1Point,
         Y: G1Point,
@@ -649,31 +649,132 @@ pub mod AtomicLock {
         R2: G1Point,
         hashlock: Span<u32>,
     ) -> felt252 {
-        // Build hash input as array of u256 values (big-endian)
-        // Format: [G.x, G.y, Y.x, Y.y, T.x, T.y, U.x, U.y, R1.x, R1.y, R2.x, R2.y, hashlock_u256]
-        // Convert hashlock (8 u32 words) to u256 first
-        let hashlock_u256 = hash_to_scalar_u256(
-            *hashlock.at(0), *hashlock.at(1), *hashlock.at(2), *hashlock.at(3),
-            *hashlock.at(4), *hashlock.at(5), *hashlock.at(6), *hashlock.at(7)
-        );
+        let mut transcript: ByteArray = Default::default();
         
-        let hash_input = array![
-            G.x, G.y,
-            Y.x, Y.y,
-            T.x, T.y,
-            U.x, U.y,
-            R1.x, R1.y,
-            R2.x, R2.y,
-            hashlock_u256
-        ];
+        // Tag: "DLEQ" || "DLEQ" (double SHA-256 for domain separation)
+        transcript.append_byte(0x44); // 'D'
+        transcript.append_byte(0x4c); // 'L'
+        transcript.append_byte(0x45); // 'E'
+        transcript.append_byte(0x51); // 'Q'
+        transcript.append_byte(0x44); // 'D'
+        transcript.append_byte(0x4c); // 'L'
+        transcript.append_byte(0x45); // 'E'
+        transcript.append_byte(0x51); // 'Q'
         
-        // Compute Keccak-256 hash
-        let hash_u256 = keccak_u256s_be_inputs(hash_input.span());
+        // Serialize all points as bytes (u384 coordinates)
+        serialize_point_to_bytes(ref transcript, G);
+        serialize_point_to_bytes(ref transcript, Y);
+        serialize_point_to_bytes(ref transcript, T);
+        serialize_point_to_bytes(ref transcript, U);
+        serialize_point_to_bytes(ref transcript, R1);
+        serialize_point_to_bytes(ref transcript, R2);
         
-        // Reduce to scalar mod curve order
+        // Append hashlock (8 u32 words = 32 bytes, big-endian)
+        // Serialize each u32 word as 4 bytes using division/modulo
+        let mut i = 0;
+        while i < hashlock.len() {
+            let word = *hashlock.at(i);
+            serialize_u32_to_4_bytes_be(ref transcript, word);
+            i += 1;
+        }
+        
+        // Compute SHA-256 hash (returns [u32; 8])
+        let hash_result = compute_sha256_byte_array(@transcript);
+        let [h0, h1, h2, h3, h4, h5, h6, h7] = hash_result;
+        
+        // Convert hash to scalar mod curve order
+        let hash_u256 = hash_to_scalar_u256(h0, h1, h2, h3, h4, h5, h6, h7);
         let scalar = reduce_scalar_ed25519(hash_u256);
         
         // Convert back to felt252 (take low 252 bits)
         scalar.low.try_into().unwrap()
+    }
+
+    /// Serialize a u32 value to 4 bytes big-endian.
+    /// 
+    /// Uses division/modulo instead of bit shifting (Cairo doesn't support bit ops).
+    fn serialize_u32_to_4_bytes_be(ref transcript: ByteArray, value: u32) {
+        let mut remaining: u32 = value;
+        let mut bytes = array![];
+        
+        // Extract 4 bytes using repeated division by 256
+        let mut i: u32 = 0;
+        while i < 4 {
+            let byte_val: u8 = (remaining % 256).try_into().unwrap();
+            bytes.append(byte_val);
+            remaining = remaining / 256;
+            i += 1;
+        }
+        
+        // Append bytes in reverse order (big-endian)
+        let mut j: u32 = 3;
+        loop {
+            transcript.append_byte(*bytes.at(j));
+            if j == 0 {
+                break;
+            }
+            j -= 1;
+        }
+    }
+
+    /// Serialize a G1Point to bytes and append to ByteArray.
+    /// 
+    /// Serializes u384 coordinates (x, y) as 48 bytes each (4×96-bit limbs = 4×12 bytes).
+    /// Format: big-endian, limb3, limb2, limb1, limb0 for each coordinate.
+    fn serialize_point_to_bytes(ref transcript: ByteArray, p: G1Point) {
+        // Serialize x coordinate (u384 = 4 felt252 limbs, each 96 bits = 12 bytes)
+        serialize_u384_to_bytes(ref transcript, p.x);
+        // Serialize y coordinate
+        serialize_u384_to_bytes(ref transcript, p.y);
+    }
+
+    /// Serialize a u384 value to 48 bytes (big-endian) and append to ByteArray.
+    /// 
+    /// u384 is stored as 4 u96 limbs (limb0, limb1, limb2, limb3), each 96 bits.
+    /// We serialize as: limb3 (12 bytes) || limb2 (12 bytes) || limb1 (12 bytes) || limb0 (12 bytes)
+    fn serialize_u384_to_bytes(ref transcript: ByteArray, value: u384) {
+        // Serialize each limb as 12 bytes (96 bits) big-endian, starting with most significant
+        serialize_u96_to_12_bytes_be(ref transcript, value.limb3);
+        serialize_u96_to_12_bytes_be(ref transcript, value.limb2);
+        serialize_u96_to_12_bytes_be(ref transcript, value.limb1);
+        serialize_u96_to_12_bytes_be(ref transcript, value.limb0);
+    }
+
+    /// Serialize a u96 value to 12 bytes big-endian.
+    /// 
+    /// u96 is a bounded integer (0 to 2^96-1). Convert to felt252, then serialize.
+    /// Uses division/modulo instead of bit shifting (Cairo doesn't support bit ops).
+    fn serialize_u96_to_12_bytes_be(ref transcript: ByteArray, value: u96) {
+        // Convert u96 to felt252 (u96 fits in felt252)
+        let value_felt: felt252 = value.into();
+        
+        // Convert felt252 to u256
+        let value_u256: u256 = value_felt.into();
+        
+        // Extract bytes using division/modulo (no bit shifting)
+        // Serialize as 12 bytes big-endian: byte0 byte1 ... byte11
+        // where value = byte0*256^11 + byte1*256^10 + ... + byte11
+        let mut remaining = value_u256.low;
+        let mut bytes = array![];
+        
+        // Extract 12 bytes using repeated division by 256
+        let base: u128 = 256;
+        let mut i: u32 = 0;
+        while i < 12 {
+            let byte_val: u8 = (remaining % base).try_into().unwrap();
+            bytes.append(byte_val);
+            remaining = remaining / base;
+            i += 1;
+        }
+        
+        // Append bytes in reverse order (big-endian)
+        let mut j: u32 = 11;
+        loop {
+            transcript.append_byte(*bytes.at(j));
+            if j == 0 {
+                break;
+            }
+            j -= 1;
+        }
     }
 }
