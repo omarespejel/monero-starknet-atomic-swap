@@ -34,13 +34,22 @@ pub mod AtomicLock {
     use core::array::ArrayTrait;
     use core::byte_array::ByteArray;
     use core::integer::u256;
+    use core::num::traits::Zero;
     use core::sha256::compute_sha256_byte_array;
+    use core::panic_with_felt252;
     use starknet::contract_address::ContractAddress;
     use starknet::get_contract_address;
     use starknet::get_block_timestamp;
     use starknet::get_caller_address;
     use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
     use super::{IERC20Dispatcher, IERC20DispatcherTrait};
+    use garaga::definitions::{deserialize_u384, G1Point, G1PointZero, get_G};
+    use garaga::ec_ops::{ec_safe_add, msm_g1, G1PointTrait};
+
+    const ED25519_ORDER: u256 = u256 {
+        low: 0x14def9dea2f79cd65812631a5cf5d3ed,
+        high: 0x10000000000000000000000000000000,
+    };
 
     /// Emitted when the lock is successfully unlocked.
     #[derive(Drop, starknet::Event)]
@@ -75,6 +84,29 @@ pub mod AtomicLock {
         h5: u32,
         h6: u32,
         h7: u32,
+        /// Ed25519 adaptor point (Weierstrass coordinates, 4-limb x/y)
+        adaptor_point_x0: felt252,
+        adaptor_point_x1: felt252,
+        adaptor_point_x2: felt252,
+        adaptor_point_x3: felt252,
+        adaptor_point_y0: felt252,
+        adaptor_point_y1: felt252,
+        adaptor_point_y2: felt252,
+        adaptor_point_y3: felt252,
+        /// DLEQ proof components (placeholders until wired)
+        dleq_challenge: felt252,
+        dleq_response: felt252,
+        /// Fake-GLV hint for single-scalar MSM on Ed25519 (Qx, Qy limbs, s1, s2_encoded)
+        fake_glv_hint0: felt252,
+        fake_glv_hint1: felt252,
+        fake_glv_hint2: felt252,
+        fake_glv_hint3: felt252,
+        fake_glv_hint4: felt252,
+        fake_glv_hint5: felt252,
+        fake_glv_hint6: felt252,
+        fake_glv_hint7: felt252,
+        fake_glv_hint8: felt252,
+        fake_glv_hint9: felt252,
         /// Whether the lock has been opened.
         unlocked: bool,
         /// Timelock expiry (block timestamp).
@@ -102,8 +134,20 @@ pub mod AtomicLock {
         lock_until: u64,
         token: ContractAddress,
         amount: u256,
+        adaptor_point_x0: felt252,
+        adaptor_point_x1: felt252,
+        adaptor_point_x2: felt252,
+        adaptor_point_x3: felt252,
+        adaptor_point_y0: felt252,
+        adaptor_point_y1: felt252,
+        adaptor_point_y2: felt252,
+        adaptor_point_y3: felt252,
+        dleq_challenge: felt252,
+        dleq_response: felt252,
+        fake_glv_hint: Span<felt252>,
     ) {
         assert(hash_words.len() == 8, Errors::INVALID_HASH_LENGTH);
+        assert(fake_glv_hint.len() == 10, 'fake_glv_hint must be 10 felts');
 
         self.h0.write(*hash_words.at(0));
         self.h1.write(*hash_words.at(1));
@@ -113,6 +157,26 @@ pub mod AtomicLock {
         self.h5.write(*hash_words.at(5));
         self.h6.write(*hash_words.at(6));
         self.h7.write(*hash_words.at(7));
+        self.adaptor_point_x0.write(adaptor_point_x0);
+        self.adaptor_point_x1.write(adaptor_point_x1);
+        self.adaptor_point_x2.write(adaptor_point_x2);
+        self.adaptor_point_x3.write(adaptor_point_x3);
+        self.adaptor_point_y0.write(adaptor_point_y0);
+        self.adaptor_point_y1.write(adaptor_point_y1);
+        self.adaptor_point_y2.write(adaptor_point_y2);
+        self.adaptor_point_y3.write(adaptor_point_y3);
+        self.dleq_challenge.write(dleq_challenge);
+        self.dleq_response.write(dleq_response);
+        self.fake_glv_hint0.write(*fake_glv_hint.at(0));
+        self.fake_glv_hint1.write(*fake_glv_hint.at(1));
+        self.fake_glv_hint2.write(*fake_glv_hint.at(2));
+        self.fake_glv_hint3.write(*fake_glv_hint.at(3));
+        self.fake_glv_hint4.write(*fake_glv_hint.at(4));
+        self.fake_glv_hint5.write(*fake_glv_hint.at(5));
+        self.fake_glv_hint6.write(*fake_glv_hint.at(6));
+        self.fake_glv_hint7.write(*fake_glv_hint.at(7));
+        self.fake_glv_hint8.write(*fake_glv_hint.at(8));
+        self.fake_glv_hint9.write(*fake_glv_hint.at(9));
         self.unlocked.write(false);
         self.lock_until.write(lock_until);
         self.depositor.write(get_caller_address());
@@ -167,6 +231,21 @@ pub mod AtomicLock {
             // Prevent re-unlocking.
             assert(!self.unlocked.read(), Errors::ALREADY_UNLOCKED);
 
+            // Reconstruct adaptor point and MSM hint from storage.
+            let adaptor_point = storage_adaptor_point(@self);
+            let fake_glv_hint: Array<felt252> = array![
+                self.fake_glv_hint0.read(),
+                self.fake_glv_hint1.read(),
+                self.fake_glv_hint2.read(),
+                self.fake_glv_hint3.read(),
+                self.fake_glv_hint4.read(),
+                self.fake_glv_hint5.read(),
+                self.fake_glv_hint6.read(),
+                self.fake_glv_hint7.read(),
+                self.fake_glv_hint8.read(),
+                self.fake_glv_hint9.read(),
+            ];
+
             // Compute SHA-256 of provided secret.
             let computed_hash = compute_sha256_byte_array(@secret);
             let [h0, h1, h2, h3, h4, h5, h6, h7] = computed_hash;
@@ -180,6 +259,26 @@ pub mod AtomicLock {
             if h5 != self.h5.read() { return false; }
             if h6 != self.h6.read() { return false; }
             if h7 != self.h7.read() { return false; }
+
+            // Ed25519 scalar check: t·G must equal stored adaptor point.
+            // Enforce adaptor point equality: t·G == stored adaptor point.
+            adaptor_point.assert_on_curve_excluding_infinity(4);
+            if adaptor_point.is_infinity() {
+                panic_with_felt252('adaptor point is infinity');
+            }
+            if is_small_order_ed25519(adaptor_point) {
+                panic_with_felt252('small order point rejected');
+            }
+            let mut scalar = hash_to_scalar_u256(h0, h1, h2, h3, h4, h5, h6, h7);
+            scalar = reduce_scalar_ed25519(scalar);
+            let computed = msm_g1(array![get_G(4)].span(), array![scalar].span(), 4, fake_glv_hint.span());
+            if computed != adaptor_point {
+                return false;
+            }
+
+            // TODO: DLEQ verification (placeholder for now)
+            // let dleq_ok = verify_dleq_stub();
+            // if !dleq_ok { return false; }
 
             // Transfer tokens to caller if configured.
             let amount = self.amount.read();
@@ -220,5 +319,76 @@ pub mod AtomicLock {
             assert(ok, Errors::TOKEN_TRANSFER_FAILED);
             true
         }
+    }
+
+    /// Derive a scalar from SHA-256 words (little endian over 4 limbs).
+    fn hash_to_scalar_u256(h0: u32, h1: u32, h2: u32, h3: u32, h4: u32, h5: u32, h6: u32, h7: u32) -> u256 {
+        let base: u256 = u256 { low: 0x1_0000_0000, high: 0 };
+        let low = u256 { low: h0.into(), high: 0 }
+            + base * u256 { low: h1.into(), high: 0 }
+            + base * base * u256 { low: h2.into(), high: 0 }
+            + base * base * base * u256 { low: h3.into(), high: 0 };
+        let high = u256 { low: h4.into(), high: 0 }
+            + base * u256 { low: h5.into(), high: 0 }
+            + base * base * u256 { low: h6.into(), high: 0 }
+            + base * base * base * u256 { low: h7.into(), high: 0 };
+        u256 { low: low.low, high: high.low }
+    }
+
+    fn reduce_scalar_ed25519(scalar: u256) -> u256 {
+        scalar % ED25519_ORDER
+    }
+
+    fn storage_adaptor_point(self: @ContractState) -> G1Point {
+        let mut xs = array![
+            self.adaptor_point_x0.read(),
+            self.adaptor_point_x1.read(),
+            self.adaptor_point_x2.read(),
+            self.adaptor_point_x3.read()
+        ];
+        let mut xs_span = xs.span();
+        let x = deserialize_u384(ref xs_span);
+
+        let mut ys = array![
+            self.adaptor_point_y0.read(),
+            self.adaptor_point_y1.read(),
+            self.adaptor_point_y2.read(),
+            self.adaptor_point_y3.read()
+        ];
+        let mut ys_span = ys.span();
+        let y = deserialize_u384(ref ys_span);
+        G1Point { x, y }
+    }
+
+    fn is_zero_point(p: @G1Point) -> bool {
+        *p == G1PointZero::zero()
+    }
+
+    fn is_zero_hint(hint: Span<felt252>) -> bool {
+        let len = hint.len();
+        let mut all_zero = true;
+        let mut i = 0;
+        while i < len {
+            if *hint.at(i) != 0 {
+                all_zero = false;
+            }
+            i += 1;
+        };
+        all_zero
+    }
+
+    fn is_small_order_ed25519(p: G1Point) -> bool {
+        // Checks if [8]P = O by three doublings using safe addition.
+        let curve_idx = 4;
+        let p2 = ec_safe_add(p, p, curve_idx);
+        if p2.is_zero() {
+            return true;
+        }
+        let p4 = ec_safe_add(p2, p2, curve_idx);
+        if p4.is_zero() {
+            return true;
+        }
+        let p8 = ec_safe_add(p4, p4, curve_idx);
+        p8.is_zero()
     }
 }
