@@ -6,8 +6,11 @@
 //! Also includes adaptor signature support for Monero atomic swaps.
 
 pub mod adaptor;
+pub mod dleq;
 pub mod starknet;
 pub mod monero;
+
+pub use dleq::{generate_dleq_proof, DleqProof};
 #[cfg(feature = "full-integration")]
 pub mod starknet_full;
 #[cfg(feature = "full-integration")]
@@ -36,6 +39,10 @@ pub struct SwapSecret {
     pub cairo_secret_literal: String,
     pub adaptor_point_x_limbs: [String; 4],
     pub adaptor_point_y_limbs: [String; 4],
+    pub dleq_second_point_x_limbs: [String; 4],
+    pub dleq_second_point_y_limbs: [String; 4],
+    pub dleq_challenge: String,
+    pub dleq_response: String,
     pub fake_glv_hint: [String; 10],
 }
 
@@ -217,12 +224,30 @@ pub fn generate_swap_secret() -> SwapSecret {
 
     // SHA-256 hash.
     let hash_bytes: [u8; 32] = Sha256::digest(&secret_bytes).into();
+    let hashlock: [u8; 32] = hash_bytes;
 
     // Convert to 8 x u32 (big-endian).
     let hash_words: [u32; 8] = core::array::from_fn(|i| {
         let start = i * 4;
         u32::from_be_bytes(hash_bytes[start..start + 4].try_into().unwrap())
     });
+
+    // Generate DLEQ proof
+    let adaptor_point_edwards = ED25519_BASEPOINT_POINT * scalar;
+    let dleq_proof = generate_dleq_proof(&scalar, &adaptor_point_edwards, &hashlock);
+
+    // Convert DLEQ second point to Weierstrass and get limbs
+    // TODO: Use Python tool to convert Edwards to Weierstrass for consistency
+    // For now, use placeholder - in production, call Python tool similar to adaptor point
+    let dleq_second_point_x_limbs = ["0x0", "0x0", "0x0", "0x0"].map(str::to_string);
+    let dleq_second_point_y_limbs = ["0x0", "0x0", "0x0", "0x0"].map(str::to_string);
+    
+    // Format DLEQ challenge and response as hex strings (felt252 in Cairo)
+    // Convert scalar bytes to hex, then format as felt252 (big-endian u256)
+    let challenge_bytes = dleq_proof.challenge.to_bytes();
+    let response_bytes = dleq_proof.response.to_bytes();
+    let dleq_challenge = format!("0x{}", hex::encode(challenge_bytes));
+    let dleq_response = format!("0x{}", hex::encode(response_bytes));
 
     // Format for Cairo.
     let cairo_hash_literal = format!(
@@ -249,6 +274,10 @@ pub fn generate_swap_secret() -> SwapSecret {
         cairo_secret_literal,
         adaptor_point_x_limbs,
         adaptor_point_y_limbs,
+        dleq_second_point_x_limbs,
+        dleq_second_point_y_limbs,
+        dleq_challenge,
+        dleq_response,
         fake_glv_hint,
     }
 }
