@@ -451,11 +451,12 @@ pub mod AtomicLock {
             );
             assert(computed == adaptor_point, 'MSM verification failed');
 
-            // NOTE: DLEQ verification is not yet implemented.
-            // The current version does not cryptographically bind the hashlock (H) and adaptor point (T).
-            // DLEQ proofs are planned for a future version to prove: ∃t: SHA-256(t) = H ∧ t·G = T
-            // For now, the protocol relies on hashlock + MSM verification, which provides strong
-            // security guarantees but does not prove the relationship between H and T.
+            // NOTE: DLEQ verification is performed in the constructor.
+            // The DLEQ proof cryptographically binds the hashlock (H) and adaptor point (T)
+            // by proving: ∃t: SHA-256(t) = H ∧ t·G = T
+            // The proof is verified during contract deployment (see constructor).
+            // This unlock function only verifies the hashlock and MSM, as the DLEQ proof
+            // was already validated when the contract was created.
 
             // Transfer tokens to caller if configured.
             let amount = self.amount.read();
