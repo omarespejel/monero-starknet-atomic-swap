@@ -1,0 +1,6 @@
+[snfoundry]
+project = "."
+
+[snforge]
+exit_first = false
+

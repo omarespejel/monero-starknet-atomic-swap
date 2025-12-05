@@ -1,0 +1,15 @@
+# Rust
+rust/target/
+
+# Cairo
+cairo/target/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Context bundles
+*-context-*.txt
+/target
+generate-context.sh
