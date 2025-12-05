@@ -6,6 +6,8 @@
 //! Also includes adaptor signature support for Monero atomic swaps.
 
 pub mod adaptor;
+pub mod starknet;
+pub mod monero;
 
 use std::process::Command;
 use std::path::PathBuf;
