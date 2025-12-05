@@ -62,6 +62,25 @@ mod dleq_tests {
             0x110538332d2eae09bf756dfd87431ded7
         ].span();
         
+        // Placeholder DLEQ hints (10 felts each)
+        // 
+        // ⚠️ PRODUCTION BLOCKER: These are placeholder hints!
+        // 
+        // For production deployment, you MUST generate real hints using:
+        //   tools/generate_dleq_hints.py
+        // 
+        // Real hints require:
+        //   - s_scalar (DLEQ response scalar)
+        //   - c_scalar (DLEQ challenge scalar)
+        //   - T (adaptor point)
+        //   - U (DLEQ second point)
+        // 
+        // See GENERATE_MSM_HINTS_GUIDE.md for detailed instructions.
+        // 
+        // These empty hints will cause MSM verification to fail in production.
+        // They are used here only to test contract structure validation.
+        let empty_hint = array![0, 0, 0, 0, 0, 0, 0, 0, 0, 0].span();
+        
         // This will fail DLEQ verification (expected), but tests that structure is accepted
         deploy_with_dleq(
             hashlock,
@@ -73,7 +92,11 @@ mod dleq_tests {
             second_x,
             second_y,
             (dleq_challenge, dleq_response),
-            hint
+            hint,
+            empty_hint, // s_hint_for_g
+            empty_hint, // s_hint_for_y
+            empty_hint, // c_neg_hint_for_t
+            empty_hint  // c_neg_hint_for_u
         );
     }
 
@@ -125,6 +148,10 @@ mod dleq_tests {
             0x110538332d2eae09bf756dfd87431ded7
         ].span();
         
+        // Placeholder DLEQ hints (10 felts each)
+        // NOTE: For production, generate proper hints using tools/generate_dleq_hints.py
+        let empty_hint = array![0, 0, 0, 0, 0, 0, 0, 0, 0, 0].span();
+        
         // Deploy contract - should fail in constructor due to invalid DLEQ proof
         // Expected: DLEQ_CHALLENGE_MISMATCH error
         deploy_with_dleq(
@@ -137,11 +164,23 @@ mod dleq_tests {
             second_x,
             second_y,
             (invalid_challenge, invalid_response),
-            hint
+            hint,
+            empty_hint, // s_hint_for_g
+            empty_hint, // s_hint_for_y
+            empty_hint, // c_neg_hint_for_t
+            empty_hint  // c_neg_hint_for_u
         );
     }
 
     /// Helper function to deploy contract with full DLEQ data
+    /// 
+    /// DLEQ hints are required for production-grade MSM operations:
+    /// - s_hint_for_g: Fake-GLV hint for s·G
+    /// - s_hint_for_y: Fake-GLV hint for s·Y
+    /// - c_neg_hint_for_t: Fake-GLV hint for (-c)·T
+    /// - c_neg_hint_for_u: Fake-GLV hint for (-c)·U
+    /// 
+    /// Generate proper hints using tools/generate_dleq_hints.py
     fn deploy_with_dleq(
         expected_hash: Span<u32>,
         lock_until: u64,
@@ -153,6 +192,10 @@ mod dleq_tests {
         dleq_second_point_y: (felt252, felt252, felt252, felt252),
         dleq: (felt252, felt252),
         fake_glv_hint: Span<felt252>,
+        dleq_s_hint_for_g: Span<felt252>,
+        dleq_s_hint_for_y: Span<felt252>,
+        dleq_c_neg_hint_for_t: Span<felt252>,
+        dleq_c_neg_hint_for_u: Span<felt252>,
     ) -> atomic_lock::IAtomicLockDispatcher {
         let declare_res = declare("AtomicLock");
         let contract = declare_res.unwrap().contract_class();
@@ -193,8 +236,14 @@ mod dleq_tests {
         Serde::serialize(@dleq_c, ref calldata);
         Serde::serialize(@dleq_r, ref calldata);
         
-        // Fake-GLV hint
+        // Fake-GLV hint (for adaptor point)
         Serde::serialize(@fake_glv_hint, ref calldata);
+        
+        // DLEQ hints (for MSM operations in verification)
+        Serde::serialize(@dleq_s_hint_for_g, ref calldata);
+        Serde::serialize(@dleq_s_hint_for_y, ref calldata);
+        Serde::serialize(@dleq_c_neg_hint_for_t, ref calldata);
+        Serde::serialize(@dleq_c_neg_hint_for_u, ref calldata);
 
         let (addr, _) = contract.deploy(@calldata).unwrap();
         IAtomicLockDispatcher { contract_address: addr }
