@@ -52,7 +52,6 @@ pub mod AtomicLock {
     use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
     use super::{IERC20Dispatcher, IERC20DispatcherTrait};
     use garaga::definitions::{deserialize_u384, G1Point, G1PointZero, get_G};
-    use garaga::definitions::types::u384;
     use garaga::ec_ops::{ec_safe_add, msm_g1, G1PointTrait};
 
     const ED25519_ORDER: u256 = u256 {
@@ -148,20 +147,17 @@ pub mod AtomicLock {
         lock_until: u64,
         token: ContractAddress,
         amount: u256,
-        adaptor_point_x0: felt252,
-        adaptor_point_x1: felt252,
-        adaptor_point_x2: felt252,
-        adaptor_point_x3: felt252,
-        adaptor_point_y0: felt252,
-        adaptor_point_y1: felt252,
-        adaptor_point_y2: felt252,
-        adaptor_point_y3: felt252,
-        dleq_challenge: felt252,
-        dleq_response: felt252,
+        adaptor_point_x: (felt252, felt252, felt252, felt252),
+        adaptor_point_y: (felt252, felt252, felt252, felt252),
+        dleq: (felt252, felt252),
         fake_glv_hint: Span<felt252>,
     ) {
         assert(hash_words.len() == 8, Errors::INVALID_HASH_LENGTH);
         assert(fake_glv_hint.len() == 10, Errors::INVALID_HINT_LENGTH);
+
+        let (adaptor_point_x0, adaptor_point_x1, adaptor_point_x2, adaptor_point_x3) = adaptor_point_x;
+        let (adaptor_point_y0, adaptor_point_y1, adaptor_point_y2, adaptor_point_y3) = adaptor_point_y;
+        let (dleq_challenge, dleq_response) = dleq;
 
         // Validate adaptor point not zero.
         let x_is_zero =
@@ -171,28 +167,38 @@ pub mod AtomicLock {
         assert(!x_is_zero && !y_is_zero, Errors::ZERO_ADAPTOR_POINT);
 
         // Reconstruct point and validate curve/small-order.
-        let point = G1Point {
-            x: u384 { limb0: adaptor_point_x0, limb1: adaptor_point_x1, limb2: adaptor_point_x2, limb3: adaptor_point_x3 },
-            y: u384 { limb0: adaptor_point_y0, limb1: adaptor_point_y1, limb2: adaptor_point_y2, limb3: adaptor_point_y3 },
-        };
+        let mut xs_array = array![adaptor_point_x0, adaptor_point_x1, adaptor_point_x2, adaptor_point_x3];
+        let mut xs_span = xs_array.span();
+        let x = deserialize_u384(ref xs_span);
+        
+        let mut ys_array = array![adaptor_point_y0, adaptor_point_y1, adaptor_point_y2, adaptor_point_y3];
+        let mut ys_span = ys_array.span();
+        let y = deserialize_u384(ref ys_span);
+        
+        let point = G1Point { x, y };
         point.assert_on_curve_excluding_infinity(4);
         assert(!is_small_order_ed25519(point), Errors::SMALL_ORDER_POINT);
 
         // Validate hint shape and match to adaptor point.
-        let hint_q = G1Point {
-            x: u384 {
-                limb0: *fake_glv_hint.at(0),
-                limb1: *fake_glv_hint.at(1),
-                limb2: *fake_glv_hint.at(2),
-                limb3: *fake_glv_hint.at(3),
-            },
-            y: u384 {
-                limb0: *fake_glv_hint.at(4),
-                limb1: *fake_glv_hint.at(5),
-                limb2: *fake_glv_hint.at(6),
-                limb3: *fake_glv_hint.at(7),
-            },
-        };
+        let mut hint_xs_array = array![
+            *fake_glv_hint.at(0),
+            *fake_glv_hint.at(1),
+            *fake_glv_hint.at(2),
+            *fake_glv_hint.at(3)
+        ];
+        let mut hint_xs_span = hint_xs_array.span();
+        let hint_x = deserialize_u384(ref hint_xs_span);
+        
+        let mut hint_ys_array = array![
+            *fake_glv_hint.at(4),
+            *fake_glv_hint.at(5),
+            *fake_glv_hint.at(6),
+            *fake_glv_hint.at(7)
+        ];
+        let mut hint_ys_span = hint_ys_array.span();
+        let hint_y = deserialize_u384(ref hint_ys_span);
+        
+        let hint_q = G1Point { x: hint_x, y: hint_y };
         assert(hint_q == point, Errors::HINT_Q_MISMATCH);
 
         let s1 = *fake_glv_hint.at(8);
