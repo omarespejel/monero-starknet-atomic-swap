@@ -1,7 +1,10 @@
-/// # AtomicLock Contract - XMR Sidecar Lock for Mainnet L2 Assets
+/// # AtomicLock Contract - Prototype Implementation / Reference PoC
 ///
-/// Production-ready Starknet contract for XMR↔️Starknet atomic swaps with Garaga MSM
+/// Prototype Starknet contract for XMR↔️Starknet atomic swaps with Garaga MSM
 /// verification on Ed25519 (Weierstrass form, curve_index=4).
+///
+/// **Status**: This is a prototype implementation and reference proof-of-concept.
+/// Production-ready status requires security audit and DLEQ proof implementation.
 ///
 /// **Hard Invariants (Enforced at Deployment)**:
 /// - Constructor: adaptor point must be non-zero, on-curve, not small-order; FakeGLV

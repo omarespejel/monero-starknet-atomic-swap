@@ -1130,5 +1130,5 @@ Based on this spec, you should also create:
    - Stagenet setup guide
    - RPC commands reference
 
-This spec is production-ready. Start Week 1 now.
+This spec is a prototype implementation / reference PoC. Production-ready status requires security audit and DLEQ proof implementation.
 

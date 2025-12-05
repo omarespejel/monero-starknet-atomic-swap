@@ -4,7 +4,7 @@ Trustless atomic swap protocol between Monero and Starknet using DLEQ proofs and
 
 ## Overview
 
-This project implements a production-ready atomic swap protocol that allows trustless exchange of Monero (XMR) and Starknet L2 assets. The protocol uses:
+This project implements a **prototype implementation / reference PoC** of an atomic swap protocol for trustless exchange of Monero (XMR) and Starknet L2 assets. The protocol uses:
 
 - **SHA-256 Hashlock**: Cryptographic lock on Starknet
 - **Ed25519 Adaptor Signatures**: Monero-side signature binding
@@ -138,20 +138,45 @@ cargo test
 cargo test --test integration_test
 ```
 
-## Security
+## Status: Prototype Implementation / Reference PoC
 
-### Hard Invariants
+**⚠️ This is a prototype implementation and reference proof-of-concept. It is NOT production-ready.**
 
+**Production-ready status requires:**
+- ✅ Security audit by qualified auditors
+- ⚠️ DLEQ proof implementation (currently deferred)
+- ⚠️ Full end-to-end testing on testnets
+- ⚠️ Complete integration with Starknet and Monero networks
+
+### Current Implementation Status
+
+**Completed:**
+- ✅ Cairo contract with hard invariants (MSM verification, timelock, refund rules)
+- ✅ Rust adaptor signature logic
+- ✅ Integration scaffold for Starknet and Monero
+- ✅ Comprehensive test suite
+
+**In Progress:**
+- ⚠️ Account signing implementation
+- ⚠️ Monero transaction serialization
+- ⚠️ End-to-end testnet testing
+
+**Deferred:**
+- ⚠️ DLEQ proof implementation (explicitly deferred to post-audit phase)
+
+### Security Considerations
+
+**Hard Invariants (Implemented):**
 - **Constructor**: Adaptor point must be non-zero, on-curve, not small-order
 - **MSM Verification**: Mandatory check that `t·G == adaptor_point`
 - **Timelock**: `lock_until` must be in the future
 - **Refund Rules**: Only depositor, only after expiry, only if locked
 
-### Known Limitations
-
+**Known Limitations:**
 - **snforge Constructor Panics**: Constructor validation tests are marked as FAIL by snforge v0.53.0, but they correctly panic (tooling limitation)
 - **Starknet Integration**: Contract deployment and event watching require full starknet-rs integration (currently scaffolded)
 - **Monero Integration**: Transaction creation and broadcasting require monero-rs integration (currently scaffolded)
+- **DLEQ Proofs**: Not yet implemented (deferred to post-audit phase)
 
 ## Roadmap
 
