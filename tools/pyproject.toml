@@ -1,0 +1,44 @@
+[project]
+name = "xmr-starknet-tools"
+version = "0.1.0"
+description = "Test data generation tools for XMR-Starknet atomic swaps"
+requires-python = ">=3.10,<3.11"
+readme = "README.md"
+license = { text = "MIT" }
+dependencies = [
+    "garaga @ git+https://github.com/keep-starknet-strange/garaga@v1.0.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "black>=24.0",
+    "ruff>=0.1.0",
+]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = []
+only-include = ["generate_ed25519_test_data.py", "README.md"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "black>=24.0",
+    "ruff>=0.1.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.black]
+line-length = 88
+target-version = ["py310"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
