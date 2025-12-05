@@ -4,6 +4,7 @@ This repo demonstrates a cross-chain hashlock primitive:
 
 - `rust/`: Generates a Monero-compatible scalar and its SHA-256 digest, formatted for Cairo.
 - `cairo/`: Starknet contract `AtomicLock` that stores the target hash and unlocks when given the correct secret, plus tests.
+- `tools/`: Python (uv) generator for Ed25519 adaptor points and Garaga FakeGlv hints used in MSM verification.
 
 ## Rust (secret generator)
 
@@ -22,7 +23,7 @@ The JSON output contains:
 ```bash
 cd cairo
 scarb build
-scarb test   # uses cairo-test plugin; see notes below
+snforge test   # uses snfoundry; cairo-test is not used here
 ```
 
 - Constructor expects 8×u32 hash words, a timelock (`lock_until`), token address, and amount (amount/token can be zero to skip transfers).
@@ -31,9 +32,20 @@ scarb test   # uses cairo-test plugin; see notes below
 
 ### Tests
 
-`tests/test_atomic_lock.cairo` shows an end-to-end flow. Replace the placeholders with fresh values from `cargo run -- --format json`.
+`tests/test_atomic_lock.cairo` covers:
+- Hashlock happy path (`test_msm_check_with_real_data`, `test_rust_generated_secret`, `test_cryptographic_handshake`)
+- Negative paths (`test_wrong_secret_fails`, `test_wrong_hint_fails` expects FakeGLV panic, `test_cannot_unlock_twice`, refund)
+- Garaga import sanity checks.
 
-If `scarb test` warns about `cairo-test` plugin, ensure `[dev-dependencies] cairo_test = "2.14.0"` is present (already added). For `snforge`, use `snfoundry.toml` in `cairo/`.
+MSM uses Garaga’s FakeGlvHint (10 felts: Q.x limbs, Q.y limbs, s1, s2_encoded) on Ed25519 in Weierstrass form. Scalars are derived as SHA-256(secret) (8×u32, little-endian limbs) then reduced mod the Ed25519 order, matching `hash_to_scalar_u256` + `reduce_scalar_ed25519` on-chain.
+
+To regenerate test vectors:
+```bash
+cd tools
+source .venv/bin/activate
+uv run python generate_ed25519_test_data.py --save
+```
+Then update `cairo/tests/test_atomic_lock.cairo` with the new `hash_words`, `x_limbs`, `y_limbs`, and `cairo_array` (FakeGlvHint) from `tools/ed25519_test_data.json`.
 
 ## Repository layout
 

@@ -12,16 +12,82 @@ mod tests {
 
     #[test]
     fn test_cryptographic_handshake() {
-        let secret_input: ByteArray = "test_secret";
-        let hash_words = compute_sha256_byte_array(@secret_input);
-        let [h0, h1, h2, h3, h4, h5, h6, h7] = hash_words;
-        let expected_hash = array![h0, h1, h2, h3, h4, h5, h6, h7].span();
+        // Use real secret/hash from generator to satisfy MSM.
+        let expected_hash = array![
+            3606997102_u32, 3756602050_u32, 1811765011_u32, 1576844653_u32,
+            61256116_u32, 2110839708_u32, 540553134_u32, 3341226206_u32
+        ].span();
+        let mut secret_input: ByteArray = Default::default();
+        secret_input.append_byte(0x09_u8);
+        secret_input.append_byte(0x9d_u8);
+        secret_input.append_byte(0xd9_u8);
+        secret_input.append_byte(0xb7_u8);
+        secret_input.append_byte(0x3e_u8);
+        secret_input.append_byte(0x2e_u8);
+        secret_input.append_byte(0x84_u8);
+        secret_input.append_byte(0xdb_u8);
+        secret_input.append_byte(0x47_u8);
+        secret_input.append_byte(0x2b_u8);
+        secret_input.append_byte(0x34_u8);
+        secret_input.append_byte(0x2d_u8);
+        secret_input.append_byte(0xc3_u8);
+        secret_input.append_byte(0xab_u8);
+        secret_input.append_byte(0x05_u8);
+        secret_input.append_byte(0x20_u8);
+        secret_input.append_byte(0xf6_u8);
+        secret_input.append_byte(0x54_u8);
+        secret_input.append_byte(0xfd_u8);
+        secret_input.append_byte(0x8a_u8);
+        secret_input.append_byte(0x81_u8);
+        secret_input.append_byte(0xd6_u8);
+        secret_input.append_byte(0x44_u8);
+        secret_input.append_byte(0x18_u8);
+        secret_input.append_byte(0x04_u8);
+        secret_input.append_byte(0x77_u8);
+        secret_input.append_byte(0x73_u8);
+        secret_input.append_byte(0x0a_u8);
+        secret_input.append_byte(0x90_u8);
+        secret_input.append_byte(0xaf_u8);
+        secret_input.append_byte(0x89_u8);
+        secret_input.append_byte(0x00_u8);
 
-        let dispatcher = deploy_with(expected_hash, 0_u64, 0.try_into().unwrap(), u256 { low: 0, high: 0 });
+        let x_limbs = (
+            0x460f72719199c63ec398673f,
+            0xf27a4af146a52a7dbdeb4cfb,
+            0x5f9c70ec759789a0,
+            0x0
+        );
+        let y_limbs = (
+            0x6b43e318a2a02d8241549109,
+            0x40e30afa4cce98c21e473980,
+            0x5e243e1eed1aa575,
+            0x0
+        );
+        let hint = array![
+            0x460f72719199c63ec398673f,
+            0xf27a4af146a52a7dbdeb4cfb,
+            0x5f9c70ec759789a0,
+            0x0,
+            0x6b43e318a2a02d8241549109,
+            0x40e30afa4cce98c21e473980,
+            0x5e243e1eed1aa575,
+            0x0,
+            0x10b51d41eab43e36d3ac30cda9707f92,
+            0x110538332d2eae09bf756dfd87431ded7
+        ].span();
 
-        // Call verify_and_unlock with the exact secret from Rust.
+        let dispatcher = deploy_with_full(
+            expected_hash,
+            0_u64,
+            0.try_into().unwrap(),
+            u256 { low: 0, high: 0 },
+            x_limbs,
+            y_limbs,
+            (0, 0),
+            hint,
+        );
+
         let success = dispatcher.verify_and_unlock(secret_input);
-
         assert(success, 'unlock fail');
         assert(dispatcher.is_unlocked(), 'state');
     }
@@ -53,54 +119,81 @@ mod tests {
 
     #[test]
     fn test_rust_generated_secret() {
-        // Values from: cd rust && cargo run -- --format json
+        // Values from Python generator
         let expected_hash = array![
-            3566193431_u32,
-            2923666528_u32,
-            179944073_u32,
-            541302880_u32,
-            2559354097_u32,
-            2501894999_u32,
-            3870367010_u32,
-            4173040258_u32
+            3606997102_u32, 3756602050_u32, 1811765011_u32, 1576844653_u32,
+            61256116_u32, 2110839708_u32, 540553134_u32, 3341226206_u32
         ].span();
         let mut secret_input: ByteArray = Default::default();
-        secret_input.append_byte(0x99_u8);
-        secret_input.append_byte(0xdd_u8);
-        secret_input.append_byte(0x9b_u8);
-        secret_input.append_byte(0x73_u8);
-        secret_input.append_byte(0xe2_u8);
-        secret_input.append_byte(0xe8_u8);
-        secret_input.append_byte(0x4d_u8);
-        secret_input.append_byte(0xb4_u8);
-        secret_input.append_byte(0x72_u8);
-        secret_input.append_byte(0xb3_u8);
-        secret_input.append_byte(0x42_u8);
-        secret_input.append_byte(0xdc_u8);
-        secret_input.append_byte(0x3a_u8);
-        secret_input.append_byte(0xb0_u8);
-        secret_input.append_byte(0x52_u8);
-        secret_input.append_byte(0x0f_u8);
-        secret_input.append_byte(0x65_u8);
-        secret_input.append_byte(0x4f_u8);
-        secret_input.append_byte(0xd8_u8);
-        secret_input.append_byte(0xa8_u8);
-        secret_input.append_byte(0x1d_u8);
-        secret_input.append_byte(0x64_u8);
-        secret_input.append_byte(0x41_u8);
-        secret_input.append_byte(0x80_u8);
+        secret_input.append_byte(0x09_u8);
+        secret_input.append_byte(0x9d_u8);
+        secret_input.append_byte(0xd9_u8);
+        secret_input.append_byte(0xb7_u8);
+        secret_input.append_byte(0x3e_u8);
+        secret_input.append_byte(0x2e_u8);
+        secret_input.append_byte(0x84_u8);
+        secret_input.append_byte(0xdb_u8);
         secret_input.append_byte(0x47_u8);
+        secret_input.append_byte(0x2b_u8);
+        secret_input.append_byte(0x34_u8);
+        secret_input.append_byte(0x2d_u8);
+        secret_input.append_byte(0xc3_u8);
+        secret_input.append_byte(0xab_u8);
+        secret_input.append_byte(0x05_u8);
+        secret_input.append_byte(0x20_u8);
+        secret_input.append_byte(0xf6_u8);
+        secret_input.append_byte(0x54_u8);
+        secret_input.append_byte(0xfd_u8);
+        secret_input.append_byte(0x8a_u8);
+        secret_input.append_byte(0x81_u8);
+        secret_input.append_byte(0xd6_u8);
+        secret_input.append_byte(0x44_u8);
+        secret_input.append_byte(0x18_u8);
+        secret_input.append_byte(0x04_u8);
         secret_input.append_byte(0x77_u8);
-        secret_input.append_byte(0xb3_u8);
+        secret_input.append_byte(0x73_u8);
         secret_input.append_byte(0x0a_u8);
         secret_input.append_byte(0x90_u8);
         secret_input.append_byte(0xaf_u8);
         secret_input.append_byte(0x89_u8);
         secret_input.append_byte(0x00_u8);
 
-        let dispatcher = deploy_with(expected_hash, 0_u64, 0.try_into().unwrap(), u256 { low: 0, high: 0 });
+        let x_limbs = (
+            0x460f72719199c63ec398673f,
+            0xf27a4af146a52a7dbdeb4cfb,
+            0x5f9c70ec759789a0,
+            0x0
+        );
+        let y_limbs = (
+            0x6b43e318a2a02d8241549109,
+            0x40e30afa4cce98c21e473980,
+            0x5e243e1eed1aa575,
+            0x0
+        );
+        let hint = array![
+            0x460f72719199c63ec398673f,
+            0xf27a4af146a52a7dbdeb4cfb,
+            0x5f9c70ec759789a0,
+            0x0,
+            0x6b43e318a2a02d8241549109,
+            0x40e30afa4cce98c21e473980,
+            0x5e243e1eed1aa575,
+            0x0,
+            0x10b51d41eab43e36d3ac30cda9707f92,
+            0x110538332d2eae09bf756dfd87431ded7
+        ].span();
 
-        // Verify
+        let dispatcher = deploy_with_full(
+            expected_hash,
+            0_u64,
+            0.try_into().unwrap(),
+            u256 { low: 0, high: 0 },
+            x_limbs,
+            y_limbs,
+            (0, 0),
+            hint,
+        );
+
         let success = dispatcher.verify_and_unlock(secret_input);
         assert(success, 'hash mismatch');
     }
@@ -112,6 +205,114 @@ mod tests {
         let dispatcher = deploy_with(expected_hash, 0_u64, 0.try_into().unwrap(), u256 { low: 0, high: 0 });
         let success = dispatcher.refund();
         assert(success, 'refund');
+    }
+
+    #[test]
+    fn test_msm_check_with_real_data() {
+        // Hash/secret from Python generator (ed25519_test_data.json)
+        let expected_hash = array![3606997102_u32, 3756602050_u32, 1811765011_u32, 1576844653_u32, 61256116_u32, 2110839708_u32, 540553134_u32, 3341226206_u32].span();
+        let mut secret_input: ByteArray = Default::default();
+        secret_input.append_byte(0x09_u8); secret_input.append_byte(0x9d_u8);
+        secret_input.append_byte(0xd9_u8); secret_input.append_byte(0xb7_u8);
+        secret_input.append_byte(0x3e_u8); secret_input.append_byte(0x2e_u8);
+        secret_input.append_byte(0x84_u8); secret_input.append_byte(0xdb_u8);
+        secret_input.append_byte(0x47_u8); secret_input.append_byte(0x2b_u8);
+        secret_input.append_byte(0x34_u8); secret_input.append_byte(0x2d_u8);
+        secret_input.append_byte(0xc3_u8); secret_input.append_byte(0xab_u8);
+        secret_input.append_byte(0x05_u8); secret_input.append_byte(0x20_u8);
+        secret_input.append_byte(0xf6_u8); secret_input.append_byte(0x54_u8);
+        secret_input.append_byte(0xfd_u8); secret_input.append_byte(0x8a_u8);
+        secret_input.append_byte(0x81_u8); secret_input.append_byte(0xd6_u8);
+        secret_input.append_byte(0x44_u8); secret_input.append_byte(0x18_u8);
+        secret_input.append_byte(0x04_u8); secret_input.append_byte(0x77_u8);
+        secret_input.append_byte(0x73_u8); secret_input.append_byte(0x0a_u8);
+        secret_input.append_byte(0x90_u8); secret_input.append_byte(0xaf_u8);
+        secret_input.append_byte(0x89_u8); secret_input.append_byte(0x00_u8);
+
+        // Real adaptor point and hint from generator
+        let x_limbs = (0x460f72719199c63ec398673f, 0xf27a4af146a52a7dbdeb4cfb, 0x5f9c70ec759789a0, 0x0);
+        let y_limbs = (0x6b43e318a2a02d8241549109, 0x40e30afa4cce98c21e473980, 0x5e243e1eed1aa575, 0x0);
+        // Fake-GLV hint (Q.x limbs, Q.y limbs, s1, s2_encoded)
+        let hint = array![
+            0x460f72719199c63ec398673f,
+            0xf27a4af146a52a7dbdeb4cfb,
+            0x5f9c70ec759789a0,
+            0x0,
+            0x6b43e318a2a02d8241549109,
+            0x40e30afa4cce98c21e473980,
+            0x5e243e1eed1aa575,
+            0x0,
+            0x10b51d41eab43e36d3ac30cda9707f92,
+            0x110538332d2eae09bf756dfd87431ded7
+        ].span();
+
+        let dispatcher = deploy_with_full(
+            expected_hash,
+            0_u64,
+            0.try_into().unwrap(),
+            u256 { low: 0, high: 0 },
+            x_limbs,
+            y_limbs,
+            (0, 0),
+            hint,
+        );
+
+        let success = dispatcher.verify_and_unlock(secret_input);
+        assert(success, 'MSM check failed');
+        assert(dispatcher.is_unlocked(), 'unlock failed');
+    }
+
+    #[test]
+    #[should_panic(expected: ('Wrong FakeGLV decomposition',))]
+    fn test_wrong_hint_fails() {
+        let expected_hash = array![3606997102_u32, 3756602050_u32, 1811765011_u32, 1576844653_u32, 61256116_u32, 2110839708_u32, 540553134_u32, 3341226206_u32].span();
+        let mut secret_input: ByteArray = Default::default();
+        secret_input.append_byte(0x09_u8); secret_input.append_byte(0x9d_u8);
+        secret_input.append_byte(0xd9_u8); secret_input.append_byte(0xb7_u8);
+        secret_input.append_byte(0x3e_u8); secret_input.append_byte(0x2e_u8);
+        secret_input.append_byte(0x84_u8); secret_input.append_byte(0xdb_u8);
+        secret_input.append_byte(0x47_u8); secret_input.append_byte(0x2b_u8);
+        secret_input.append_byte(0x34_u8); secret_input.append_byte(0x2d_u8);
+        secret_input.append_byte(0xc3_u8); secret_input.append_byte(0xab_u8);
+        secret_input.append_byte(0x05_u8); secret_input.append_byte(0x20_u8);
+        secret_input.append_byte(0xf6_u8); secret_input.append_byte(0x54_u8);
+        secret_input.append_byte(0xfd_u8); secret_input.append_byte(0x8a_u8);
+        secret_input.append_byte(0x81_u8); secret_input.append_byte(0xd6_u8);
+        secret_input.append_byte(0x44_u8); secret_input.append_byte(0x18_u8);
+        secret_input.append_byte(0x04_u8); secret_input.append_byte(0x77_u8);
+        secret_input.append_byte(0x73_u8); secret_input.append_byte(0x0a_u8);
+        secret_input.append_byte(0x90_u8); secret_input.append_byte(0xaf_u8);
+        secret_input.append_byte(0x89_u8); secret_input.append_byte(0x00_u8);
+
+        let x_limbs = (0x460f72719199c63ec398673f, 0xf27a4af146a52a7dbdeb4cfb, 0x5f9c70ec759789a0, 0x0);
+        let y_limbs = (0x6b43e318a2a02d8241549109, 0x40e30afa4cce98c21e473980, 0x5e243e1eed1aa575, 0x0);
+        // Tamper hint: change s1 by +1
+        let hint = array![
+            0x460f72719199c63ec398673f,
+            0xf27a4af146a52a7dbdeb4cfb,
+            0x5f9c70ec759789a0,
+            0x0,
+            0x6b43e318a2a02d8241549109,
+            0x40e30afa4cce98c21e473980,
+            0x5e243e1eed1aa575,
+            0x0,
+            0x10b51d41eab43e36d3ac30cda9707f93, // s1 + 1
+            0x110538332d2eae09bf756dfd87431ded7
+        ].span();
+
+        let dispatcher = deploy_with_full(
+            expected_hash,
+            0_u64,
+            0.try_into().unwrap(),
+            u256 { low: 0, high: 0 },
+            x_limbs,
+            y_limbs,
+            (0, 0),
+            hint,
+        );
+
+        // Expect MSM to panic due to invalid hint decomposition.
+        dispatcher.verify_and_unlock(secret_input);
     }
 
     fn deploy_with(
@@ -128,10 +329,66 @@ mod tests {
         Serde::serialize(@lock_until, ref calldata);
         Serde::serialize(@token, ref calldata);
         Serde::serialize(@amount, ref calldata);
+        // adaptor_point (x/y limbs)
+        Serde::serialize(@0, ref calldata);
+        Serde::serialize(@0, ref calldata);
+        Serde::serialize(@0, ref calldata);
+        Serde::serialize(@0, ref calldata);
+        Serde::serialize(@0, ref calldata);
+        Serde::serialize(@0, ref calldata);
+        Serde::serialize(@0, ref calldata);
+        Serde::serialize(@0, ref calldata);
+        // DLEQ placeholders
+        Serde::serialize(@0, ref calldata);
+        Serde::serialize(@0, ref calldata);
+        // fake_glv_hint[10]
+        Serde::serialize(@array![0, 0, 0, 0, 0, 0, 0, 0, 0, 0].span(), ref calldata);
+
+        let deploy_res = contract.deploy(@calldata);
+        let (addr, _) = deploy_res.unwrap();
+        IAtomicLockDispatcher { contract_address: addr }
+    }
+
+    /// Helper for future tests that need real adaptor point and hint values from Rust.
+    fn deploy_with_full(
+        expected_hash: Span<u32>,
+        lock_until: u64,
+        token: ContractAddress,
+        amount: u256,
+        adaptor_point_x: (felt252, felt252, felt252, felt252),
+        adaptor_point_y: (felt252, felt252, felt252, felt252),
+        dleq: (felt252, felt252),
+        fake_glv_hint: Span<felt252>,
+    ) -> IAtomicLockDispatcher {
+        let declare_res = declare("AtomicLock");
+        let contract = declare_res.unwrap().contract_class();
+
+        let (x0, x1, x2, x3) = adaptor_point_x;
+        let (y0, y1, y2, y3) = adaptor_point_y;
+        let (dleq_c, dleq_r) = dleq;
+
+        let mut calldata = ArrayTrait::new();
+        expected_hash.serialize(ref calldata);
+        Serde::serialize(@lock_until, ref calldata);
+        Serde::serialize(@token, ref calldata);
+        Serde::serialize(@amount, ref calldata);
+        // adaptor_point (x/y limbs)
+        Serde::serialize(@x0, ref calldata);
+        Serde::serialize(@x1, ref calldata);
+        Serde::serialize(@x2, ref calldata);
+        Serde::serialize(@x3, ref calldata);
+        Serde::serialize(@y0, ref calldata);
+        Serde::serialize(@y1, ref calldata);
+        Serde::serialize(@y2, ref calldata);
+        Serde::serialize(@y3, ref calldata);
+        // DLEQ placeholders/inputs
+        Serde::serialize(@dleq_c, ref calldata);
+        Serde::serialize(@dleq_r, ref calldata);
+        // fake_glv_hint[10]
+        Serde::serialize(@fake_glv_hint, ref calldata);
 
         let deploy_res = contract.deploy(@calldata);
         let (addr, _) = deploy_res.unwrap();
         IAtomicLockDispatcher { contract_address: addr }
     }
 }
-
