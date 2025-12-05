@@ -290,6 +290,70 @@ mod tests {
         assert(success, 'refund');
     }
 
+    /// Gas profiling test: measures gas consumption for verify_and_unlock with MSM enabled.
+    /// 
+    /// This test verifies that verify_and_unlock (including SHA-256 hash check and MSM verification)
+    /// consumes reasonable gas. Run with: `snforge test test_gas_profile_msm_unlock`
+    /// 
+    /// Expected gas (approximate, may vary):
+    /// - L1 gas: ~0 (no L1 data)
+    /// - L1 data gas: ~2400 (calldata)
+    /// - L2 gas: ~5.4M (SHA-256 + MSM verification)
+    #[test]
+    fn test_gas_profile_msm_unlock() {
+        // Use real test data for accurate gas measurement
+        let expected_hash = array![3606997102_u32, 3756602050_u32, 1811765011_u32, 1576844653_u32, 61256116_u32, 2110839708_u32, 540553134_u32, 3341226206_u32].span();
+        let mut secret_input: ByteArray = Default::default();
+        secret_input.append_byte(0x09_u8); secret_input.append_byte(0x9d_u8);
+        secret_input.append_byte(0xd9_u8); secret_input.append_byte(0xb7_u8);
+        secret_input.append_byte(0x3e_u8); secret_input.append_byte(0x2e_u8);
+        secret_input.append_byte(0x84_u8); secret_input.append_byte(0xdb_u8);
+        secret_input.append_byte(0x47_u8); secret_input.append_byte(0x2b_u8);
+        secret_input.append_byte(0x34_u8); secret_input.append_byte(0x2d_u8);
+        secret_input.append_byte(0xc3_u8); secret_input.append_byte(0xab_u8);
+        secret_input.append_byte(0x05_u8); secret_input.append_byte(0x20_u8);
+        secret_input.append_byte(0xf6_u8); secret_input.append_byte(0x54_u8);
+        secret_input.append_byte(0xfd_u8); secret_input.append_byte(0x8a_u8);
+        secret_input.append_byte(0x81_u8); secret_input.append_byte(0xd6_u8);
+        secret_input.append_byte(0x44_u8); secret_input.append_byte(0x18_u8);
+        secret_input.append_byte(0x04_u8); secret_input.append_byte(0x77_u8);
+        secret_input.append_byte(0x73_u8); secret_input.append_byte(0x0a_u8);
+        secret_input.append_byte(0x90_u8); secret_input.append_byte(0xaf_u8);
+        secret_input.append_byte(0x89_u8); secret_input.append_byte(0x00_u8);
+
+        let x_limbs = (0x460f72719199c63ec398673f, 0xf27a4af146a52a7dbdeb4cfb, 0x5f9c70ec759789a0, 0x0);
+        let y_limbs = (0x6b43e318a2a02d8241549109, 0x40e30afa4cce98c21e473980, 0x5e243e1eed1aa575, 0x0);
+        let hint = array![
+            0x460f72719199c63ec398673f,
+            0xf27a4af146a52a7dbdeb4cfb,
+            0x5f9c70ec759789a0,
+            0x0,
+            0x6b43e318a2a02d8241549109,
+            0x40e30afa4cce98c21e473980,
+            0x5e243e1eed1aa575,
+            0x0,
+            0x10b51d41eab43e36d3ac30cda9707f92,
+            0x110538332d2eae09bf756dfd87431ded7
+        ].span();
+
+        let dispatcher = deploy_with_full(
+            expected_hash,
+            0_u64,
+            0.try_into().unwrap(),
+            u256 { low: 0, high: 0 },
+            x_limbs,
+            y_limbs,
+            (0, 0),
+            hint,
+        );
+
+        // This call includes: SHA-256 hash check + MSM verification (t·G == adaptor_point)
+        // Check snforge output for gas metrics: l1_gas, l1_data_gas, l2_gas
+        let success = dispatcher.verify_and_unlock(secret_input);
+        assert(success, 'gas profile test failed');
+        assert(dispatcher.is_unlocked(), 'unlock state failed');
+    }
+
     #[test]
     fn test_msm_check_with_real_data() {
         // Hash/secret from Python generator (ed25519_test_data.json)

@@ -41,6 +41,25 @@ def format_cairo_hint(hint_felts: List[int]) -> str:
 
 
 def generate_ed25519_test_data(secret_hex: str | None = None) -> dict:
+    """
+    Generate Ed25519 test data for Cairo MSM verification.
+    
+    Scalar derivation process:
+    1. SHA-256(secret_bytes) → 32-byte hash
+    2. Interpret hash as 8×u32 words (big-endian, 4 bytes per word)
+    3. Convert to big integer: scalar_raw = sum(hash_words[i] << (32 * i)) for i in [0..7]
+       (little-endian interpretation: h0 + h1·2^32 + h2·2^64 + ...)
+    4. Reduce modulo Ed25519 curve order: scalar = scalar_raw % n
+       This ensures the scalar is in valid range [0, n) for cryptographic operations.
+    
+    This matches Cairo's hash_to_scalar_u256 + reduce_scalar_ed25519 functions exactly.
+    
+    Args:
+        secret_hex: 32-byte secret as hex string (64 hex chars). If None, uses default.
+    
+    Returns:
+        Dictionary with secret, hash_words, scalar, adaptor_point, and fake_glv_hint.
+    """
     # Use provided 32-byte secret or an example default
     if secret_hex is None:
         secret_hex = "99dd9b73e2e84db472b342dc3ab0520f654fd8a81d644180477730a90af8900"
@@ -54,30 +73,42 @@ def generate_ed25519_test_data(secret_hex: str | None = None) -> dict:
     int(secret_hex, 16)
     secret_bytes = bytes.fromhex(secret_hex)
 
-    # Hash -> words -> scalar (little-endian u32 limbs) to mirror hash_to_scalar_u256; reduce mod order
+    # Scalar derivation: SHA-256(secret) → 8×u32 words → big integer → mod Ed25519 order
+    # Step 1: Hash to 8×u32 words (big-endian interpretation of hash bytes)
     hash_words = sha256_words(secret_bytes)
+    # Step 2: Convert to big integer (little-endian interpretation: h0 + h1·2^32 + ...)
     scalar_raw = 0
     for i, w in enumerate(hash_words):
         scalar_raw += w << (32 * i)
-
+    # Step 3: Reduce modulo Ed25519 curve order
     curve_id = CurveID.ED25519
     curve = CURVES[curve_id.value]
     scalar_int = scalar_raw % curve.n
+    
+    # Compute adaptor point T = scalar·G
     generator = G1Point.get_nG(curve_id, 1)
-
     adaptor_point = generator.scalar_mul(scalar_int)
 
     x_limbs = u384_to_cairo_tuple(adaptor_point.x)
     y_limbs = u384_to_cairo_tuple(adaptor_point.y)
 
-    # Fake-GLV hint (returns (Q, s1, s2_encoded)); Q should equal adaptor_point
+    # Fake-GLV hint generation for MSM optimization.
+    # Garaga's MSM uses fake-GLV decomposition to optimize scalar multiplication.
+    # Returns: (Q, s1, s2_encoded) where:
+    #   - Q: Point (must equal adaptor_point for verification to pass)
+    #   - s1, s2_encoded: Scalar components for GLV decomposition
     Q, s1, s2_encoded = get_fake_glv_hint(generator, scalar_int)
     assert Q == adaptor_point, "MSM hint point mismatch"
 
     Q_x_limbs = u384_to_cairo_tuple(Q.x)
     Q_y_limbs = u384_to_cairo_tuple(Q.y)
 
-    # 10 felts: Q.x limbs (4) + Q.y limbs (4) + s1 + s2_encoded
+    # FakeGlvHint structure (10 felts total, matches Cairo contract expectation):
+    #   felts[0..3]: Q.x limbs (u384, 4×96-bit limbs)
+    #   felts[4..7]: Q.y limbs (u384, 4×96-bit limbs)
+    #   felts[8]: s1 (scalar component)
+    #   felts[9]: s2_encoded (encoded scalar component)
+    # This ordering matches Cairo's fake_glv_hint0..9 storage layout.
     hint_felts = [*Q_x_limbs, *Q_y_limbs, s1, s2_encoded]
 
     return {

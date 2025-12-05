@@ -290,24 +290,31 @@ pub mod AtomicLock {
 
             // Reconstruct adaptor point and MSM hint from storage.
             let adaptor_point = storage_adaptor_point(@self);
+            
+            // FakeGlvHint structure (10 felts total):
+            // - felts[0..3]: Q.x limbs (u384, 4×96-bit limbs)
+            // - felts[4..7]: Q.y limbs (u384, 4×96-bit limbs)
+            // - felts[8]: s1 (scalar component for GLV decomposition)
+            // - felts[9]: s2_encoded (encoded scalar component)
+            // Q must equal adaptor_point for MSM to verify correctly.
             let fake_glv_hint: Array<felt252> = array![
-                self.fake_glv_hint0.read(),
-                self.fake_glv_hint1.read(),
-                self.fake_glv_hint2.read(),
-                self.fake_glv_hint3.read(),
-                self.fake_glv_hint4.read(),
-                self.fake_glv_hint5.read(),
-                self.fake_glv_hint6.read(),
-                self.fake_glv_hint7.read(),
-                self.fake_glv_hint8.read(),
-                self.fake_glv_hint9.read(),
+                self.fake_glv_hint0.read(),  // Q.x limb0
+                self.fake_glv_hint1.read(),  // Q.x limb1
+                self.fake_glv_hint2.read(),  // Q.x limb2
+                self.fake_glv_hint3.read(),  // Q.x limb3
+                self.fake_glv_hint4.read(),  // Q.y limb0
+                self.fake_glv_hint5.read(),  // Q.y limb1
+                self.fake_glv_hint6.read(),  // Q.y limb2
+                self.fake_glv_hint7.read(),  // Q.y limb3
+                self.fake_glv_hint8.read(),  // s1
+                self.fake_glv_hint9.read(),  // s2_encoded
             ];
 
             // Compute SHA-256 of provided secret.
             let computed_hash = compute_sha256_byte_array(@secret);
             let [h0, h1, h2, h3, h4, h5, h6, h7] = computed_hash;
 
-            // Compare against stored hash.
+            // Compare against stored hash (fail fast, cheap check).
             if h0 != self.h0.read() { return false; }
             if h1 != self.h1.read() { return false; }
             if h2 != self.h2.read() { return false; }
@@ -318,8 +325,13 @@ pub mod AtomicLock {
             if h7 != self.h7.read() { return false; }
 
             // Mandatory MSM check: t·G must equal stored adaptor point.
+            // Scalar derivation: SHA-256(secret) → 8×u32 words (little-endian) → u256 big integer → mod Ed25519 order
+            // This ensures the scalar is in the valid range for Ed25519 operations.
             let mut scalar = hash_to_scalar_u256(h0, h1, h2, h3, h4, h5, h6, h7);
             scalar = reduce_scalar_ed25519(scalar);
+            
+            // Compute t·G using Garaga's MSM with fake-GLV optimization.
+            // MSM verifies: scalar·G == adaptor_point, proving knowledge of t without revealing it.
             let computed = msm_g1(array![get_G(4)].span(), array![scalar].span(), 4, fake_glv_hint.span());
             assert(computed == adaptor_point, 'MSM verification failed');
 
@@ -368,7 +380,14 @@ pub mod AtomicLock {
         }
     }
 
-    /// Derive a scalar from SHA-256 words (little endian over 4 limbs).
+    /// Derive a scalar from SHA-256 hash words.
+    ///
+    /// Process: SHA-256(secret) → 8×u32 words (big-endian from hash) → u256 big integer (little-endian interpretation)
+    ///
+    /// The hash words are interpreted as little-endian limbs:
+    ///   scalar = h0 + h1·2^32 + h2·2^64 + h3·2^96 + h4·2^128 + h5·2^160 + h6·2^192 + h7·2^224
+    ///
+    /// This matches the Python tool's scalar derivation for consistency.
     fn hash_to_scalar_u256(h0: u32, h1: u32, h2: u32, h3: u32, h4: u32, h5: u32, h6: u32, h7: u32) -> u256 {
         let base: u256 = u256 { low: 0x1_0000_0000, high: 0 };
         let low = u256 { low: h0.into(), high: 0 }
@@ -382,6 +401,10 @@ pub mod AtomicLock {
         u256 { low: low.low, high: high.low }
     }
 
+    /// Reduce scalar modulo Ed25519 curve order.
+    ///
+    /// Ensures the scalar is in the valid range [0, n) where n is the Ed25519 curve order.
+    /// This is required before passing the scalar to Garaga's MSM operations.
     fn reduce_scalar_ed25519(scalar: u256) -> u256 {
         scalar % ED25519_ORDER
     }

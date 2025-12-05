@@ -62,7 +62,22 @@ snforge test   # uses snfoundry; cairo-test is not used here
 - Constructor validation (`test_constructor_rejects_zero_point`, `test_constructor_rejects_wrong_hint_length`, `test_constructor_rejects_mismatched_hint`, `test_constructor_rejects_small_order_point`)
 - Garaga import sanity checks.
 
-MSM uses Garaga's FakeGlvHint (10 felts: Q.x limbs, Q.y limbs, s1, s2_encoded) on Ed25519 in Weierstrass form. Scalars are derived as SHA-256(secret) (8×u32, little-endian limbs) then reduced mod the Ed25519 order, matching `hash_to_scalar_u256` + `reduce_scalar_ed25519` on-chain.
+**Scalar Derivation**: SHA-256(secret) → 8×u32 words (big-endian from hash) → u256 big integer (little-endian interpretation: h0 + h1·2^32 + ...) → reduced mod Ed25519 order. This matches `hash_to_scalar_u256` + `reduce_scalar_ed25519` in the contract.
+
+**FakeGlvHint Structure** (10 felts total):
+- `felts[0..3]`: Q.x limbs (u384, 4×96-bit limbs)
+- `felts[4..7]`: Q.y limbs (u384, 4×96-bit limbs)  
+- `felts[8]`: s1 (scalar component for GLV decomposition)
+- `felts[9]`: s2_encoded (encoded scalar component)
+
+Q must equal the adaptor_point for MSM verification to pass. This structure matches Garaga's MSM API requirements for Ed25519 (curve_index = 4) in Weierstrass form.
+
+**Gas Costs**: `verify_and_unlock` with MSM enabled consumes approximately:
+- L1 gas: ~0 (no L1 data)
+- L1 data gas: ~2400 (calldata)
+- L2 gas: ~5.4M (SHA-256 hash check + MSM verification)
+
+Run `snforge test test_gas_profile_msm_unlock` to see current gas metrics. Last measured: ~5.48M L2 gas.
 
 #### Known Limitations
 
