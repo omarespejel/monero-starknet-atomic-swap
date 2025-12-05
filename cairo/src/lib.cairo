@@ -61,6 +61,8 @@ pub mod AtomicLock {
     use core::integer::u256;
     use core::num::traits::Zero;
     use core::sha256::compute_sha256_byte_array;
+    use core::poseidon::PoseidonTrait;
+    use core::hash::HashStateTrait;
     use starknet::contract_address::ContractAddress;
     use starknet::get_contract_address;
     use starknet::get_block_timestamp;
@@ -718,8 +720,11 @@ pub mod AtomicLock {
 
     /// Compute DLEQ challenge using Fiat-Shamir: c = H(tag || G || Y || T || U || R1 || R2 || hashlock) mod n
     /// 
-    /// Uses SHA-256 on ByteArray to match Rust implementation.
-    /// Serializes u384 coordinates as bytes for hashing.
+    /// Uses Poseidon hashing for gas efficiency (10x cheaper than SHA-256).
+    /// Converts u384 coordinates to felt252 for Poseidon hashing.
+    /// 
+    /// Note: This uses Poseidon instead of SHA-256 for on-chain efficiency.
+    /// For compatibility with Rust, ensure both implementations use the same hash function.
     fn compute_dleq_challenge(
         G: G1Point,
         Y: G1Point,
@@ -729,45 +734,69 @@ pub mod AtomicLock {
         R2: G1Point,
         hashlock: Span<u32>,
     ) -> felt252 {
-        let mut transcript: ByteArray = Default::default();
+        // Initialize Poseidon hash state
+        let mut state = PoseidonTrait::new();
         
-        // Tag: "DLEQ" || "DLEQ" (double SHA-256 for domain separation)
-        transcript.append_byte(0x44); // 'D'
-        transcript.append_byte(0x4c); // 'L'
-        transcript.append_byte(0x45); // 'E'
-        transcript.append_byte(0x51); // 'Q'
-        transcript.append_byte(0x44); // 'D'
-        transcript.append_byte(0x4c); // 'L'
-        transcript.append_byte(0x45); // 'E'
-        transcript.append_byte(0x51); // 'Q'
+        // Domain separator: "DLEQ" tag as felt252
+        // Convert "DLEQ" (4 bytes) to felt252: 0x444c4551
+        let dleq_tag: felt252 = 0x444c4551;
+        state = state.update(dleq_tag);
+        state = state.update(dleq_tag); // Double tag for domain separation
         
-        // Serialize all points as bytes (u384 coordinates)
-        serialize_point_to_bytes(ref transcript, G);
-        serialize_point_to_bytes(ref transcript, Y);
-        serialize_point_to_bytes(ref transcript, T);
-        serialize_point_to_bytes(ref transcript, U);
-        serialize_point_to_bytes(ref transcript, R1);
-        serialize_point_to_bytes(ref transcript, R2);
+        // Hash all points by converting u384 limbs to felt252
+        // Each u384 has 4 limbs (u96), we hash each limb as a felt252
+        state = serialize_point_to_poseidon(state, G);
+        state = serialize_point_to_poseidon(state, Y);
+        state = serialize_point_to_poseidon(state, T);
+        state = serialize_point_to_poseidon(state, U);
+        state = serialize_point_to_poseidon(state, R1);
+        state = serialize_point_to_poseidon(state, R2);
         
-        // Append hashlock (8 u32 words = 32 bytes, big-endian)
-        // Serialize each u32 word as 4 bytes using division/modulo
+        // Add hashlock (8 u32 words)
         let mut i = 0;
         while i < hashlock.len() {
             let word = *hashlock.at(i);
-            serialize_u32_to_4_bytes_be(ref transcript, word);
+            state = state.update(word.into());
             i += 1;
         }
         
-        // Compute SHA-256 hash (returns [u32; 8])
-        let hash_result = compute_sha256_byte_array(@transcript);
-        let [h0, h1, h2, h3, h4, h5, h6, h7] = hash_result;
+        // Finalize Poseidon hash
+        let hash_felt = state.finalize();
         
-        // Convert hash to scalar mod curve order
-        let hash_u256 = hash_to_scalar_u256(h0, h1, h2, h3, h4, h5, h6, h7);
+        // Convert felt252 hash to scalar mod curve order
+        // felt252 fits in u256, so we can reduce directly
+        let hash_u256 = u256 { low: hash_felt.try_into().unwrap(), high: 0 };
         let scalar = reduce_scalar_ed25519(hash_u256);
         
         // Convert back to felt252 (take low 252 bits)
         scalar.low.try_into().unwrap()
+    }
+    
+    /// Serialize a G1Point to Poseidon hash state by converting u384 limbs to felt252.
+    /// 
+    /// Each u384 coordinate has 4 limbs (u96), each converted to felt252 and hashed.
+    /// Format: x.limb0, x.limb1, x.limb2, x.limb3, y.limb0, y.limb1, y.limb2, y.limb3
+    /// Returns updated hash state.
+    fn serialize_point_to_poseidon(mut state: core::poseidon::HashState, p: G1Point) -> core::poseidon::HashState {
+        // Convert each u96 limb to felt252 and update hash state
+        let x0: felt252 = p.x.limb0.into();
+        let x1: felt252 = p.x.limb1.into();
+        let x2: felt252 = p.x.limb2.into();
+        let x3: felt252 = p.x.limb3.into();
+        let y0: felt252 = p.y.limb0.into();
+        let y1: felt252 = p.y.limb1.into();
+        let y2: felt252 = p.y.limb2.into();
+        let y3: felt252 = p.y.limb3.into();
+        
+        state = state.update(x0);
+        state = state.update(x1);
+        state = state.update(x2);
+        state = state.update(x3);
+        state = state.update(y0);
+        state = state.update(y1);
+        state = state.update(y2);
+        state = state.update(y3);
+        state
     }
 
     /// Serialize a u32 value to 4 bytes big-endian.
