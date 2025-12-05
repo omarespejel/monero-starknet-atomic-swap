@@ -648,20 +648,43 @@ pub mod AtomicLock {
         let c_scalar = reduce_felt_to_scalar(c);
         let s_scalar = reduce_felt_to_scalar(s);
 
-        // Compute R1' = s·G - c·T using MSM with two points
-        // We use MSM([G, T], [s, -c mod n]) to compute s·G + (-c)·T
-        // Note: Empty hints for now - in production, compute proper hints
+        // Compute R1' = s·G - c·T = s·G + (-c)·T
+        // PRODUCTION: Split into separate single-scalar MSMs to avoid multi-scalar hint complexity
+        // We compute -c mod n as a scalar, then multiply T by that negated scalar
+        // This avoids needing point negation and is more efficient
+        // TODO: Generate proper hints for s and -c scalars using Python tool
         let c_neg_scalar = (ED25519_ORDER - (c_scalar % ED25519_ORDER)) % ED25519_ORDER;
-        let points_R1 = array![G, T];
-        let scalars_R1 = array![s_scalar, c_neg_scalar];
-        let hint_R1 = array![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0].span();
-        let R1_prime = msm_g1(points_R1.span(), scalars_R1.span(), curve_idx, hint_R1);
+        
+        let sG = msm_g1(
+            array![G].span(),
+            array![s_scalar].span(),
+            curve_idx,
+            array![0, 0, 0, 0, 0, 0, 0, 0, 0, 0].span() // Empty hint for now - TODO: generate proper hint
+        );
+        let neg_cT = msm_g1(
+            array![T].span(),
+            array![c_neg_scalar].span(),
+            curve_idx,
+            array![0, 0, 0, 0, 0, 0, 0, 0, 0, 0].span() // Empty hint for now - TODO: generate proper hint
+        );
+        // Add: R1' = sG + (-c)·T = sG - cT
+        let R1_prime = ec_safe_add(sG, neg_cT, curve_idx);
 
-        // Compute R2' = s·Y - c·U using MSM with two points
-        let points_R2 = array![Y, U];
-        let scalars_R2 = array![s_scalar, c_neg_scalar];
-        let hint_R2 = array![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0].span();
-        let R2_prime = msm_g1(points_R2.span(), scalars_R2.span(), curve_idx, hint_R2);
+        // Compute R2' = s·Y - c·U = s·Y + (-c)·U
+        let sY = msm_g1(
+            array![Y].span(),
+            array![s_scalar].span(),
+            curve_idx,
+            array![0, 0, 0, 0, 0, 0, 0, 0, 0, 0].span() // Empty hint for now - TODO: generate proper hint
+        );
+        let neg_cU = msm_g1(
+            array![U].span(),
+            array![c_neg_scalar].span(),
+            curve_idx,
+            array![0, 0, 0, 0, 0, 0, 0, 0, 0, 0].span() // Empty hint for now - TODO: generate proper hint
+        );
+        // Add: R2' = sY + (-c)·U = sY - cU
+        let R2_prime = ec_safe_add(sY, neg_cU, curve_idx);
 
         // Recompute challenge: c' = H(tag, G, Y, T, U, R1', R2', hashlock)
         let c_prime = compute_dleq_challenge(G, Y, T, U, R1_prime, R2_prime, hashlock);
@@ -717,6 +740,7 @@ pub mod AtomicLock {
         let f_u256 = u256 { low: f_u128, high: 0 };
         f_u256 % ED25519_ORDER
     }
+
 
 
     /// Compute DLEQ challenge using Fiat-Shamir: c = H(tag || G || Y || T || U || R1 || R2 || hashlock) mod n

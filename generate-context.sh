@@ -21,14 +21,18 @@ echo ""
   printf '%s\n' "You are reviewing a repo that:"
   printf '%s\n' "- Generates a Monero-style scalar in Rust (\`cargo run\`) and prints its SHA-256 digest as 8×u32 plus the secret as a Cairo byte string."
   printf '%s\n' "- Contains a Starknet AtomicLock contract that stores the target hash (8×u32) and enforces a MSM check against an Ed25519 adaptor point."
+  printf '%s\n' "- Implements DLEQ (Discrete Logarithm Equality) proofs to cryptographically bind the hashlock to the adaptor point."
   printf '%s\n' "- Includes a Cairo test harness that deploys the contract and calls \`verify_and_unlock\` with Rust/Python-produced data."
   printf '%s\n' "- Provides Python tooling (uv + garaga) to generate Ed25519 adaptor points, fake-GLV hints, and Cairo-ready test vectors."
+  printf '%s\n' "- Includes Rust modules for adaptor signatures, DLEQ proof generation, and Monero/Starknet integration."
   printf '%s\n' ""
   printf '%s\n' "Focus your analysis on:"
   printf '%s\n' "- Scalar sampling, hashing, and formatting consistency between Rust and Cairo."
   printf '%s\n' "- Correct storage/layout of the SHA-256 digest (endianness and word order)."
+  printf '%s\n' "- DLEQ proof generation (Rust) and verification (Cairo) implementation."
   printf '%s\n' "- Test wiring: constructor calldata, deployment, and \`verify_and_unlock\` call."
   printf '%s\n' "- Manifest and toolchain alignment (Rust deps, Scarb/Starknet versions)."
+  printf '%s\n' "- Adaptor signature implementation for Monero atomic swaps."
   printf '%s\n' ""
   printf '%s\n' "---"
   printf '%s\n' ""
@@ -76,6 +80,14 @@ RUST_FILES=(
   "rust/Cargo.lock"
   "rust/src/lib.rs"
   "rust/src/main.rs"
+  "rust/src/dleq.rs"
+  "rust/src/adaptor/mod.rs"
+  "rust/src/adaptor/adaptor_sig.rs"
+  "rust/src/adaptor/key_splitting.rs"
+  "rust/src/starknet.rs"
+  "rust/src/monero.rs"
+  "rust/src/bin/maker.rs"
+  "rust/src/bin/taker.rs"
 )
 
 CAIRO_FILES=(
@@ -84,6 +96,11 @@ CAIRO_FILES=(
   "cairo/snfoundry.toml"
   "cairo/src/lib.cairo"
   "cairo/tests/test_atomic_lock.cairo"
+  "cairo/tests/test_garaga_integration.cairo"
+)
+
+RUST_TEST_FILES=(
+  "rust/tests/integration_test.rs"
 )
 
 for path in "${ROOT_FILES[@]}"; do
@@ -99,6 +116,10 @@ for path in "${RUST_FILES[@]}"; do
 done
 
 for path in "${CAIRO_FILES[@]}"; do
+  add_file "$path"
+done
+
+for path in "${RUST_TEST_FILES[@]}"; do
   add_file "$path"
 done
 
