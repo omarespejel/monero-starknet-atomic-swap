@@ -9,6 +9,8 @@ pub mod adaptor;
 pub mod dleq;
 pub mod starknet;
 pub mod monero;
+// TODO: Uncomment when Poseidon is fully implemented
+// pub mod poseidon;
 
 pub use dleq::{generate_dleq_proof, DleqProof};
 #[cfg(feature = "full-integration")]

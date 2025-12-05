@@ -8,11 +8,21 @@
 //! - U is the second point (t·Y)
 //! - G is the standard Ed25519 generator
 //! - Y is the second generator point (derived deterministically)
+//!
+//! **Hash Function Compatibility:**
+//! - Currently uses SHA-256 for challenge computation
+//! - Cairo uses Poseidon (10x cheaper gas)
+//! - TODO: Implement Poseidon in Rust for full compatibility
+//! - See DLEQ_COMPATIBILITY.md for details
 
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar;
 use sha2::{Digest, Sha256, Sha512};
+
+// TODO: Uncomment when Poseidon is fully implemented
+// mod poseidon;
+// use poseidon::compute_poseidon_challenge;
 
 /// DLEQ proof structure containing the second point, challenge, and response.
 pub struct DleqProof {
@@ -107,7 +117,16 @@ fn generate_deterministic_nonce(secret: &Scalar, hashlock: &[u8; 32]) -> Scalar 
 ///
 /// Challenge: c = H(tag || G || Y || T || U || R1 || R2 || hashlock) mod n
 ///
-/// Where:
+/// **Current Implementation:** Uses SHA-256 (simpler, works now)
+/// **Target Implementation:** Poseidon (10x cheaper gas, matches Cairo)
+///
+/// **Compatibility Note:**
+/// - Rust currently uses SHA-256 with compressed Edwards points
+/// - Cairo uses Poseidon with Weierstrass u384 limbs
+/// - These produce different challenges - proofs won't verify cross-platform
+/// - See DLEQ_COMPATIBILITY.md for migration path
+///
+/// **Format:**
 /// - tag: "DLEQ" (double SHA-256 for domain separation)
 /// - G, Y, T, U, R1, R2: Ed25519 points (compressed format)
 /// - hashlock: 32-byte hash
@@ -120,6 +139,11 @@ fn compute_challenge(
     R2: &EdwardsPoint,
     hashlock: &[u8; 32],
 ) -> Scalar {
+    // TODO: Switch to Poseidon once implemented
+    // let c = compute_poseidon_challenge(G, Y, T, U, R1, R2, hashlock);
+    // return c;
+    
+    // Current: SHA-256 implementation (simpler, but incompatible with Cairo)
     let mut hasher = Sha256::new();
 
     // Tag: SHA256("DLEQ") || SHA256("DLEQ") for domain separation
