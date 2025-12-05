@@ -164,7 +164,8 @@ pub mod AtomicLock {
             adaptor_point_x0 == 0 && adaptor_point_x1 == 0 && adaptor_point_x2 == 0 && adaptor_point_x3 == 0;
         let y_is_zero =
             adaptor_point_y0 == 0 && adaptor_point_y1 == 0 && adaptor_point_y2 == 0 && adaptor_point_y3 == 0;
-        assert(!x_is_zero && !y_is_zero, Errors::ZERO_ADAPTOR_POINT);
+        // Only reject the true infinity (both x and y zero).
+        assert(!(x_is_zero && y_is_zero), Errors::ZERO_ADAPTOR_POINT);
 
         // Reconstruct point and validate curve/small-order.
         let mut xs_array = array![adaptor_point_x0, adaptor_point_x1, adaptor_point_x2, adaptor_point_x3];
