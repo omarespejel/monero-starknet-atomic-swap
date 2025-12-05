@@ -1,15 +1,18 @@
 # XMR↔Starknet Atomic Swap
 
-Trustless atomic swap protocol between Monero and Starknet using DLEQ proofs and Garaga v1.0.0.
+Prototype implementation of a trustless atomic swap protocol between Monero and Starknet. 
+Currently uses hashlock + MSM verification (DLEQ proofs planned for future version).
 
 ## Overview
 
-This project implements a **prototype implementation / reference PoC** of an atomic swap protocol for trustless exchange of Monero (XMR) and Starknet L2 assets. The protocol uses:
+This project implements a **prototype implementation / reference PoC** of an atomic swap protocol for trustless exchange of Monero (XMR) and Starknet L2 assets. 
 
+**Current Implementation:**
 - **SHA-256 Hashlock**: Cryptographic lock on Starknet
 - **Ed25519 Adaptor Signatures**: Monero-side signature binding
-- **Garaga MSM Verification**: Efficient on-chain Ed25519 point verification
-- **DLEQ Proofs**: (Future) Cryptographic binding between hashlock and adaptor point
+- **Garaga MSM Verification**: Efficient on-chain Ed25519 point verification (`t·G == adaptor_point`)
+
+**Important**: The current version does **NOT** bind the hashlock and adaptor point via a cryptographic proof. DLEQ (Discrete Logarithm Equality) proofs are planned for a future version but are not yet implemented. The protocol currently relies on hashlock + MSM verification, which provides strong security guarantees but does not cryptographically prove the relationship between the hashlock and adaptor point.
 
 ## Architecture
 
@@ -144,9 +147,11 @@ cargo test --test integration_test
 
 **Production-ready status requires:**
 - ✅ Security audit by qualified auditors
-- ⚠️ DLEQ proof implementation (currently deferred)
+- ⚠️ DLEQ proof implementation (planned but not yet implemented)
 - ⚠️ Full end-to-end testing on testnets
 - ⚠️ Complete integration with Starknet and Monero networks
+
+**Important Note on DLEQ**: DLEQ proofs are advertised as part of the protocol design but are **not yet implemented**. The current version does not cryptographically bind the hashlock and adaptor point via a proof. This is explicitly deferred to a post-audit phase. The protocol currently provides strong security through hashlock + MSM verification, but lacks the cryptographic proof that the same secret `t` generates both the hashlock and adaptor point.
 
 ### Current Implementation Status
 
@@ -163,6 +168,9 @@ cargo test --test integration_test
 
 **Deferred:**
 - ⚠️ DLEQ proof implementation (explicitly deferred to post-audit phase)
+  - **Current limitation**: The hashlock (H) and adaptor point (T) are not cryptographically bound via a proof
+  - **Impact**: Protocol relies on hashlock + MSM verification, which is strong but does not prove ∃t: SHA-256(t) = H ∧ t·G = T
+  - **Future**: DLEQ proofs will provide cryptographic binding between H and T
 
 ### Security Considerations
 
@@ -177,6 +185,10 @@ cargo test --test integration_test
 - **Starknet Integration**: Contract deployment and event watching require full starknet-rs integration (currently scaffolded)
 - **Monero Integration**: Transaction creation and broadcasting require monero-rs integration (currently scaffolded)
 - **DLEQ Proofs**: Not yet implemented (deferred to post-audit phase)
+  - **Current state**: DLEQ is mentioned in protocol design but not implemented
+  - **What's missing**: No cryptographic proof binding hashlock (H) and adaptor point (T)
+  - **Current security**: Relies on hashlock + MSM verification (strong, but not cryptographically bound)
+  - **Future**: DLEQ will prove ∃t: SHA-256(t) = H ∧ t·G = T
 
 ## Roadmap
 

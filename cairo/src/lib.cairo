@@ -371,9 +371,11 @@ pub mod AtomicLock {
             let computed = msm_g1(array![get_G(4)].span(), array![scalar].span(), 4, fake_glv_hint.span());
             assert(computed == adaptor_point, 'MSM verification failed');
 
-            // TODO: DLEQ verification (placeholder for now)
-            // let dleq_ok = verify_dleq_stub();
-            // if !dleq_ok { return false; }
+            // NOTE: DLEQ verification is not yet implemented.
+            // The current version does not cryptographically bind the hashlock (H) and adaptor point (T).
+            // DLEQ proofs are planned for a future version to prove: ∃t: SHA-256(t) = H ∧ t·G = T
+            // For now, the protocol relies on hashlock + MSM verification, which provides strong
+            // security guarantees but does not prove the relationship between H and T.
 
             // Transfer tokens to caller if configured.
             let amount = self.amount.read();
