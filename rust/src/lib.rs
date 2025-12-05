@@ -2,6 +2,10 @@
 //!
 //! Provides a function to sample a Monero-compatible scalar, compute its
 //! SHA-256 digest, and format outputs for Cairo tests.
+//!
+//! Also includes adaptor signature support for Monero atomic swaps.
+
+pub mod adaptor;
 
 use std::process::Command;
 use std::path::PathBuf;
@@ -57,7 +61,7 @@ where
     let value = serde_json::Value::deserialize(deserializer)?;
     
     // Extract the raw JSON string and parse manually to preserve large integers
-    let json_str = serde_json::to_string(&value).map_err(D::Error::custom)?;
+    let _json_str = serde_json::to_string(&value).map_err(D::Error::custom)?;
     
     // Parse the array manually from raw JSON
     // This is a workaround for serde_json converting large integers to f64

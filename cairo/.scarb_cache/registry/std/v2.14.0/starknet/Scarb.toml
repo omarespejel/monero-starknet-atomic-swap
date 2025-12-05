@@ -1,0 +1,6 @@
+[package]
+name = "starknet"
+version = "2.14.0"
+
+[cairo-plugin]
+builtin = true

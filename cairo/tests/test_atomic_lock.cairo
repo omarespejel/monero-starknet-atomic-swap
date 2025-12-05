@@ -7,7 +7,10 @@ mod tests {
     use core::result::ResultTrait;
     use core::serde::Serde;
     use starknet::contract_address::ContractAddress;
-    use snforge_std::{declare, ContractClassTrait, DeclareResultTrait};
+    use snforge_std::{declare, ContractClassTrait, DeclareResultTrait, start_cheat_block_timestamp, stop_cheat_block_timestamp};
+    
+    // Future timestamp for test deployments (far enough in future to pass validation)
+    const FUTURE_TIMESTAMP: u64 = 9999999999_u64;
 
     #[test]
     fn test_cryptographic_handshake() {
@@ -77,7 +80,7 @@ mod tests {
 
         let dispatcher = deploy_with_full(
             expected_hash,
-            0_u64,
+            FUTURE_TIMESTAMP,
             0.try_into().unwrap(),
             u256 { low: 0, high: 0 },
             x_limbs,
@@ -110,7 +113,7 @@ mod tests {
         ].span();
         let dispatcher = deploy_with_full(
             expected_hash,
-            0_u64,
+            FUTURE_TIMESTAMP,
             0.try_into().unwrap(),
             u256 { low: 0, high: 0 },
             x_limbs,
@@ -164,7 +167,7 @@ mod tests {
         ].span();
         let dispatcher = deploy_with_full(
             expected_hash,
-            0_u64,
+            FUTURE_TIMESTAMP,
             0.try_into().unwrap(),
             u256 { low: 0, high: 0 },
             x_limbs,
@@ -245,7 +248,7 @@ mod tests {
 
         let dispatcher = deploy_with_full(
             expected_hash,
-            0_u64,
+            FUTURE_TIMESTAMP,
             0.try_into().unwrap(),
             u256 { low: 0, high: 0 },
             x_limbs,
@@ -260,7 +263,9 @@ mod tests {
 
     #[test]
     fn test_refund_after_expiry() {
-        // lock_until = 0 to allow immediate refund without time travel
+        // Test refund after lock expiry.
+        // Constructor requires lock_until > current timestamp, so we deploy with a future timestamp
+        // then warp time forward to test refund functionality.
         let expected_hash = array![3606997102_u32, 3756602050_u32, 1811765011_u32, 1576844653_u32, 61256116_u32, 2110839708_u32, 540553134_u32, 3341226206_u32].span();
         let x_limbs = (0x460f72719199c63ec398673f, 0xf27a4af146a52a7dbdeb4cfb, 0x5f9c70ec759789a0, 0x0);
         let y_limbs = (0x6b43e318a2a02d8241549109, 0x40e30afa4cce98c21e473980, 0x5e243e1eed1aa575, 0x0);
@@ -276,9 +281,11 @@ mod tests {
             0x10b51d41eab43e36d3ac30cda9707f92,
             0x110538332d2eae09bf756dfd87431ded7
         ].span();
+        // Deploy with lock_until = 100 (future timestamp that passes validation)
+        let lock_until = 100_u64;
         let dispatcher = deploy_with_full(
             expected_hash,
-            0_u64,
+            lock_until,
             0.try_into().unwrap(),
             u256 { low: 0, high: 0 },
             x_limbs,
@@ -286,8 +293,16 @@ mod tests {
             (0, 0),
             hint,
         );
+        
+        // Warp time forward to after lock_until
+        start_cheat_block_timestamp(dispatcher.contract_address, lock_until + 1);
+        
+        // Now refund should succeed (lock expired, still locked, caller is depositor)
         let success = dispatcher.refund();
         assert(success, 'refund');
+        
+        // Stop cheating
+        stop_cheat_block_timestamp(dispatcher.contract_address);
     }
 
     /// Gas profiling test: measures gas consumption for verify_and_unlock with MSM enabled.
@@ -338,7 +353,7 @@ mod tests {
 
         let dispatcher = deploy_with_full(
             expected_hash,
-            0_u64,
+            FUTURE_TIMESTAMP,
             0.try_into().unwrap(),
             u256 { low: 0, high: 0 },
             x_limbs,
@@ -395,7 +410,7 @@ mod tests {
 
         let dispatcher = deploy_with_full(
             expected_hash,
-            0_u64,
+            FUTURE_TIMESTAMP,
             0.try_into().unwrap(),
             u256 { low: 0, high: 0 },
             x_limbs,
@@ -449,7 +464,7 @@ mod tests {
 
         let dispatcher = deploy_with_full(
             expected_hash,
-            0_u64,
+            FUTURE_TIMESTAMP,
             0.try_into().unwrap(),
             u256 { low: 0, high: 0 },
             x_limbs,
@@ -593,7 +608,7 @@ mod tests {
 
         let dispatcher = deploy_with_full(
             expected_hash,
-            0_u64,
+            FUTURE_TIMESTAMP,
             0.try_into().unwrap(),
             u256 { low: 0, high: 0 },
             x_limbs,
@@ -606,6 +621,70 @@ mod tests {
         let success = dispatcher.verify_and_unlock(secret_input);
         assert(success, 'Rust Python Cairo failed');
         assert(dispatcher.is_unlocked(), 'unlock state failed');
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_constructor_rejects_past_lock_time() {
+        let expected_hash = array![1_u32, 2_u32, 3_u32, 4_u32, 5_u32, 6_u32, 7_u32, 8_u32].span();
+        let x_limbs = (0x460f72719199c63ec398673f, 0xf27a4af146a52a7dbdeb4cfb, 0x5f9c70ec759789a0, 0x0);
+        let y_limbs = (0x6b43e318a2a02d8241549109, 0x40e30afa4cce98c21e473980, 0x5e243e1eed1aa575, 0x0);
+        let hint = array![
+            0x460f72719199c63ec398673f,
+            0xf27a4af146a52a7dbdeb4cfb,
+            0x5f9c70ec759789a0,
+            0x0,
+            0x6b43e318a2a02d8241549109,
+            0x40e30afa4cce98c21e473980,
+            0x5e243e1eed1aa575,
+            0x0,
+            0x10b51d41eab43e36d3ac30cda9707f92,
+            0x110538332d2eae09bf756dfd87431ded7
+        ].span();
+        
+        // Try to deploy with lock_until = 0 (past timestamp)
+        deploy_with_full(
+            expected_hash,
+            0_u64, // Past timestamp - should panic
+            0.try_into().unwrap(),
+            u256 { low: 0, high: 0 },
+            x_limbs,
+            y_limbs,
+            (0, 0),
+            hint,
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_constructor_rejects_mixed_zero_amount_token() {
+        let expected_hash = array![1_u32, 2_u32, 3_u32, 4_u32, 5_u32, 6_u32, 7_u32, 8_u32].span();
+        let x_limbs = (0x460f72719199c63ec398673f, 0xf27a4af146a52a7dbdeb4cfb, 0x5f9c70ec759789a0, 0x0);
+        let y_limbs = (0x6b43e318a2a02d8241549109, 0x40e30afa4cce98c21e473980, 0x5e243e1eed1aa575, 0x0);
+        let hint = array![
+            0x460f72719199c63ec398673f,
+            0xf27a4af146a52a7dbdeb4cfb,
+            0x5f9c70ec759789a0,
+            0x0,
+            0x6b43e318a2a02d8241549109,
+            0x40e30afa4cce98c21e473980,
+            0x5e243e1eed1aa575,
+            0x0,
+            0x10b51d41eab43e36d3ac30cda9707f92,
+            0x110538332d2eae09bf756dfd87431ded7
+        ].span();
+        
+        // Try to deploy with non-zero amount but zero token (mixed state - should panic)
+        deploy_with_full(
+            expected_hash,
+            9999999999_u64, // Future timestamp
+            0.try_into().unwrap(), // Zero token
+            u256 { low: 1000, high: 0 }, // Non-zero amount - should panic
+            x_limbs,
+            y_limbs,
+            (0, 0),
+            hint,
+        );
     }
 
     #[test]
