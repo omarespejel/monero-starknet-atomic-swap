@@ -9,6 +9,8 @@
 use anyhow::{Context, Result};
 use clap::Parser;
 use xmr_secret_gen::starknet::StarknetClient;
+#[cfg(feature = "full-integration")]
+use xmr_secret_gen::starknet_full::StarknetAccount;
 use serde_json::json;
 
 #[derive(Parser)]
@@ -56,29 +58,50 @@ async fn main() -> Result<()> {
             println!("   Secret provided: {}", secret_hex);
             
             // Convert secret to ByteArray format for Cairo
-            let _secret_bytes = hex::decode(&secret_hex)
+            let secret_bytes = hex::decode(&secret_hex)
                 .context("Invalid secret hex")?;
             
-            println!("   ⚠️  Contract interaction requires account signing");
-            println!("   ⚠️  In production, use starknet-rs to:");
-            println!("      1. Create account client");
-            println!("      2. Call verify_and_unlock(secret_bytes)");
-            println!("      3. Wait for transaction confirmation");
+            #[cfg(feature = "full-integration")]
+            {
+                if let Some(account_path) = args.starknet_account {
+                    // Use full integration if account provided
+                    let account = StarknetAccount::new(
+                        args.starknet_rpc.clone(),
+                        "0x0".to_string(), // Account address - should be loaded from file
+                        "0x0".to_string(), // Private key - should be loaded from file
+                    );
+                    
+                    println!("   Calling verify_and_unlock...");
+                    let tx_hash = account
+                        .verify_and_unlock(&contract_addr, &secret_bytes)
+                        .await
+                        .context("Failed to call contract")?;
+                    
+                    println!("   ✅ Transaction submitted! Hash: {}", tx_hash);
+                    println!("   Waiting for confirmation...");
+                    
+                    // In production, wait for transaction receipt
+                    println!("   ⚠️  Transaction confirmation requires full implementation");
+                } else {
+                    println!("   ⚠️  Full contract interaction requires --starknet-account");
+                    println!("\n   Manual unlock command:");
+                    println!("   starknet invoke \\");
+                    println!("     --address {} \\", contract_addr);
+                    println!("     --function verify_and_unlock \\");
+                    println!("     --inputs {}", secret_hex);
+                }
+            }
             
-            // In production, uncomment:
-            // let account = load_account(&args.starknet_account)?;
-            // let result = account.call_contract(
-            //     &contract_addr,
-            //     "verify_and_unlock",
-            //     vec![secret_bytes],
-            // ).await?;
-            // println!("   ✅ Unlock successful! TX: {}", result.transaction_hash);
-            
-            println!("\n   Manual unlock command:");
-            println!("   starknet invoke \\");
-            println!("     --address {} \\", contract_addr);
-            println!("     --function verify_and_unlock \\");
-            println!("     --inputs {}", secret_hex);
+            #[cfg(not(feature = "full-integration"))]
+            {
+                println!("   ⚠️  Contract interaction requires full-integration feature");
+                println!("   ⚠️  Build with: cargo build --features full-integration");
+                println!("\n   Manual unlock command:");
+                println!("   starknet invoke \\");
+                println!("     --address {} \\", contract_addr);
+                println!("     --function verify_and_unlock \\");
+                println!("     --inputs {}", secret_hex);
+            }
         } else {
             println!("   ⚠️  Secret required for unlock");
             println!("   ⚠️  Provide --secret <hex>");

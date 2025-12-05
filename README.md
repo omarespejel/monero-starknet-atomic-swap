@@ -159,12 +159,25 @@ cargo test --test integration_test
 - [x] Phase 2: Monero Adaptor Signatures
 - [x] Phase 3: Pre-audit Hardening
 - [x] Phase 4: On-chain Protocol Lock-in
-- [ ] Phase 5: DLEQ Proof Implementation
-- [ ] Phase 6: Full Starknet Integration
-- [ ] Phase 7: Full Monero Integration
+- [x] Phase 5: Full Integration Scaffold (v0.4.0)
+- [ ] Phase 6: Account Signing Implementation
+- [ ] Phase 7: DLEQ Proof Implementation
 - [ ] Phase 8: End-to-End Testing on Testnets
 - [ ] Phase 9: Security Audit
 - [ ] Phase 10: Mainnet Deployment
+
+## v0.4.0 Status
+
+**Full Integration Modules** (scaffolded, ready for implementation):
+- ✅ `starknet_full.rs`: Contract deployment, event watching, function calls
+- ✅ `monero_full.rs`: Transaction creation, signature finalization, broadcasting
+- ✅ Maker/Taker binaries updated to use full integrations
+- ⚠️ Account signing still requires implementation (use Starknet CLI for now)
+
+**Next Steps for Full Functionality**:
+1. Implement account key loading and signing in `StarknetAccount`
+2. Complete Monero transaction serialization in `MoneroRpcClient`
+3. Test end-to-end on Sepolia + stagenet
 
 ## License
 

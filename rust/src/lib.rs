@@ -8,6 +8,10 @@
 pub mod adaptor;
 pub mod starknet;
 pub mod monero;
+#[cfg(feature = "full-integration")]
+pub mod starknet_full;
+#[cfg(feature = "full-integration")]
+pub mod monero_full;
 
 use std::process::Command;
 use std::path::PathBuf;

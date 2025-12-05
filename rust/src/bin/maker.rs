@@ -11,7 +11,13 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use std::path::PathBuf;
 use xmr_secret_gen::adaptor::{split_monero_key, create_adaptor_signature};
-use xmr_secret_gen::{generate_swap_secret, starknet::StarknetClient, monero::MoneroClient};
+use xmr_secret_gen::{
+    generate_swap_secret,
+    starknet::StarknetClient,
+    monero::MoneroClient,
+};
+#[cfg(feature = "full-integration")]
+use xmr_secret_gen::{starknet_full::StarknetAccount, monero_full::MoneroRpcClient};
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::scalar::Scalar;
 use serde_json::json;
@@ -147,32 +153,53 @@ async fn main() -> Result<()> {
     // Step 6: Wait for unlock event (if contract deployed)
     if let Some(contract_addr) = contract_address {
         println!("\n👀 Step 6: Waiting for secret reveal (Unlocked event)...");
-        let starknet_client = StarknetClient::new(args.starknet_rpc.clone());
         
-        println!("   Watching contract: {}", contract_addr);
-        println!("   ⚠️  Event watching requires contract address");
-        println!("   ⚠️  Implement: watch_unlocked_events(&starknet_client, &contract_addr)");
+        #[cfg(feature = "full-integration")]
+        {
+            if let Some(account_path) = args.starknet_account {
+                // Use full integration if account provided
+                let account = StarknetAccount::new(
+                    args.starknet_rpc.clone(),
+                    "0x0".to_string(), // Account address - should be loaded from file
+                    "0x0".to_string(), // Private key - should be loaded from file
+                );
+                
+                println!("   Watching contract: {}", contract_addr);
+                let revealed_secret_hash = account
+                    .watch_unlocked_events(&contract_addr, 5)
+                    .await
+                    .context("Failed to watch events")?;
+                
+                println!("   ✅ Secret revealed! Hash: {}", revealed_secret_hash);
+                
+                // Step 7: Finalize and broadcast Monero transaction
+                println!("\n💰 Step 7: Finalizing Monero signature and broadcasting...");
+                let monero_client = MoneroRpcClient::new(args.monero_rpc.clone());
+                
+                // Finalize signature using revealed secret
+                use xmr_secret_gen::adaptor::finalize_signature;
+                let finalized_sig = finalize_signature(&adaptor_sig, &adaptor_scalar)
+                    .context("Failed to finalize signature")?;
+                
+                println!("   ✅ Signature finalized");
+                println!("   ⚠️  Transaction broadcasting requires full Monero wallet integration");
+                println!("   ⚠️  In production, use monero-rs to broadcast finalized transaction");
+            } else {
+                println!("   ⚠️  Full event watching requires --starknet-account");
+                println!("   ⚠️  For now, monitor manually or use Starknet explorer");
+            }
+        }
         
-        // In production, uncomment:
-        // let revealed_secret_hash = watch_unlocked_events(&starknet_client, &contract_addr, 5).await?;
-        // println!("   Secret revealed! Hash: {}", revealed_secret_hash);
-        
-        // Step 7: Finalize and broadcast Monero transaction
-        println!("\n💰 Step 7: Finalizing Monero signature and broadcasting...");
-        let monero_client = MoneroClient::new(args.monero_rpc.clone());
-        
-        // When secret is revealed, finalize signature
-        // In production:
-        // let finalized_sig = finalize_signature(&adaptor_sig, &adaptor_scalar)?;
-        // let tx_hash = monero_client.finalize_and_broadcast(&partial_tx, &adaptor_scalar).await?;
-        // println!("   Transaction broadcasted: {}", tx_hash);
-        
-        println!("   ⚠️  When t is revealed:");
-        println!("     1. Call finalize_signature(adaptor_sig, t)");
-        println!("     2. Broadcast finalized transaction to Monero stagenet");
+        #[cfg(not(feature = "full-integration"))]
+        {
+            let starknet_client = StarknetClient::new(args.starknet_rpc.clone());
+            println!("   Watching contract: {}", contract_addr);
+            println!("   ⚠️  Event watching requires full-integration feature");
+            println!("   ⚠️  Build with: cargo build --features full-integration");
+        }
     } else {
         println!("\n⏭️  Steps 6-7: Waiting for contract deployment...");
-        println!("   After deployment, run maker again with contract address");
+        println!("   After deployment, run maker again with --contract-address");
     }
     
     println!("\n✅ Maker setup complete!");
