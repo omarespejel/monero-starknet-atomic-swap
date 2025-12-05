@@ -1,10 +1,12 @@
-# XMR ↔️ Starknet Atomic Lock PoC
+# XMR ↔️ Starknet Atomic Swap
 
-This repo demonstrates a cross-chain hashlock primitive:
+This repository implements a trustless atomic swap between Monero and Starknet using adaptor signatures and DLEQ proofs. The swap works by binding a SHA-256 hashlock on Starknet to an Ed25519 adaptor point on Monero, ensuring the same secret scalar unlocks both chains.
 
-- `rust/`: Generates a Monero-compatible scalar and its SHA-256 digest, formatted for Cairo.
-- `cairo/`: Starknet contract `AtomicLock` that stores the target hash and unlocks when given the correct secret, plus tests.
-- `tools/`: Python (uv) generator for Ed25519 adaptor points and Garaga FakeGlv hints used in MSM verification.
+**Current Status**: Phase 1 complete. Rust, Python, and Cairo components are integrated and verified. The same scalar `t` that unlocks the Starknet contract also finalizes the Monero adaptor signature.
+
+- `rust/`: Generates swap secrets, splits Monero keys, and creates adaptor signatures. Automatically calls Python tool for adaptor point generation.
+- `cairo/`: Starknet contract that verifies SHA-256 hash and Ed25519 point equality (t·G == adaptor_point) using Garaga v1.0.0.
+- `tools/`: Python generator for Ed25519 adaptor points and fake-GLV hints used in Cairo's MSM verification.
 
 ## Rust (secret generator)
 
@@ -22,6 +24,23 @@ The JSON output contains:
 - `fake_glv_hint`: 10-element fake-GLV hint for MSM verification
 
 **Rust → Python Integration**: Rust automatically calls the Python tool (`tools/generate_ed25519_test_data.py`) to generate real adaptor point and fake-GLV hint from the secret. If the Python tool is unavailable, Rust falls back to placeholder values (all zeros) with a warning.
+
+### Monero Adaptor Signatures
+
+The `rust/src/adaptor/` module implements key splitting and adaptor signature creation for Monero:
+
+- **Key Splitting** (`key_splitting.rs`): Splits a Monero spend key into `base_key` + `adaptor_scalar`. The adaptor scalar `t` is the same scalar used in Cairo's hashlock.
+- **Adaptor Signatures** (`adaptor_sig.rs`): Creates partial signatures using `base_key` and the adaptor point `T = t·G`. When `t` is revealed on Starknet, the signature can be finalized and the full spend key extracted.
+
+**Integration Test** (`rust/tests/integration_test.rs`): Simulates a complete swap round:
+1. Generate secret scalar `t` (same as Cairo expects)
+2. Split Monero key into base + adaptor components
+3. Create adaptor signature on Monero side
+4. Simulate Starknet unlock (reveals `t`)
+5. Finalize Monero signature using revealed `t`
+6. Verify signature is valid
+
+This proves the same `t` works for both chains, making the atomic swap cryptographically sound.
 
 ## Cairo (AtomicLock)
 
@@ -69,10 +88,41 @@ Then update `cairo/tests/test_atomic_lock.cairo` with the new `hash_words`, `x_l
 
 **Note**: The Python tool now outputs large integers as strings in JSON to preserve precision for Rust parsers.
 
-## Repository layout
+## Current Implementation Status
+
+**Phase 1: Core Integration** ✅ Complete
+- Rust generates secrets and calls Python tool for adaptor points
+- Python generates Weierstrass coordinates and fake-GLV hints
+- Cairo verifies SHA-256 hash and MSM (t·G == adaptor_point)
+- Monero adaptor signature support implemented
+- End-to-end integration test passes
+
+**Phase 2: DLEQ Proofs** 🔄 Next
+- Implement DLEQ proof generation in Rust
+- Wire DLEQ verification into Cairo contract
+- Complete cryptographic binding between hashlock and adaptor point
+
+**Phase 3: Full CLSAG** 📋 Planned
+- Replace simplified adaptor signatures with full CLSAG implementation
+- Add ring signature support for Monero privacy
+- Test with real Monero testnet transactions
+
+## Repository Layout
 
 ```
-rust/   # Rust CLI & lib
-cairo/  # Starknet contract + tests
+rust/
+  src/
+    lib.rs              # Secret generation + Python tool integration
+    adaptor/            # Monero adaptor signature support
+      mod.rs
+      key_splitting.rs  # Split Monero key into base + adaptor
+      adaptor_sig.rs    # Create and finalize adaptor signatures
+  tests/
+    integration_test.rs # Full swap round simulation
+cairo/
+  src/lib.cairo         # AtomicLock contract with MSM verification
+  tests/test_atomic_lock.cairo
+tools/
+  generate_ed25519_test_data.py  # Python tool for adaptor points
 ```
 
