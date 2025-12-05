@@ -65,16 +65,19 @@
 
 #### Cairo Side (Starknet Contract)
 
-**Check if Available:**
+**✅ AVAILABLE:** Cairo stdlib has BLAKE2s support!
+
 ```cairo
-// Try importing:
-use core::hash::blake2s;
-// OR
-use starknet::syscalls::blake2s_syscall;
+use core::blake::{blake2s_compress, blake2s_finalize};
+
+// BLAKE2s state is Box<[u32; 8]>
+// Input is Box<[u32; 16]> (512 bits = 16 × u32)
 ```
 
-**If Available:**
+**Implementation:**
 ```cairo
+use core::blake::{blake2s_compress, blake2s_finalize};
+
 fn compute_dleq_challenge(
     G: G1Point,
     Y: G1Point,
@@ -84,32 +87,72 @@ fn compute_dleq_challenge(
     R2: G1Point,
     hashlock: Span<u32>,
 ) -> felt252 {
-    let mut hasher = blake2s::new();
+    // Initialize BLAKE2s state (8 u32 words, all zeros)
+    let mut state = BoxTrait::new([0_u32; 8]);
+    let mut byte_count = 0_u32;
     
-    // Serialize points in same format as Rust
-    serialize_point_to_blake2s(ref hasher, G);
-    serialize_point_to_blake2s(ref hasher, Y);
-    serialize_point_to_blake2s(ref hasher, T);
-    serialize_point_to_blake2s(ref hasher, U);
-    serialize_point_to_blake2s(ref hasher, R1);
-    serialize_point_to_blake2s(ref hasher, R2);
+    // Serialize points to u32 arrays (16 u32 = 512 bits per block)
+    // Format: Convert u384 limbs to u32 array format
+    let mut all_data = array![];
     
-    // Add hashlock
+    // Serialize each point (8 felt252 values = 8 u32 words per point)
+    serialize_point_to_u32_array(ref all_data, G);
+    serialize_point_to_u32_array(ref all_data, Y);
+    serialize_point_to_u32_array(ref all_data, T);
+    serialize_point_to_u32_array(ref all_data, U);
+    serialize_point_to_u32_array(ref all_data, R1);
+    serialize_point_to_u32_array(ref all_data, R2);
+    
+    // Add hashlock (8 u32 words)
     let mut i = 0;
     while i < hashlock.len() {
-        hasher.update((*hashlock.at(i)).into());
+        all_data.append(*hashlock.at(i));
         i += 1;
     }
     
-    let hash = hasher.finalize();
-    reduce_to_scalar(hash)
+    // Process in 512-bit blocks (16 u32 words)
+    let mut offset = 0;
+    while offset + 16 <= all_data.len() {
+        let mut block = array![];
+        let mut j = 0;
+        while j < 16 {
+            block.append(*all_data.at(offset + j));
+            j += 1;
+        }
+        let msg = BoxTrait::new(block.try_into().unwrap());
+        state = blake2s_compress(state, byte_count, msg);
+        byte_count += 64; // 16 u32 × 4 bytes = 64 bytes
+        offset += 16;
+    }
+    
+    // Final block (if remaining)
+    if offset < all_data.len() {
+        let mut block = array![0_u32; 16];
+        let mut j = 0;
+        while offset + j < all_data.len() {
+            *block.at_mut(j) = *all_data.at(offset + j);
+            j += 1;
+        }
+        let msg = BoxTrait::new(block.try_into().unwrap());
+        let remaining_bytes = (all_data.len() - offset) * 4;
+        state = blake2s_finalize(state, byte_count + remaining_bytes, msg);
+    } else {
+        // Empty final block
+        let msg = BoxTrait::new([0_u32; 16]);
+        state = blake2s_finalize(state, byte_count, msg);
+    }
+    
+    // Extract hash from state (first felt252 from state array)
+    let hash_state = state.unbox();
+    let hash_u32 = hash_state[0];
+    let hash_felt: felt252 = hash_u32.into();
+    
+    // Reduce to scalar mod curve order
+    reduce_to_scalar(hash_felt)
 }
 ```
 
-**If Not Available:**
-- Keep Poseidon (already working)
-- Document as "future optimization"
-- Wait for Cairo stdlib support
+**Note:** This is a low-level implementation. Consider creating a helper wrapper for easier use.
 
 #### Rust Side (DLEQ Prover)
 
@@ -179,17 +222,23 @@ Where `||` means concatenation in the **same byte format**.
 
 ## Recommended Implementation Path
 
-### Phase 1: Research (1 day)
+### Phase 1: Research (1 day) ✅ COMPLETE
 
 **Tasks:**
-1. ✅ Check if Cairo 2.x stdlib has BLAKE2s support
-2. ✅ Verify `core::hash::blake2s` or `starknet::syscalls::blake2s_syscall` availability
-3. ✅ Check Garaga documentation for BLAKE2s utilities
+1. ✅ **FOUND:** Cairo 2.14.0 stdlib **HAS BLAKE2s support**!
+   - Available in `core::blake` module
+   - Functions: `blake2s_compress()` and `blake2s_finalize()`
+   - Low-level primitives (need wrapper for high-level API)
+2. ✅ Verified `core::blake::blake2s_compress` and `blake2s_finalize` availability
+3. ✅ Checked Garaga documentation (no BLAKE2s utilities, but can use core)
 4. ✅ Research Starknet v0.14.1+ BLAKE2s usage patterns
 
-**Decision Point:**
-- If BLAKE2s available → Proceed to Phase 2
-- If not available → Keep Poseidon, document as future optimization
+**Finding:**
+- ✅ **BLAKE2s IS AVAILABLE** in Cairo stdlib (`core::blake`)
+- ⚠️ Low-level API (compress/finalize) - may need wrapper for ease of use
+- ✅ Can proceed to Phase 2 implementation
+
+**Decision:** ✅ **Proceed to Phase 2** - BLAKE2s is available!
 
 ### Phase 2: Implementation (2-3 days)
 
