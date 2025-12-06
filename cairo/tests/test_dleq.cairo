@@ -57,23 +57,15 @@ mod dleq_tests {
             61256116_u32, 2110839708_u32, 540553134_u32, 3341226206_u32
         ].span();
         
-        let adaptor_x = (
-            0x460f72719199c63ec398673f,
-            0xf27a4af146a52a7dbdeb4cfb,
-            0x5f9c70ec759789a0,
-            0x0
-        );
-        let adaptor_y = (
-            0x6b43e318a2a02d8241549109,
-            0x40e30afa4cce98c21e473980,
-            0x5e243e1eed1aa575,
-            0x0
-        );
+        // TODO: Convert Weierstrass test data to compressed Edwards
+        // For now, use placeholder compressed Edwards values
+        // These will need to be replaced with actual compressed Edwards points from Rust
+        let adaptor_point_edwards_compressed: u256 = u256 { low: 0x1234567890abcdef, high: 0 };
+        let adaptor_point_sqrt_hint: u256 = u256 { low: 0x5678, high: 0 };
         
-        // For testing: use adaptor point as second point (on-curve, but won't form valid DLEQ)
-        // In production, second point should be t·Y where Y is the second generator
-        let second_x = adaptor_x;
-        let second_y = adaptor_y;
+        // For testing: use same values for second point (placeholder)
+        let dleq_second_point_edwards_compressed: u256 = adaptor_point_edwards_compressed;
+        let dleq_second_point_sqrt_hint: u256 = adaptor_point_sqrt_hint;
         
         // Placeholder DLEQ proof (non-zero to pass scalar validation)
         // NOTE: This will fail DLEQ challenge verification, but tests structure
@@ -118,10 +110,10 @@ mod dleq_tests {
             FUTURE_TIMESTAMP,
             0.try_into().unwrap(),
             u256 { low: 0, high: 0 },
-            adaptor_x,
-            adaptor_y,
-            second_x,
-            second_y,
+            adaptor_point_edwards_compressed,
+            adaptor_point_sqrt_hint,
+            dleq_second_point_edwards_compressed,
+            dleq_second_point_sqrt_hint,
             (dleq_challenge, dleq_response),
             hint,
             empty_hint, // s_hint_for_g
@@ -143,24 +135,14 @@ mod dleq_tests {
             61256116_u32, 2110839708_u32, 540553134_u32, 3341226206_u32
         ].span();
         
-        // Valid adaptor point (from existing test - known to be on-curve)
-        let adaptor_x = (
-            0x460f72719199c63ec398673f,
-            0xf27a4af146a52a7dbdeb4cfb,
-            0x5f9c70ec759789a0,
-            0x0
-        );
-        let adaptor_y = (
-            0x6b43e318a2a02d8241549109,
-            0x40e30afa4cce98c21e473980,
-            0x5e243e1eed1aa575,
-            0x0
-        );
+        // TODO: Convert Weierstrass test data to compressed Edwards
+        // For now, use placeholder compressed Edwards values
+        let adaptor_point_edwards_compressed: u256 = u256 { low: 0xdeadbeef, high: 0 };
+        let adaptor_point_sqrt_hint: u256 = u256 { low: 0x5678, high: 0 };
         
-        // Use adaptor point as second point (on-curve, but won't form valid DLEQ proof)
-        // This passes structural validation but fails DLEQ verification
-        let second_x = adaptor_x;
-        let second_y = adaptor_y;
+        // Use same values for second point (placeholder)
+        let dleq_second_point_edwards_compressed: u256 = adaptor_point_edwards_compressed;
+        let dleq_second_point_sqrt_hint: u256 = adaptor_point_sqrt_hint;
         
         // Invalid DLEQ proof (random values that won't verify)
         let invalid_challenge: felt252 = 0xdeadbeef;
@@ -190,10 +172,10 @@ mod dleq_tests {
             FUTURE_TIMESTAMP,
             0.try_into().unwrap(),
             u256 { low: 0, high: 0 },
-            adaptor_x,
-            adaptor_y,
-            second_x,
-            second_y,
+            adaptor_point_edwards_compressed,
+            adaptor_point_sqrt_hint,
+            dleq_second_point_edwards_compressed,
+            dleq_second_point_sqrt_hint,
             (invalid_challenge, invalid_response),
             hint,
             empty_hint, // s_hint_for_g
@@ -217,10 +199,10 @@ mod dleq_tests {
         lock_until: u64,
         token: ContractAddress,
         amount: u256,
-        adaptor_point_x: (felt252, felt252, felt252, felt252),
-        adaptor_point_y: (felt252, felt252, felt252, felt252),
-        dleq_second_point_x: (felt252, felt252, felt252, felt252),
-        dleq_second_point_y: (felt252, felt252, felt252, felt252),
+        adaptor_point_edwards_compressed: u256,
+        adaptor_point_sqrt_hint: u256,
+        dleq_second_point_edwards_compressed: u256,
+        dleq_second_point_sqrt_hint: u256,
         dleq: (felt252, felt252),
         fake_glv_hint: Span<felt252>,
         dleq_s_hint_for_g: Span<felt252>,
@@ -231,10 +213,6 @@ mod dleq_tests {
         let declare_res = declare("AtomicLock");
         let contract = declare_res.unwrap().contract_class();
 
-        let (x0, x1, x2, x3) = adaptor_point_x;
-        let (y0, y1, y2, y3) = adaptor_point_y;
-        let (dleq_x0, dleq_x1, dleq_x2, dleq_x3) = dleq_second_point_x;
-        let (dleq_y0, dleq_y1, dleq_y2, dleq_y3) = dleq_second_point_y;
         let (dleq_c, dleq_r) = dleq;
 
         let mut calldata = ArrayTrait::new();
@@ -243,25 +221,13 @@ mod dleq_tests {
         Serde::serialize(@token, ref calldata);
         Serde::serialize(@amount, ref calldata);
         
-        // Adaptor point (x/y limbs)
-        Serde::serialize(@x0, ref calldata);
-        Serde::serialize(@x1, ref calldata);
-        Serde::serialize(@x2, ref calldata);
-        Serde::serialize(@x3, ref calldata);
-        Serde::serialize(@y0, ref calldata);
-        Serde::serialize(@y1, ref calldata);
-        Serde::serialize(@y2, ref calldata);
-        Serde::serialize(@y3, ref calldata);
+        // Adaptor point (compressed Edwards + sqrt hint)
+        Serde::serialize(@adaptor_point_edwards_compressed, ref calldata);
+        Serde::serialize(@adaptor_point_sqrt_hint, ref calldata);
         
-        // DLEQ second point (x/y limbs)
-        Serde::serialize(@dleq_x0, ref calldata);
-        Serde::serialize(@dleq_x1, ref calldata);
-        Serde::serialize(@dleq_x2, ref calldata);
-        Serde::serialize(@dleq_x3, ref calldata);
-        Serde::serialize(@dleq_y0, ref calldata);
-        Serde::serialize(@dleq_y1, ref calldata);
-        Serde::serialize(@dleq_y2, ref calldata);
-        Serde::serialize(@dleq_y3, ref calldata);
+        // DLEQ second point (compressed Edwards + sqrt hint)
+        Serde::serialize(@dleq_second_point_edwards_compressed, ref calldata);
+        Serde::serialize(@dleq_second_point_sqrt_hint, ref calldata);
         
         // DLEQ proof (challenge, response)
         Serde::serialize(@dleq_c, ref calldata);
