@@ -18,8 +18,8 @@ mod point_decompression_tests {
     };
 
     const TEST_ADAPTOR_POINT_SQRT_HINT: u256 = u256 {
-        low: 0xc402f618a49c0d85b51775742039618d,
-        high: 0x5799b1d09a1b508834cdf2b51069065d,
+        low: 0x3bfd09e75b63f27a4ae88a8bdfc69e60,
+        high: 0x28664e2f65e4af77cb320d4aef96f9a2,
     };
 
     const TEST_SECOND_POINT_COMPRESSED: u256 = u256 {

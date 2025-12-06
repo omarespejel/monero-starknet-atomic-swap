@@ -71,9 +71,14 @@ def xrecover_twisted_edwards(y_compressed: int) -> int:
         # This shouldn't happen for valid Ed25519 points
         raise ValueError(f"Invalid square root: x^2 = {hex(x_sq_check)}, expected {hex(x_sq)} or {hex((P - x_sq) % P)}")
     
-    # Adjust sign: if sign bit doesn't match x parity, negate x
-    if (x & 1) != sign_bit:
-        x = (P - x) % P
+    # NOTE: Do NOT apply final sign adjustment here!
+    # Garaga's decompress_edwards_pt_from_y_compressed_le_into_weirstrass_point
+    # applies the sign adjustment itself by checking:
+    #   sqrt_hint.low % 2 == sign_bit
+    #   If false, negates: neg_mod_p(sqrt_hint)
+    # 
+    # So we return x WITHOUT sign adjustment - Garaga handles it.
+    # This matches Garaga's pattern from signatures.py line 454-457.
     
     return x
 
