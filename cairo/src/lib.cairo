@@ -61,8 +61,8 @@ pub mod AtomicLock {
     use core::integer::u256;
     use core::num::traits::Zero;
     use core::sha256::compute_sha256_byte_array;
-    use core::poseidon::PoseidonTrait;
-    use core::hash::HashStateTrait;
+    use core::blake::{blake2s_compress, blake2s_finalize, Blake2sState, Blake2sInput};
+    use core::box::BoxTrait;
     use starknet::contract_address::ContractAddress;
     use starknet::get_contract_address;
     use starknet::get_block_timestamp;

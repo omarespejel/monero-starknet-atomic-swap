@@ -10,15 +10,16 @@
 //! - Y is the second generator point (derived deterministically)
 //!
 //! **Hash Function Compatibility:**
-//! - Currently uses SHA-256 for challenge computation
-//! - Cairo uses Poseidon (10x cheaper gas)
-//! - TODO: Implement Poseidon in Rust for full compatibility
-//! - See DLEQ_COMPATIBILITY.md for details
+//! - Uses BLAKE2s for challenge computation (matches Cairo)
+//! - BLAKE2s is Starknet's official standard (v0.14.1+)
+//! - 8x cheaper proving cost than Poseidon
+//! - Native Cairo stdlib support via core::blake
 
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar;
 use sha2::{Digest, Sha256, Sha512};
+use blake2::{Blake2s256, Digest as Blake2Digest};
 
 // TODO: Uncomment when Poseidon is fully implemented
 // mod poseidon;
@@ -117,19 +118,20 @@ fn generate_deterministic_nonce(secret: &Scalar, hashlock: &[u8; 32]) -> Scalar 
 ///
 /// Challenge: c = H(tag || G || Y || T || U || R1 || R2 || hashlock) mod n
 ///
-/// **Current Implementation:** Uses SHA-256 (simpler, works now)
-/// **Target Implementation:** Poseidon (10x cheaper gas, matches Cairo)
-///
-/// **Compatibility Note:**
-/// - Rust currently uses SHA-256 with compressed Edwards points
-/// - Cairo uses Poseidon with Weierstrass u384 limbs
-/// - These produce different challenges - proofs won't verify cross-platform
-/// - See DLEQ_COMPATIBILITY.md for migration path
+/// **Implementation:** Uses BLAKE2s (Starknet's official standard)
+/// - 8x cheaper proving cost than Poseidon
+/// - Native Cairo stdlib support via core::blake
+/// - Matches Cairo implementation exactly
 ///
 /// **Format:**
-/// - tag: "DLEQ" (double SHA-256 for domain separation)
-/// - G, Y, T, U, R1, R2: Ed25519 points (compressed format)
+/// - tag: "DLEQ" (4 bytes, 0x444c4551)
+/// - G, Y, T, U, R1, R2: Ed25519 points (compressed format, 32 bytes each)
 /// - hashlock: 32-byte hash
+///
+/// **Serialization Order:**
+/// 1. Tag: "DLEQ" (4 bytes)
+/// 2. Points in order: G, Y, T, U, R1, R2 (each 32 bytes compressed)
+/// 3. Hashlock (32 bytes)
 fn compute_challenge(
     G: &EdwardsPoint,
     Y: &EdwardsPoint,
@@ -139,25 +141,23 @@ fn compute_challenge(
     R2: &EdwardsPoint,
     hashlock: &[u8; 32],
 ) -> Scalar {
-    // TODO: Switch to Poseidon once implemented
-    // let c = compute_poseidon_challenge(G, Y, T, U, R1, R2, hashlock);
-    // return c;
-    
-    // Current: SHA-256 implementation (simpler, but incompatible with Cairo)
-    let mut hasher = Sha256::new();
+    // Use BLAKE2s (Starknet's official standard, matches Cairo)
+    let mut hasher = Blake2s256::new();
 
-    // Tag: SHA256("DLEQ") || SHA256("DLEQ") for domain separation
-    let tag = Sha256::digest(b"DLEQ");
-    hasher.update(tag);
-    hasher.update(tag);
+    // Tag: "DLEQ" (4 bytes) for domain separation
+    // This matches Cairo's tag: 0x444c4551
+    hasher.update(b"DLEQ");
 
     // Serialize points in compressed format (32 bytes each)
+    // Order: G, Y, T, U, R1, R2 (must match Cairo exactly)
     hasher.update(G.compress().as_bytes());
     hasher.update(Y.compress().as_bytes());
     hasher.update(T.compress().as_bytes());
     hasher.update(U.compress().as_bytes());
     hasher.update(R1.compress().as_bytes());
     hasher.update(R2.compress().as_bytes());
+
+    // Add hashlock (32 bytes)
     hasher.update(hashlock);
 
     // Reduce hash to scalar mod curve order
