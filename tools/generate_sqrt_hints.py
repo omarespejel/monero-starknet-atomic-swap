@@ -48,8 +48,9 @@ def xrecover_twisted_edwards(y_compressed: int) -> int:
     # x = x_sq^((p+3)/8) mod p
     x = pow(x_sq, (P + 3) // 8, P)
     
-    # Check if x^2 = x_sq or x^2 = -x_sq
+    # RFC 8032 Section 5.1.3: Check if x^2 = x_sq or x^2 = -x_sq
     x_sq_check = (x * x) % P
+    
     if x_sq_check == x_sq:
         # x is correct
         pass
@@ -59,7 +60,13 @@ def xrecover_twisted_edwards(y_compressed: int) -> int:
         I = pow(2, (P - 1) // 4, P)
         x = (x * I) % P
         # Verify after multiplication
-        assert (x * x) % P == x_sq, f"Square root failed after I multiplication"
+        x_sq_check_after = (x * x) % P
+        if x_sq_check_after != x_sq:
+            # If still wrong, try the other square root
+            x = (P - x) % P
+            x_sq_check_after = (x * x) % P
+            if x_sq_check_after != x_sq:
+                raise ValueError(f"Square root failed: x^2 = {hex(x_sq_check_after)}, expected {hex(x_sq)}")
     else:
         # This shouldn't happen for valid Ed25519 points
         raise ValueError(f"Invalid square root: x^2 = {hex(x_sq_check)}, expected {hex(x_sq)} or {hex((P - x_sq) % P)}")
