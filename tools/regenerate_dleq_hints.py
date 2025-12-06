@@ -94,9 +94,29 @@ def main():
     curve = CURVES[CurveID.ED25519.value]
     order = curve.n
     
-    s_scalar = response_int % order
-    c_scalar = challenge_int % order
+    # CRITICAL: Cairo's compute_dleq_challenge_blake2s returns scalar.low (after reducing mod order)
+    # Then reduce_felt_to_scalar does: f_u128 = felt252.try_into().unwrap()
+    # So the scalar used in MSM is: (hash % order).low
+    #
+    # test_vectors.json contains the full hash values, so we need to:
+    # 1. Reduce mod order: hash % order
+    # 2. Take low part: (hash % order).low
+    # 3. Use that as the scalar for hint generation
+    
+    # Reduce mod order first (matching compute_dleq_challenge_blake2s)
+    response_scalar_full = response_int % order
+    challenge_scalar_full = challenge_int % order
+    
+    # Extract low u128 (matching scalar.low in Cairo)
+    # This is what reduce_felt_to_scalar will use
+    s_scalar = response_scalar_full & ((1 << 128) - 1)
+    c_scalar = challenge_scalar_full & ((1 << 128) - 1)
     c_neg_scalar = (order - c_scalar) % order
+    
+    print(f"Note: Using scalar.low values (matching Cairo's reduce_felt_to_scalar)")
+    print(f"  Response scalar.low: 0x{s_scalar:032x}")
+    print(f"  Challenge scalar.low: 0x{c_scalar:032x}")
+    print()
     
     print("=" * 80)
     print("Regenerating DLEQ hints for new test vectors")
