@@ -247,6 +247,8 @@ pub mod AtomicLock {
         pub const DLEQ_VERIFICATION_FAILED: felt252 = 'DLEQ verification failed';
         pub const DLEQ_POINT_NOT_ON_CURVE: felt252 = 'DLEQ: point not on curve';
         pub const DLEQ_SMALL_ORDER_POINT: felt252 = 'DLEQ: small order point';
+        pub const MSM_LEN_MISMATCH: felt252 = 'MSM len mismatch';
+        pub const MSM_HINT_LEN_WRONG: felt252 = 'MSM hint len wrong';
         // Decompression failure errors (for debugging)
         pub const ADAPTOR_POINT_DECOMPRESS_FAILED: felt252 = 'Adaptor point decompress failed';
         pub const SECOND_POINT_DECOMPRESS_FAILED: felt252 = 'Second point decompress failed';
@@ -944,17 +946,29 @@ pub mod AtomicLock {
         let c_neg_scalar = (ED25519_ORDER - (c_scalar % ED25519_ORDER)) % ED25519_ORDER;
         
         // PRODUCTION: Use provided fake-GLV hints for MSM operations
+        // Debug assertions to verify array lengths match (per auditor recommendation)
+        let points_g = array![G].span();
+        let scalars_s = array![s_scalar].span();
+        assert(points_g.len() == scalars_s.len(), Errors::MSM_LEN_MISMATCH);
+        assert(s_hint_for_g.len() == points_g.len() * 10, Errors::MSM_HINT_LEN_WRONG);
+        
         // s_hint_for_g: hint for s·G (Q = s·G)
         let sG = msm_g1(
-            array![G].span(),
-            array![s_scalar].span(),
+            points_g,
+            scalars_s,
             curve_idx,
             s_hint_for_g
         );
+        
         // c_neg_hint_for_t: hint for (-c)·T (Q = (-c)·T)
+        let points_t = array![T].span();
+        let scalars_c_neg = array![c_neg_scalar].span();
+        assert(points_t.len() == scalars_c_neg.len(), Errors::MSM_LEN_MISMATCH);
+        assert(c_neg_hint_for_t.len() == points_t.len() * 10, Errors::MSM_HINT_LEN_WRONG);
+        
         let neg_cT = msm_g1(
-            array![T].span(),
-            array![c_neg_scalar].span(),
+            points_t,
+            scalars_c_neg,
             curve_idx,
             c_neg_hint_for_t
         );
@@ -963,16 +977,27 @@ pub mod AtomicLock {
 
         // Compute R2' = s·Y - c·U = s·Y + (-c)·U
         // s_hint_for_y: hint for s·Y (Q = s·Y)
+        let points_y = array![Y].span();
+        let scalars_s2 = array![s_scalar].span();
+        assert(points_y.len() == scalars_s2.len(), Errors::MSM_LEN_MISMATCH);
+        assert(s_hint_for_y.len() == points_y.len() * 10, Errors::MSM_HINT_LEN_WRONG);
+        
         let sY = msm_g1(
-            array![Y].span(),
-            array![s_scalar].span(),
+            points_y,
+            scalars_s2,
             curve_idx,
             s_hint_for_y
         );
+        
         // c_neg_hint_for_u: hint for (-c)·U (Q = (-c)·U)
+        let points_u = array![U].span();
+        let scalars_c_neg2 = array![c_neg_scalar].span();
+        assert(points_u.len() == scalars_c_neg2.len(), Errors::MSM_LEN_MISMATCH);
+        assert(c_neg_hint_for_u.len() == points_u.len() * 10, Errors::MSM_HINT_LEN_WRONG);
+        
         let neg_cU = msm_g1(
-            array![U].span(),
-            array![c_neg_scalar].span(),
+            points_u,
+            scalars_c_neg2,
             curve_idx,
             c_neg_hint_for_u
         );
