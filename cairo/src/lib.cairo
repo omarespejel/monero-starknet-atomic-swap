@@ -247,6 +247,11 @@ pub mod AtomicLock {
         pub const DLEQ_VERIFICATION_FAILED: felt252 = 'DLEQ verification failed';
         pub const DLEQ_POINT_NOT_ON_CURVE: felt252 = 'DLEQ: point not on curve';
         pub const DLEQ_SMALL_ORDER_POINT: felt252 = 'DLEQ: small order point';
+        // Decompression failure errors (for debugging)
+        pub const ADAPTOR_POINT_DECOMPRESS_FAILED: felt252 = 'Adaptor point decompress failed';
+        pub const SECOND_POINT_DECOMPRESS_FAILED: felt252 = 'Second point decompress failed';
+        pub const R1_DECOMPRESS_FAILED: felt252 = 'R1 decompress failed';
+        pub const R2_DECOMPRESS_FAILED: felt252 = 'R2 decompress failed';
         pub const DLEQ_CHALLENGE_MISMATCH: felt252 = 'DLEQ: challenge mismatch';
         pub const DLEQ_SCALAR_OUT_OF_RANGE: felt252 = 'DLEQ: scalar out of range';
         pub const DLEQ_ZERO_SCALAR: felt252 = 'DLEQ: zero scalar rejected';
@@ -336,7 +341,11 @@ pub mod AtomicLock {
             adaptor_point_sqrt_hint
         );
         
+        // AUDIT: Debug assertion to identify decompression failures
         // INVARIANT: Decompression must succeed (point must be valid Edwards)
+        if adaptor_point_weierstrass.is_none() {
+            assert(false, Errors::ADAPTOR_POINT_DECOMPRESS_FAILED);
+        }
         let point = adaptor_point_weierstrass.unwrap();
         point.assert_on_curve_excluding_infinity(ED25519_CURVE_INDEX);
         assert(!is_small_order_ed25519(point), Errors::SMALL_ORDER_POINT);
@@ -398,6 +407,10 @@ pub mod AtomicLock {
             dleq_second_point_sqrt_hint
         );
         
+        // AUDIT: Debug assertion to identify decompression failures
+        if dleq_second_point_weierstrass.is_none() {
+            assert(false, Errors::SECOND_POINT_DECOMPRESS_FAILED);
+        }
         let dleq_second_point = dleq_second_point_weierstrass.unwrap();
         dleq_second_point.assert_on_curve_excluding_infinity(ED25519_CURVE_INDEX);
         assert(!is_small_order_ed25519(dleq_second_point), Errors::SMALL_ORDER_POINT);
@@ -426,6 +439,10 @@ pub mod AtomicLock {
             dleq_r1_compressed,
             dleq_r1_sqrt_hint
         );
+        // AUDIT: Debug assertion to identify decompression failures
+        if dleq_r1_weierstrass.is_none() {
+            assert(false, Errors::R1_DECOMPRESS_FAILED);
+        }
         let dleq_r1 = dleq_r1_weierstrass.unwrap();
         dleq_r1.assert_on_curve_excluding_infinity(ED25519_CURVE_INDEX);
         assert(!is_small_order_ed25519(dleq_r1), Errors::SMALL_ORDER_POINT);
@@ -434,6 +451,10 @@ pub mod AtomicLock {
             dleq_r2_compressed,
             dleq_r2_sqrt_hint
         );
+        // AUDIT: Debug assertion to identify decompression failures
+        if dleq_r2_weierstrass.is_none() {
+            assert(false, Errors::R2_DECOMPRESS_FAILED);
+        }
         let dleq_r2 = dleq_r2_weierstrass.unwrap();
         dleq_r2.assert_on_curve_excluding_infinity(ED25519_CURVE_INDEX);
         assert(!is_small_order_ed25519(dleq_r2), Errors::SMALL_ORDER_POINT);
