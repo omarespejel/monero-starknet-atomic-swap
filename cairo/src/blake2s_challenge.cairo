@@ -32,13 +32,34 @@ type Blake2sInput = core::box::Box<[u32; 16]>;
 /// Value: 0x444c4551
 const DLEQ_TAG: u32 = 0x444c4551;
 
-/// Initialize BLAKE2s state with standard IV
+/// Initialize BLAKE2s state with standard RFC 7693 IV
 /// 
-/// BLAKE2s initial state (IV) for 32-byte output:
-/// - All zeros for standard BLAKE2s
-/// - Key length = 0, output length = 32 bytes
+/// BLAKE2s requires the Initialization Vector (IV) XOR'd with the parameter block.
+/// For 32-byte output, no key: parameter block = 0x01010020
+/// (fanout=1, depth=1, digest_length=32, key_length=0)
+/// 
+/// RFC 7693 IV constants:
+/// - IV[0] = 0x6A09E667 (XOR with 0x01010020 → 0x6B08E647)
+/// - IV[1] = 0xBB67AE85
+/// - IV[2] = 0x3C6EF372
+/// - IV[3] = 0xA54FF53A
+/// - IV[4] = 0x510E527F
+/// - IV[5] = 0x9B05688C
+/// - IV[6] = 0x1F83D9AB
+/// - IV[7] = 0x5BE0CD19
 fn initial_blake2s_state() -> Blake2sState {
-    core::box::BoxTrait::new([0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32])
+    // CRITICAL FIX: Use RFC 7693 IV XOR'd with parameter block
+    // Without this, BLAKE2s produces completely different output
+    core::box::BoxTrait::new([
+        0x6B08E647_u32,  // IV[0] ^ 0x01010020 (0x6A09E667 ^ 0x01010020)
+        0xBB67AE85_u32,  // IV[1]
+        0x3C6EF372_u32,  // IV[2]
+        0xA54FF53A_u32,  // IV[3]
+        0x510E527F_u32,  // IV[4]
+        0x9B05688C_u32,  // IV[5]
+        0x1F83D9AB_u32,  // IV[6]
+        0x5BE0CD19_u32,  // IV[7]
+    ])
 }
 
 /// Process multiple u256 values through BLAKE2s compression (batch optimization)
@@ -111,24 +132,65 @@ fn process_u256(
     (new_state, byte_count + 32) // 32 bytes per u256
 }
 
+/// Byte-swap a u32 word (Big-Endian -> Little-Endian)
+/// 
+/// Transforms 0x12345678 -> 0x78563412
+/// This is needed because SHA-256 produces Big-Endian words,
+/// but BLAKE2s expects Little-Endian byte streams.
+/// 
+/// Implementation matches auditor's specification:
+/// Extract bytes from least to most significant, then reconstruct in reverse order.
+/// 
+/// @param value u32 word in Big-Endian format
+/// @return u32 word in Little-Endian format
+fn byte_swap_u32(value: u32) -> u32 {
+    // Extract bytes from least to most significant (as auditor suggests)
+    let b0 = value & 0xFF;                    // Least significant byte (bits 0-7)
+    let b1 = (value / 0x100) & 0xFF;          // Byte 1 (bits 8-15)
+    let b2 = (value / 0x10000) & 0xFF;        // Byte 2 (bits 16-23)
+    let b3 = (value / 0x1000000) & 0xFF;      // Most significant byte (bits 24-31)
+    
+    // Reconstruct in reverse order: b0 becomes MSB, b3 becomes LSB
+    // Result: 0x78563412 for input 0x12345678
+    (b0 * 0x1000000) + (b1 * 0x10000) + (b2 * 0x100) + b3
+}
+
 /// Convert hashlock from Span<u32> (8 words) to u256
 /// 
-/// Interprets 8 u32 words as big-endian u256 for consistency with SHA-256 hashlock format.
+/// CRITICAL FIX: SHA-256 produces Big-Endian u32 words, but BLAKE2s expects Little-Endian bytes.
+/// We byte-swap each word before packing into u256 so that when process_u256 extracts them
+/// as little-endian, they match what Rust's BLAKE2s sees.
 /// 
-/// @param hashlock SHA-256 hash as 8 u32 words (big-endian)
-/// @return u256 representation of hashlock
+/// @param hashlock SHA-256 hash as 8 u32 words (big-endian from SHA-256)
+/// @return u256 representation of hashlock (with byte-swapped words for BLAKE2s compatibility)
 pub fn hashlock_to_u256(hashlock: Span<u32>) -> u256 {
-    // Convert 8 u32 words to u256 (big-endian interpretation)
+    // CRITICAL: Validate span length before accessing elements
+    // This prevents "Option::unwrap failed" if span is corrupted or has wrong length
+    assert(hashlock.len() == 8, 'Hashlock must be 8 u32 words');
+    
+    // CRITICAL FIX: Byte-swap each word before packing
+    // SHA-256 words are Big-Endian (0x12345678), but BLAKE2s expects Little-Endian bytes
+    // After byte-swap: 0x78563412, which when extracted as little-endian gives correct bytes
+    let h0_swapped = byte_swap_u32(*hashlock.at(0));
+    let h1_swapped = byte_swap_u32(*hashlock.at(1));
+    let h2_swapped = byte_swap_u32(*hashlock.at(2));
+    let h3_swapped = byte_swap_u32(*hashlock.at(3));
+    let h4_swapped = byte_swap_u32(*hashlock.at(4));
+    let h5_swapped = byte_swap_u32(*hashlock.at(5));
+    let h6_swapped = byte_swap_u32(*hashlock.at(6));
+    let h7_swapped = byte_swap_u32(*hashlock.at(7));
+    
+    // Convert 8 byte-swapped u32 words to u256 (little-endian interpretation)
     // u256 = h0 + h1·2^32 + h2·2^64 + ... + h7·2^224
     let base: u256 = u256 { low: 0x1_0000_0000, high: 0 };
-    let low = u256 { low: (*hashlock.at(0)).into(), high: 0 }
-        + base * u256 { low: (*hashlock.at(1)).into(), high: 0 }
-        + base * base * u256 { low: (*hashlock.at(2)).into(), high: 0 }
-        + base * base * base * u256 { low: (*hashlock.at(3)).into(), high: 0 };
-    let high = u256 { low: (*hashlock.at(4)).into(), high: 0 }
-        + base * u256 { low: (*hashlock.at(5)).into(), high: 0 }
-        + base * base * u256 { low: (*hashlock.at(6)).into(), high: 0 }
-        + base * base * base * u256 { low: (*hashlock.at(7)).into(), high: 0 };
+    let low = u256 { low: h0_swapped.into(), high: 0 }
+        + base * u256 { low: h1_swapped.into(), high: 0 }
+        + base * base * u256 { low: h2_swapped.into(), high: 0 }
+        + base * base * base * u256 { low: h3_swapped.into(), high: 0 };
+    let high = u256 { low: h4_swapped.into(), high: 0 }
+        + base * u256 { low: h5_swapped.into(), high: 0 }
+        + base * base * u256 { low: h6_swapped.into(), high: 0 }
+        + base * base * base * u256 { low: h7_swapped.into(), high: 0 };
     u256 { low: low.low, high: high.low }
 }
 
@@ -200,6 +262,10 @@ pub fn compute_dleq_challenge_blake2s(
     let hash_state = state.unbox();
     let hash_span = hash_state.span();
     
+    // CRITICAL: Validate span length before accessing elements
+    // BLAKE2s state should always have exactly 8 u32 words
+    assert(hash_span.len() == 8, 'BLAKE2s state must have 8 words');
+    
     // Extract all 8 u32 words (little-endian interpretation)
     // Words 0-3 form the low u128, words 4-7 form the high u128
     let w0: u128 = (*hash_span.at(0)).into();
@@ -221,12 +287,25 @@ pub fn compute_dleq_challenge_blake2s(
     let hash_u256 = u256 { low, high };
     let scalar = hash_u256 % ed25519_order;
     
-    // CRITICAL: Return full scalar as felt252 (not just scalar.low)
-    // scalar % order < order < 2^252, so fits in felt252
-    // Combine low and high: felt252 = scalar.low + scalar.high * 2^128
+    // CRITICAL: Convert scalar to felt252 safely
+    // Since scalar < ed25519_order and ed25519_order is close to 2^252,
+    // we need to handle the conversion carefully to avoid overflow
+    // Try converting the full scalar directly first
+    let scalar_felt_option: Option<felt252> = scalar.try_into();
+    
+    // If direct conversion fails (scalar >= felt252 prime), we need to reduce further
+    // This should be rare but can happen if scalar is very close to ed25519_order
+    if scalar_felt_option.is_some() {
+        return scalar_felt_option.unwrap();
+    }
+    
+    // Fallback: Convert scalar mod felt252 prime by reducing again
+    // This ensures we always return a valid felt252
+    // Note: This is safe because felt252 arithmetic wraps modulo the prime
     let base_128: felt252 = 0x100000000000000000000000000000000; // 2^128
-    let low_felt: felt252 = scalar.low.try_into().unwrap();
-    let high_felt: felt252 = scalar.high.try_into().unwrap();
+    let low_felt: felt252 = scalar.low.try_into().unwrap(); // Always succeeds (u128 < felt252)
+    let high_felt: felt252 = scalar.high.try_into().unwrap(); // Always succeeds (u128 < felt252)
+    // Arithmetic wraps modulo felt252 prime, so this is safe
     let scalar_felt = low_felt + high_felt * base_128;
     scalar_felt
 }
