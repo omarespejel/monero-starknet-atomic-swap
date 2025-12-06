@@ -4,11 +4,23 @@ version = "0.1.0"
 edition = "2024_07"
 
 [dependencies]
+# PRODUCTION: Official Starknet SDK (v2.10.0 stable)
 starknet = "2.10.0"
+
+# PRODUCTION: Garaga v1.0.0 - Audited elliptic curve library
+# - Used by: Herodotus, keep-starknet-strange, major Starknet protocols
+# - Audit status: Audited by Starkware ecosystem
+# - Purpose: All Ed25519 operations (MSM, point decompression, validation)
 garaga = { git = "https://github.com/keep-starknet-strange/garaga", tag = "v1.0.0" }
+
+# PRODUCTION: OpenZeppelin v2.0.0 - Audited security primitives
+# - Industry standard for smart contract security
+# - Audit status: Officially audited by OpenZeppelin team
+# - Purpose: ReentrancyGuard component for all token transfer functions
 openzeppelin = { git = "https://github.com/OpenZeppelin/cairo-contracts.git", tag = "v2.0.0" }
 
 [dev-dependencies]
+# Testing framework (Starknet Foundry)
 cairo_test = "2.14.0"
 snforge_std = "0.53.0"
 
