@@ -9,7 +9,7 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/):
 - **MINOR**: New features (backward compatible)
 - **PATCH**: Bug fixes (backward compatible)
 
-## Current Version: v0.5.0
+## Current Version: v0.5.2
 
 **Status**: Pre-1.0.0 (development phase)
 
@@ -20,7 +20,17 @@ During pre-1.0.0:
 
 ## Release Tags
 
-### v0.5.0 - Cryptography Milestone (Current)
+### v0.5.2 - Critical Cryptographic Fixes (Current)
+- **Date**: 2025-12-06
+- **Milestone**: Fixed endianness, double consumption, and scalar interpretation bugs
+- **Status**: Cryptographic fixes complete, integration testing ongoing
+- **Key Fixes**:
+  - Endianness bug in BLAKE2s challenge computation: FIXED
+  - Double consumption bug in DLEQ verification: FIXED
+  - Scalar interpretation alignment: FIXED
+  - Sequential MSM call failures: FIXED
+
+### v0.5.0 - Cryptography Milestone
 - **Date**: 2024-01-XX
 - **Milestone**: Hardest cryptography parts cleared
 - **Status**: 90% production-ready
@@ -154,6 +164,7 @@ Create when:
 
 | Version | Date | Milestone | Status |
 |---------|------|-----------|--------|
+| v0.5.2 | 2025-12-06 | Critical cryptographic fixes | ✅ Released |
 | v0.5.0 | 2024-01-XX | Cryptography cleared | ✅ Released |
 | v0.4.0 | 2024-01-XX | Infrastructure complete | ✅ Released |
 | v0.3.0 | 2024-01-XX | Initial production-ready | ✅ Released |
