@@ -18,11 +18,12 @@ This project implements a **prototype implementation / reference PoC** of an ato
 - **DLEQ Proofs**: Cryptographic binding between hashlock and adaptor point (implemented)
 
 **DLEQ Implementation Status:**
-- **Cairo**: DLEQ verification implemented using BLAKE2s hashing (8x cheaper than Poseidon)
+- **Cairo**: DLEQ verification implemented using BLAKE2s (gas-optimized)
 - **Rust**: DLEQ proof generation implemented using BLAKE2s
-- **Compatibility**: ✅ Hash functions aligned (both BLAKE2s) - see `TECHNICAL.md`
+- **Compatibility**: Hash functions aligned (both BLAKE2s)
+- **Current Blocker**: Compressed Edwards point decompression failing in tests (investigating)
 
-**Important**: DLEQ proofs cryptographically bind the hashlock (H) and adaptor point (T) by proving ∃t: SHA-256(t) = H ∧ t·G = T. Both Rust and Cairo implementations use BLAKE2s for challenge computation (see `TECHNICAL.md`).
+**Technical Details**: DLEQ proofs bind hashlock (H) and adaptor point (T) by proving ∃t: SHA-256(t) = H ∧ t·G = T. Challenge computation uses BLAKE2s in both implementations. See `TECHNICAL.md` for implementation details.
 
 ## Architecture
 
@@ -138,10 +139,12 @@ cargo run --bin taker -- \
 │       └── integration_test.rs
 ├── tools/              # Python tooling
 │   ├── generate_ed25519_test_data.py
-│   └── generate_second_base.py  # Second generator tool
-├── DLEQ_COMPATIBILITY.md        # Rust↔Cairo compatibility guide
-├── HASH_FUNCTION_ANALYSIS.md     # Poseidon vs BLAKE2s analysis
-├── POSEIDON_IMPLEMENTATION.md    # Poseidon implementation plan
+│   ├── generate_hints_from_test_vectors.py
+│   ├── garaga_conversion.py
+│   └── verify_rust_cairo_equivalence.py
+├── AUDIT.md            # Audit documentation and findings
+├── TECHNICAL.md        # Technical implementation details
+├── SECURITY.md         # Security architecture
 └── README.md
 ```
 
@@ -160,105 +163,96 @@ cargo test
 cargo test --test integration_test
 ```
 
-## Status: Prototype Implementation / Reference PoC
+## Implementation Status
 
-**This is a prototype implementation and reference proof-of-concept. It is NOT production-ready.**
+**Current State**: Prototype implementation with DLEQ verification. Not production-ready.
 
-**Production-ready status requires:**
-- Security audit by qualified auditors
-- DLEQ proof implementation (implemented, hash function alignment pending)
-- Hash function alignment (Rust↔Cairo compatibility)
-- Full end-to-end testing on testnets
-- Complete integration with Starknet and Monero networks
+### Completed Components
 
-**DLEQ Implementation Status**: **IMPLEMENTED**
+**Cairo Contract:**
+- AtomicLock contract with DLEQ verification
+- BLAKE2s challenge computation (gas-optimized)
+- MSM verification using Garaga v1.0.0
+- Point validation (on-curve, small-order checks)
+- Reentrancy protection (OpenZeppelin)
 
-- **Cairo**: Full DLEQ verification in constructor using Poseidon hashing
-- **Rust**: DLEQ proof generation with SHA-256 (needs Poseidon for compatibility)
-- **Features**: Comprehensive validation (on-curve, small-order, scalar range), events, error handling
-- **Compatibility**: See `DLEQ_COMPATIBILITY.md` for Rust↔Cairo alignment details
-- **Future**: BLAKE2s migration planned (see `HASH_FUNCTION_ANALYSIS.md`)
+**Rust Library:**
+- DLEQ proof generation (BLAKE2s)
+- Compressed Edwards point handling
+- Test vector generation
+- Conversion utilities (Garaga-compatible)
 
-### Current Implementation Status
+**Testing Infrastructure:**
+- Unit tests for DLEQ verification
+- Byte-order verification tests
+- Challenge computation tests
+- CI/CD workflow for automated testing
+
+### Current Blockers
+
+**Compressed Point Decompression:**
+- All Edwards points fail decompression in Cairo tests
+- Hex→u256 conversion verified correct (matches Garaga pattern)
+- Issue likely in sqrt hints or decompression function usage
+- Blocks end-to-end test execution
+
+**End-to-End Testing:**
+- Test infrastructure created but blocked by decompression issue
+- Rust↔Cairo compatibility verified for challenge computation
+- Full DLEQ verification pending decompression fix
+
+### Known Limitations
+
+**Monero Integration:**
+- Minimal adaptor-signature demo (not full CLSAG)
+- No key image handling, change outputs, or multi-output transactions
+- Proof-of-concept only, not production wallet integration
+
+**Production Readiness:**
+- Security audit required
+- End-to-end testing incomplete
+- Account signing implementation pending
+
+### Security Architecture
+
+**Implemented Security Measures:**
+- Point validation (on-curve, small-order checks)
+- Scalar range validation (mod Ed25519 order)
+- Reentrancy protection (OpenZeppelin ReentrancyGuard)
+- Timelock enforcement
+- Access control (depositor-only refund)
+
+**Audited Components:**
+- Garaga v1.0.0 (elliptic curve operations)
+- OpenZeppelin v2.0.0 (security primitives)
+- Cairo stdlib (BLAKE2s, SHA-256)
+
+**Security Documentation:**
+- See `SECURITY.md` for threat model and security properties
+- See `AUDIT.md` for audit findings and verification status
+
+## Technical Documentation
+
+- **`TECHNICAL.md`**: Architecture, module structure, DLEQ implementation, gas benchmarks
+- **`AUDIT.md`**: Audit findings, byte-order verification, critical issues
+- **`SECURITY.md`**: Security architecture, threat model, security properties
+
+## Development Status
 
 **Completed:**
-- Cairo contract with hard invariants (MSM verification, timelock, refund rules)
-- **DLEQ proof verification in Cairo** (Poseidon hashing, comprehensive validation)
-- **DLEQ proof generation in Rust** (SHA-256, needs Poseidon for compatibility)
-- Rust adaptor signature logic
-- Integration scaffold for Starknet and Monero
-- Comprehensive test suite
-- Production-grade validation (on-curve, small-order, scalar range checks)
-- Events and error handling
+- DLEQ proof implementation (Rust + Cairo, BLAKE2s)
+- Byte-order verification (confirmed correct)
+- Test infrastructure (unit tests, integration tests)
+- CI/CD workflow
 
 **In Progress:**
+- Compressed point decompression fix (blocking end-to-end tests)
+- End-to-end test execution
+
+**Pending:**
+- Security audit
 - Account signing implementation
-- Monero transaction serialization (minimal demo, not production wallet)
-- End-to-end testnet testing
-
-**Monero Integration Status:**
-- **Current**: Minimal adaptor-signature demo (simplified, not full CLSAG)
-- **Not Implemented**: Full CLSAG, key image handling, change outputs, multi-output transactions
-- **Purpose**: Proof-of-concept demonstration, not production wallet integration
-
-**In Progress:**
-- Hash function alignment (Rust↔Cairo compatibility)
-  - **Current**: Rust uses SHA-256, Cairo uses Poseidon (incompatible)
-  - **Impact**: Proofs generated in Rust won't verify in Cairo until aligned
-  - **Solutions**: See `DLEQ_COMPATIBILITY.md` (both Poseidon or both SHA-256)
-  - **Future**: BLAKE2s migration (8x cheaper than Poseidon) - see `HASH_FUNCTION_ANALYSIS.md`
-
-### Security Considerations
-
-**Hard Invariants (Implemented):**
-- **Constructor**: Adaptor point must be non-zero, on-curve, not small-order
-- **MSM Verification**: Mandatory check that `t·G == adaptor_point`
-- **Timelock**: `lock_until` must be in the future
-- **Refund Rules**: Only depositor, only after expiry, only if locked
-
-**Known Limitations:**
-- **snforge Constructor Panics**: Constructor validation tests are marked as FAIL by snforge v0.53.0, but they correctly panic (tooling limitation)
-- **Starknet Integration**: Contract deployment and event watching require full starknet-rs integration (currently scaffolded)
-- **Monero Integration**: Minimal adaptor-signature demo, not a production wallet integration
-  - Does not implement full CLSAG (Compact Linkable Spontaneous Anonymous Group signatures)
-  - No robust handling of key images, change outputs, or multi-output transactions
-  - This is a proof-of-concept demonstration, not a drop-in module for production wallets
-  - For production use, integrate with a proper Monero wallet stack
-- **DLEQ Proofs**: **IMPLEMENTED** (hash function alignment pending)
-  - **Current state**: DLEQ verification in Cairo, proof generation in Rust
-  - **What's working**: Cryptographic proof binding hashlock (H) and adaptor point (T)
-  - **Current limitation**: Hash function mismatch (Rust: SHA-256, Cairo: Poseidon)
-  - **Security**: DLEQ proves ∃t: SHA-256(t) = H ∧ t·G = T (once hash functions aligned)
-  - **Documentation**: See `DLEQ_COMPATIBILITY.md` and `HASH_FUNCTION_ANALYSIS.md`
-
-## Roadmap
-
-- [x] Phase 1: Starknet EC Sanity (MSM verification)
-- [x] Phase 2: Monero Adaptor Signatures
-- [x] Phase 3: Pre-audit Hardening
-- [x] Phase 4: On-chain Protocol Lock-in
-- [x] Phase 5: Full Integration Scaffold (v0.4.0)
-- [x] Phase 6: DLEQ Proof Implementation (Implemented, alignment pending)
-- [ ] Phase 7: Hash Function Alignment (Rust↔Cairo compatibility)
-- [ ] Phase 8: Account Signing Implementation
-- [ ] Phase 9: End-to-End Testing on Testnets
-- [ ] Phase 10: Security Audit
-- [ ] Phase 11: Mainnet Deployment
-
-## v0.4.0 Status
-
-**Full Integration Modules** (scaffolded, ready for implementation):
-- `starknet_full.rs`: Contract deployment, event watching, function calls
-- `monero_full.rs`: Transaction creation, signature finalization, broadcasting
-- Maker/Taker binaries updated to use full integrations
-- Account signing still requires implementation (use Starknet CLI for now)
-
-**Next Steps for Full Functionality**:
-1. Implement account key loading and signing in `StarknetAccount`
-2. Complete Monero transaction serialization (or integrate with production wallet stack)
-3. Test end-to-end on Sepolia + stagenet
-
-**Note on Monero Integration**: The current implementation is a minimal demo. For production use, consider integrating with a proper Monero wallet library (e.g., monero-rs) that handles full CLSAG, key images, change outputs, and multi-output transactions.
+- Production deployment
 
 ## License
 
