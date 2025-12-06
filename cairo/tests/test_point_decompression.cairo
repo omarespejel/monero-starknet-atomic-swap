@@ -43,13 +43,13 @@ mod point_decompression_tests {
     };
     
     const TEST_R2_COMPRESSED: u256 = u256 {
-        low: 0x2a8dcb3f7f2fdfac40805970f83a3577,
-        high: 0xde953c10ba21a6970b15ecdc1a8d404,
+        low: 0x66666666666666666666666666666658,
+        high: 0x66666666666666666666666666666666,
     };
     
     const TEST_R2_SQRT_HINT: u256 = u256 { 
-        low: 0x250c4f56970b928e5e65f8a7e607fadf,
-        high: 0x472b8e7d01324de31b540f88af07aeb4,
+        low: 0x9f3ee81fe68dcbcf9de661eedd114a9e,
+        high: 0x397c8b3280ddfb2ffe72518d79cc504c,
     };
 
     #[test]
