@@ -29,10 +29,10 @@ mod e2e_dleq_tests {
 
     // Compressed Edwards points from test vectors (u256, little-endian)
     // Hex strings from test_vectors.json: 32 bytes split into low (16 bytes) and high (16 bytes)
-    // Each interpreted as little-endian u128
+    // Each interpreted as little-endian bytes (corrected for byte-order compatibility)
     const TEST_ADAPTOR_POINT_COMPRESSED: u256 = u256 {
-        low: 0x45cfef03f63cce8554e86953e7cc99b5,
-        high: 0x7d29ad71e4643882427dde0adb325f95,
+        low: 0x54e86953e7cc99b545cfef03f63cce85,
+        high: 0x427dde0adb325f957d29ad71e4643882,
     };
 
     const TEST_ADAPTOR_POINT_SQRT_HINT: u256 = u256 {
@@ -41,8 +41,8 @@ mod e2e_dleq_tests {
     };
 
     const TEST_SECOND_POINT_COMPRESSED: u256 = u256 {
-        low: 0x0b7616f84c5c7bbed893b3476bdf0977,
-        high: 0x08e2e2065e60d1cd5c79d0fa84d64409,
+        low: 0xd893b3476bdf09770b7616f84c5c7bbe,
+        high: 0x5c79d0fa84d6440908e2e2065e60d1cd,
     };
 
     const TEST_SECOND_POINT_SQRT_HINT: u256 = u256 {
@@ -63,15 +63,15 @@ mod e2e_dleq_tests {
 
     // R1 and R2 commitment points (compressed Edwards)
     const TEST_R1_COMPRESSED: u256 = u256 {
-        low: 0x691d32a931f4d23909c289904f3df85b,
-        high: 0xd6c54224331717aef7926242a14aef11,
+        low: 0x9c289904f3df85b691d32a931f4d239,
+        high: 0xf7926242a14aef11d6c54224331717ae,
     };
 
     const TEST_R1_SQRT_HINT: u256 = u256 { low: 0x0, high: 0x0 }; // Placeholder (not needed for challenge computation)
 
     const TEST_R2_COMPRESSED: u256 = u256 {
-        low: 0x40805970f83a35772a8dcb3f7f2fdfac,
-        high: 0x70b15ecdc1a8d4040de953c10ba21a69,
+        low: 0x2a8dcb3f7f2fdfac40805970f83a3577,
+        high: 0xde953c10ba21a6970b15ecdc1a8d404,
     };
 
     const TEST_R2_SQRT_HINT: u256 = u256 { low: 0x0, high: 0x0 }; // Placeholder (not needed for challenge computation)
