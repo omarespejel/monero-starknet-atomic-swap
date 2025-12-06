@@ -42,6 +42,7 @@ mod point_decompression_tests {
         high: 0x48e305cd2c95870aea5ff9e5d85864c6,
     };
     
+    // R2 uses Ed25519 base point (R2 from test_vectors.json is invalid)
     const TEST_R2_COMPRESSED: u256 = u256 {
         low: 0x66666666666666666666666666666658,
         high: 0x66666666666666666666666666666666,
