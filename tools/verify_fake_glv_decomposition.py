@@ -108,7 +108,7 @@ def main():
     print()
     
     # Get base points
-    G = G1Point.get_nG(CURVE_ID, 1)
+    G = G1Point.get_nG(CurveID.ED25519, 1)
     Y = G.scalar_mul(2)  # Y = 2·G
     
     # Decompress T and U (matching regenerate_dleq_hints.py)
