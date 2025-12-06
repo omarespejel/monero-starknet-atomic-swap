@@ -313,6 +313,21 @@ pub mod AtomicLock {
         // INVARIANT: Fake-GLV hint must be exactly 10 felts (Q.x[4], Q.y[4], s1, s2)
         assert(fake_glv_hint.len() == 10, Errors::INVALID_HINT_LENGTH);
         
+        // AUDIT: Per auditor recommendation - validate DLEQ hint lengths immediately
+        // This catches calldata corruption early (e.g., double length prefix)
+        assert(dleq_s_hint_for_g.len() == 10, Errors::INVALID_HINT_LENGTH);
+        assert(dleq_s_hint_for_y.len() == 10, Errors::INVALID_HINT_LENGTH);
+        assert(dleq_c_neg_hint_for_t.len() == 10, Errors::INVALID_HINT_LENGTH);
+        assert(dleq_c_neg_hint_for_u.len() == 10, Errors::INVALID_HINT_LENGTH);
+        
+        // AUDIT: Validate first element of fake_glv_hint to detect length prefix corruption
+        // If calldata has double length prefix, first element will be the length (10) instead of Q.x limb0
+        // Q.x limb0 should be a large value (96-bit), not a small value like 10
+        let first_hint_value = *fake_glv_hint.at(0);
+        // If first value is exactly 10, it's likely the length prefix (corruption detected)
+        // Q.x limb0 should be much larger (typically > 2^32)
+        assert(first_hint_value != 10, Errors::INVALID_HINT_LENGTH); // Detect length prefix corruption
+        
         // Enforce swap-side invariants for production locks:
         // INVARIANT: lock_until must be in the future (prevents immediate expiry)
         // AUDIT: Timelock ensures depositor has time to refund if swap fails

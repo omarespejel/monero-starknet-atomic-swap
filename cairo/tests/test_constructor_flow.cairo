@@ -87,7 +87,7 @@ mod constructor_flow_tests {
             TEST_ADAPTOR_POINT_SQRT_HINT
         );
         if adaptor_result.is_none() {
-            assert(false, 'Step 1 failed: adaptor decompress');
+            assert(false, 'Step1 failed');
         }
         let adaptor = adaptor_result.unwrap();
         adaptor.assert_on_curve_excluding_infinity(ED25519_CURVE_INDEX);
@@ -99,7 +99,7 @@ mod constructor_flow_tests {
             TEST_SECOND_POINT_SQRT_HINT
         );
         if second_result.is_none() {
-            assert(false, 'Step 2 failed: second decompress');
+            assert(false, 'Step2 failed');
         }
         let second = second_result.unwrap();
         second.assert_on_curve_excluding_infinity(ED25519_CURVE_INDEX);
@@ -111,7 +111,7 @@ mod constructor_flow_tests {
             TEST_R1_SQRT_HINT
         );
         if r1_result.is_none() {
-            assert(false, 'Step 3 failed: R1 decompress');
+            assert(false, 'Step3 failed');
         }
         let r1 = r1_result.unwrap();
         r1.assert_on_curve_excluding_infinity(ED25519_CURVE_INDEX);
@@ -123,7 +123,7 @@ mod constructor_flow_tests {
             TEST_R2_SQRT_HINT
         );
         if r2_result.is_none() {
-            assert(false, 'Step 4 failed: R2 decompress');
+            assert(false, 'Step4 failed');
         }
         let r2 = r2_result.unwrap();
         r2.assert_on_curve_excluding_infinity(ED25519_CURVE_INDEX);
