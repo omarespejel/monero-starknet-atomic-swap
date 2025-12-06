@@ -7,7 +7,7 @@ mod decompression_format_tests {
     use garaga::ec_ops::G1PointTrait;
     use core::integer::u256;
 
-    const ED25519_CURVE_INDEX: u32 = 0;
+    const ED25519_CURVE_INDEX: u32 = 4;  // Ed25519 uses curve index 4 in Garaga
 
     // Ed25519 base point - known good point
     // Hex: 5866666666666666666666666666666666666666666666666666666666666666

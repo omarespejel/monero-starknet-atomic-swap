@@ -136,26 +136,39 @@ The corrected `xrecover_twisted_edwards` function:
 - Parity: `hint % 2 = 1`, `sign_bit % 2 = 0` → **Mismatch** (Garaga will negate)
 - After negation: `hint^2` matches `x_squared_expected` ✅
 
+## Final Fix: Curve Index Correction ✅
+
+**Issue Identified by Auditor**: Ed25519 in Garaga uses **curve index 4**, not 0.
+
+**Fix Applied**: Updated `ED25519_CURVE_INDEX` from `0` to `4` in all test files.
+
+**Result**: All tests now pass! ✅
+
 ## Current Test Status
 
-**Decompression Tests**: All 4 tests now succeed in decompression step
-- `test_adaptor_point_decompression`: Decompression succeeds ✅
-- `test_second_point_decompression`: Decompression succeeds ✅
-- `test_r1_decompression`: Decompression succeeds ✅
-- `test_r2_decompression`: Decompression succeeds ✅
+**Decompression Tests**: All 4 tests now pass completely ✅
+- `test_adaptor_point_decompression`: ✅ PASS
+- `test_second_point_decompression`: ✅ PASS
+- `test_r1_decompression`: ✅ PASS
+- `test_r2_decompression`: ✅ PASS
 
-**Remaining Issue**: `point not on curve` error
-- Error occurs in `assert_on_curve_excluding_infinity(ED25519_CURVE_INDEX)`
-- This validates the Weierstrass point after conversion from twisted Edwards
-- Possible causes:
-  1. Curve index mismatch (`ED25519_CURVE_INDEX = 0` may be incorrect)
-  2. Issue with Garaga's twisted Edwards → Weierstrass conversion
-  3. Point validation happening before conversion completes
+**Root Cause**: Curve index was incorrect (`0` instead of `4`)
+- Index `0` is likely BN254 or secp256k1
+- Index `4` is Ed25519 in Garaga's curve mapping
+- Points were correctly decompressed, but validated against wrong curve
 
-## Recommendations for Next Steps
+## Summary of Complete Fix Journey
 
-1. **Verify Curve Index**: Confirm `ED25519_CURVE_INDEX = 0` is correct for Ed25519 in Garaga
-2. **Check Garaga Documentation**: Review Garaga's documentation for correct curve index usage
-3. **Test with Known Point**: Try decompressing Ed25519 base point and verify it passes curve validation
-4. **Inspect Garaga Source**: Check Garaga's `decompress_edwards_pt_from_y_compressed_le_into_weirstrass_point` implementation to understand conversion process
+1. ✅ **Compressed points**: Correctly converted (little-endian per RFC 8032)
+2. ✅ **Sqrt hints**: Regenerated with correct values (validated with debug script)
+3. ✅ **Decompression**: Succeeds (returns `Some(point)`)
+4. ✅ **Curve validation**: Fixed curve index from `0` to `4` ✅
+
+**All issues resolved!** All decompression tests now pass completely.
+
+## Files Updated
+
+- `cairo/tests/test_point_decompression.cairo`: Updated curve index to 4
+- `cairo/tests/test_decompression_formats.cairo`: Updated curve index to 4
+- `cairo/tests/test_ed25519_base_point.cairo`: Updated curve index to 4
 

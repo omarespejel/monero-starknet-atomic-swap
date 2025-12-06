@@ -9,7 +9,7 @@ mod point_decompression_tests {
     use garaga::ec_ops::G1PointTrait;
     use core::integer::u256;
 
-    const ED25519_CURVE_INDEX: u32 = 0;
+    const ED25519_CURVE_INDEX: u32 = 4;  // Ed25519 uses curve index 4 in Garaga
 
     // Test vectors from test_e2e_dleq.cairo
     const TEST_ADAPTOR_POINT_COMPRESSED: u256 = u256 {

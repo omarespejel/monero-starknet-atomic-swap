@@ -7,7 +7,7 @@ mod ed25519_base_point_tests {
     use garaga::ec_ops::G1PointTrait;
     use core::integer::u256;
 
-    const ED25519_CURVE_INDEX: u32 = 0;
+    const ED25519_CURVE_INDEX: u32 = 4;  // Ed25519 uses curve index 4 in Garaga
 
     // Ed25519 base point (generator G) - guaranteed valid
     const ED25519_BASE_POINT_COMPRESSED: u256 = u256 {
