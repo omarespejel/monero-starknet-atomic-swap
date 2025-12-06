@@ -82,24 +82,25 @@ fn process_u256(
     
     // Extract u32 words directly and build fixed array
     // Low part (u128): extract 4 u32 words
+    // Note: u128 % 2^32 and division are safe - result always fits in u32
     let mut remaining_low = value.low;
-    let low0: u32 = (remaining_low % u32_mask_u128).try_into().unwrap();
+    let low0: u32 = (remaining_low % u32_mask_u128).try_into().unwrap(); // Safe: u128 % 2^32 < 2^32
     remaining_low = remaining_low / u32_mask_u128;
-    let low1: u32 = (remaining_low % u32_mask_u128).try_into().unwrap();
+    let low1: u32 = (remaining_low % u32_mask_u128).try_into().unwrap(); // Safe: u128 / 2^32 < 2^96, % 2^32 < 2^32
     remaining_low = remaining_low / u32_mask_u128;
-    let low2: u32 = (remaining_low % u32_mask_u128).try_into().unwrap();
+    let low2: u32 = (remaining_low % u32_mask_u128).try_into().unwrap(); // Safe: u128 / 2^64 < 2^64, % 2^32 < 2^32
     remaining_low = remaining_low / u32_mask_u128;
-    let low3: u32 = (remaining_low % u32_mask_u128).try_into().unwrap();
+    let low3: u32 = remaining_low.try_into().unwrap(); // Safe: u128 / 2^96 < 2^32
     
     // High part (u128): extract 4 u32 words
     let mut remaining_high = value.high;
-    let high0: u32 = (remaining_high % u32_mask_u128).try_into().unwrap();
+    let high0: u32 = (remaining_high % u32_mask_u128).try_into().unwrap(); // Safe: u128 % 2^32 < 2^32
     remaining_high = remaining_high / u32_mask_u128;
-    let high1: u32 = (remaining_high % u32_mask_u128).try_into().unwrap();
+    let high1: u32 = (remaining_high % u32_mask_u128).try_into().unwrap(); // Safe: u128 / 2^32 < 2^96, % 2^32 < 2^32
     remaining_high = remaining_high / u32_mask_u128;
-    let high2: u32 = (remaining_high % u32_mask_u128).try_into().unwrap();
+    let high2: u32 = (remaining_high % u32_mask_u128).try_into().unwrap(); // Safe: u128 / 2^64 < 2^64, % 2^32 < 2^32
     remaining_high = remaining_high / u32_mask_u128;
-    let high3: u32 = (remaining_high % u32_mask_u128).try_into().unwrap();
+    let high3: u32 = remaining_high.try_into().unwrap(); // Safe: u128 / 2^96 < 2^32
     
     // Create BLAKE2s input block directly as fixed array
     let msg: Blake2sInput = core::box::BoxTrait::new([
@@ -200,10 +201,12 @@ pub fn compute_dleq_challenge_blake2s(
     let hash_felt: felt252 = hash_u32.into();
     
     // Convert to u256 and reduce mod curve order
-    let hash_u256 = u256 { low: hash_felt.try_into().unwrap(), high: 0 };
+    // Note: hash_felt is < 2^251 (felt252 range), so conversion to u256 is safe
+    let hash_u256 = u256 { low: hash_felt.try_into().unwrap(), high: 0 }; // Safe: felt252 < 2^251 < 2^128
     let scalar = hash_u256 % ed25519_order;
     
     // Convert back to felt252 (take low 252 bits)
-    scalar.low.try_into().unwrap()
+    // Note: scalar.low < ed25519_order < 2^252, so fits in felt252
+    scalar.low.try_into().unwrap() // Safe: scalar % order < order < 2^252
 }
 
