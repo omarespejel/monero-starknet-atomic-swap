@@ -326,7 +326,12 @@ pub mod AtomicLock {
         let first_hint_value = *fake_glv_hint.at(0);
         // If first value is exactly 10, it's likely the length prefix (corruption detected)
         // Q.x limb0 should be much larger (typically > 2^32)
+        // AUDIT: Also check DLEQ hints for same corruption pattern
+        let first_dleq_hint_g = *dleq_s_hint_for_g.at(0);
         assert(first_hint_value != 10, Errors::INVALID_HINT_LENGTH); // Detect length prefix corruption
+        assert(first_dleq_hint_g != 10, Errors::INVALID_HINT_LENGTH); // Detect DLEQ hint corruption
+        // Note: If first element is 10, it means double length prefix corruption
+        // This would cause all values to shift by one position
         
         // Enforce swap-side invariants for production locks:
         // INVARIANT: lock_until must be in the future (prevents immediate expiry)
