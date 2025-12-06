@@ -61,5 +61,101 @@ All sqrt hints now pass validation:
 
 ## Commits
 
-- `cd7f158`: fix: update sqrt hints with correct values from xrecover_twisted_edwards
+1. `cd7f158`: fix: update sqrt hints with correct values from xrecover_twisted_edwards
+   - Regenerated all sqrt hints using corrected `xrecover_twisted_edwards` function
+   - Updated test file with correct values
+   - All hints now pass validation
+
+2. `88b75c1`: docs: add auditor fix summary for sqrt hint correction
+   - Created comprehensive summary document
+   - Documented problem, solution, and verification results
+
+## Technical Details
+
+### Debug Script Implementation
+
+The `tools/debug_hints.py` script implements the auditor's recommended debugging approach:
+
+```python
+def debug_hint(compressed_hex: str, sqrt_hint_low: str, sqrt_hint_high: str):
+    # Parse compressed point (little-endian per RFC 8032)
+    compressed_bytes = bytes.fromhex(compressed_hex.replace('0x', ''))
+    compressed = int.from_bytes(compressed_bytes, 'little')
+    
+    # Extract sign bit and y-coordinate
+    sign_bit = (compressed >> 255) & 1
+    y = compressed & ((1 << 255) - 1)
+    
+    # Compute expected x_squared
+    y_sq = (y * y) % P
+    numerator = (y_sq - 1) % P
+    denominator = (D * y_sq + 1) % P
+    x_squared_expected = (numerator * pow(denominator, -1, P)) % P
+    
+    # Verify hint^2 matches expected
+    hint_squared = (sqrt_hint * sqrt_hint) % P
+    
+    # Check Garaga's parity logic
+    hint_parity = sqrt_hint % 2
+    # Garaga negates if parities don't match
+```
+
+### Sqrt Hint Generation Process
+
+The corrected `xrecover_twisted_edwards` function:
+
+1. Extracts y-coordinate and sign bit from compressed point
+2. Computes `x^2 = (y^2 - 1) / (d*y^2 + 1) mod p`
+3. Computes `x = x_sq^((p+3)/8) mod p`
+4. If `x^2 != x_sq`, multiplies by `I = 2^((p-1)/4) mod p`
+5. **Returns x WITHOUT sign adjustment** (Garaga applies it)
+
+### Validation Results (Detailed)
+
+**Adaptor Point**:
+- Compressed: `85ce3cf603efcf45b599cce75369e854823864e471ad297d955f32db0ade7d42`
+- Sqrt hint: `low=0xbb73e7230cbed81eed006ba59a2103f1, high=0x689ee25ca0c65d5a1c560224726871b0`
+- Parity: `hint % 2 = 1`, `sign_bit % 2 = 0` → **Mismatch** (Garaga will negate)
+- After negation: `hint^2` matches `x_squared_expected` ✅
+
+**Second Point**:
+- Compressed: `be7b5c4cf816760b7709df6b47b393d8cdd1605e06e2e2080944d684fad0795c`
+- Sqrt hint: `low=0xdcad2173817c163b5405cec7698eb4b8, high=0x742bb3c44b13553c8ddff66565b44cac`
+- Parity: `hint % 2 = 0`, `sign_bit % 2 = 0` → **Match** (no negation)
+- `hint^2` matches `x_squared_expected` ✅
+
+**R1**:
+- Compressed: `b8abab369ee130161af4fd21f325a30f7e9bdb6cd604ce8b426b24b184cfe2ab`
+- Sqrt hint: `low=0x4f1efce2a44c72b5d316cc9b8d8e4673, high=0x28bde2dde999d287316395d449669102`
+- Parity: `hint % 2 = 1`, `sign_bit % 2 = 1` → **Match** (no negation)
+- `hint^2` matches `x_squared_expected` ✅
+
+**R2** (Ed25519 base point):
+- Compressed: `5866666666666666666666666666666666666666666666666666666666666666`
+- Sqrt hint: `low=0x96d3389f6ada584d36a9d29f70da2ad3, high=0x5e96c92c3291ac013f5b1dce022923a3`
+- Parity: `hint % 2 = 1`, `sign_bit % 2 = 0` → **Mismatch** (Garaga will negate)
+- After negation: `hint^2` matches `x_squared_expected` ✅
+
+## Current Test Status
+
+**Decompression Tests**: All 4 tests now succeed in decompression step
+- `test_adaptor_point_decompression`: Decompression succeeds ✅
+- `test_second_point_decompression`: Decompression succeeds ✅
+- `test_r1_decompression`: Decompression succeeds ✅
+- `test_r2_decompression`: Decompression succeeds ✅
+
+**Remaining Issue**: `point not on curve` error
+- Error occurs in `assert_on_curve_excluding_infinity(ED25519_CURVE_INDEX)`
+- This validates the Weierstrass point after conversion from twisted Edwards
+- Possible causes:
+  1. Curve index mismatch (`ED25519_CURVE_INDEX = 0` may be incorrect)
+  2. Issue with Garaga's twisted Edwards → Weierstrass conversion
+  3. Point validation happening before conversion completes
+
+## Recommendations for Next Steps
+
+1. **Verify Curve Index**: Confirm `ED25519_CURVE_INDEX = 0` is correct for Ed25519 in Garaga
+2. **Check Garaga Documentation**: Review Garaga's documentation for correct curve index usage
+3. **Test with Known Point**: Try decompressing Ed25519 base point and verify it passes curve validation
+4. **Inspect Garaga Source**: Check Garaga's `decompress_edwards_pt_from_y_compressed_le_into_weirstrass_point` implementation to understand conversion process
 
