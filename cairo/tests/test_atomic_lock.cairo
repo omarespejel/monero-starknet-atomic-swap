@@ -728,23 +728,30 @@ mod tests {
         let declare_res = declare("AtomicLock");
         let contract = declare_res.unwrap().contract_class();
 
-        // Placeholder compressed Edwards points (will fail DLEQ verification)
+        // Use Ed25519 base point (G) as placeholder - valid compressed Edwards point
+        // This will decompress successfully but DLEQ verification will fail (expected)
         // For tests that need real DLEQ, use deploy_with_dleq from test_dleq.cairo
-        let adaptor_point_compressed = u256 { low: 0x1234, high: 0 };
-        let adaptor_point_sqrt_hint = u256 { low: 0x5678, high: 0 };
-        let dleq_second_point_compressed = u256 { low: 0x9abc, high: 0 };
-        let dleq_second_point_sqrt_hint = u256 { low: 0xdef0, high: 0 };
+        const ED25519_BASE_POINT_COMPRESSED: u256 = u256 {
+            low: 0x66666666666666586666666666666666,
+            high: 0x66666666666666666666666666666666,
+        };
+        // Sqrt hint for base point (x-coordinate)
+        // Using a placeholder - real tests should compute this properly
+        let adaptor_point_compressed = ED25519_BASE_POINT_COMPRESSED;
+        let adaptor_point_sqrt_hint = u256 { low: 0x216936d3cd6e53fec0a4e231fdd6dc5c692cc7609525a7b2c9562d608f25d51, high: 0 };
+        let dleq_second_point_compressed = ED25519_BASE_POINT_COMPRESSED;
+        let dleq_second_point_sqrt_hint = u256 { low: 0x216936d3cd6e53fec0a4e231fdd6dc5c692cc7609525a7b2c9562d608f25d51, high: 0 };
         
         let (dleq_c, dleq_r) = dleq;
         
         // Placeholder DLEQ hints (empty - will cause MSM to fail)
         let empty_hint = array![0, 0, 0, 0, 0, 0, 0, 0, 0, 0].span();
         
-        // Placeholder R1 and R2 (commitment points)
-        let r1_compressed = u256 { low: 0x1111, high: 0 };
-        let r1_sqrt_hint = u256 { low: 0x2222, high: 0 };
-        let r2_compressed = u256 { low: 0x3333, high: 0 };
-        let r2_sqrt_hint = u256 { low: 0x4444, high: 0 };
+        // Placeholder R1 and R2 (commitment points) - use base point for valid decompression
+        let r1_compressed = ED25519_BASE_POINT_COMPRESSED;
+        let r1_sqrt_hint = u256 { low: 0x216936d3cd6e53fec0a4e231fdd6dc5c692cc7609525a7b2c9562d608f25d51, high: 0 };
+        let r2_compressed = ED25519_BASE_POINT_COMPRESSED;
+        let r2_sqrt_hint = u256 { low: 0x216936d3cd6e53fec0a4e231fdd6dc5c692cc7609525a7b2c9562d608f25d51, high: 0 };
 
         let mut calldata = ArrayTrait::new();
         expected_hash.serialize(ref calldata);
