@@ -33,5 +33,9 @@ path = "src/bin/maker.rs"
 name = "taker"
 path = "src/bin/taker.rs"
 
+[[bin]]
+name = "get_constants"
+path = "src/bin/get_constants.rs"
+
 [dev-dependencies]
 assert_cmd = "2.0"

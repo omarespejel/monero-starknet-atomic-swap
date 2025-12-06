@@ -1,0 +1,17 @@
+{
+  "adaptor_point_compressed": "85ce3cf603efcf45b599cce75369e854823864e471ad297d955f32db0ade7d42",
+  "adaptor_point_sqrt_hint": "5229357bbd30a2e270c96220e0b860e05d145aae28943fc7329d4a56f6707110",
+  "challenge": "db8e86169afd3293b58260ada05e90bb436a67e38f1aac7799f8581342a7c204",
+  "description": "DLEQ proof test vector for Rust↔Cairo compatibility",
+  "expected_verification": true,
+  "g_compressed": "5866666666666666666666666666666666666666666666666666666666666666",
+  "hashlock": "d78e3502108c5b5a5c902f24725ce15e14ab8e411b93285f9c5b1405f11dca4d",
+  "notes": "This test vector can be used in Cairo tests to verify BLAKE2s compatibility",
+  "r1_compressed": "39d2f431a9321d695bf83d4f9089c209ae1717332442c5d611ef4aa1426292f7",
+  "r2_compressed": "77353af870598040acdf2f7f3fcb8d2a04d4a8c1cd5eb170691aa20bc153e90d",
+  "response": "89273470d10829ecc995eea2946384008bb92095214db046c99840f6909e5602",
+  "second_point_compressed": "be7b5c4cf816760b7709df6b47b393d8cdd1605e06e2e2080944d684fad0795c",
+  "second_point_sqrt_hint": "8deb942bc4b4e13c81c7a86c96349c5710c2d0c4174dd439144588f905c37c61",
+  "secret": "1212121212121212121212121212121212121212121212121212121212121212",
+  "y_compressed": "c9a3f86aae465f0e56513864510f3997561fa2c9e85ea21dc2292309f3cd6022"
+}

@@ -25,16 +25,16 @@ cargo test dleq
 
 ## Current Testing Status
 
-### ✅ What We Can Test Now
+### What We Can Test Now
 
-- ✅ Contract compiles successfully
-- ✅ MSM operations work (with empty hints)
-- ✅ Input validation logic (can test individually)
-- ✅ Rust proof generation works (SHA-256)
-- ✅ Structural validation (contract accepts DLEQ parameters)
-- ✅ Invalid proof rejection (challenge mismatch)
+- Contract compiles successfully
+- MSM operations work (with empty hints)
+- Input validation logic (can test individually)
+- Rust proof generation works (SHA-256)
+- Structural validation (contract accepts DLEQ parameters)
+- Invalid proof rejection (challenge mismatch)
 
-### ⚠️ What's Blocking Full Testing
+### What's Blocking Full Testing
 
 1. **Hash Function Mismatch**: Rust (SHA-256) ≠ Cairo (Poseidon)
    - Rust-generated proofs won't verify in Cairo
@@ -48,7 +48,7 @@ cargo test dleq
 
 ## Testing Strategy
 
-### Phase 1: Structural Tests (Works Now) ✅
+### Phase 1: Structural Tests (Works Now)
 
 **Test:** `test_dleq_contract_deployment_structure`
 - Verifies contract accepts DLEQ parameters
@@ -62,14 +62,14 @@ snforge test test_dleq_contract_deployment_structure
 ```
 
 **What This Tests:**
-- ✅ Contract accepts DLEQ parameters (structural validation)
-- ✅ Invalid DLEQ proofs are rejected (challenge mismatch)
-- ✅ On-curve validation works
-- ✅ Scalar validation works
+- Contract accepts DLEQ parameters (structural validation)
+- Invalid DLEQ proofs are rejected (challenge mismatch)
+- On-curve validation works
+- Scalar validation works
 
 **What This Doesn't Test Yet:**
-- ❌ Full DLEQ proof verification (requires proper proof generation)
-- ❌ Rust → Cairo compatibility (hash function mismatch)
+- Full DLEQ proof verification (requires proper proof generation)
+- Rust → Cairo compatibility (hash function mismatch)
 
 ---
 
@@ -82,7 +82,7 @@ snforge test test_dleq_contract_deployment_structure
 2. Deploy contract with proof
 3. Verify deployment succeeds
 
-**Status:** ⚠️ Needs implementation (proof generation in Cairo)
+**Status:** Needs implementation (proof generation in Cairo)
 
 **Test Cases Needed:**
 1. ✅ Valid DLEQ proof (should verify)
@@ -103,7 +103,7 @@ snforge test test_dleq_contract_deployment_structure
 - Edwards → Weierstrass conversion
 - Proper MSM hints
 
-**Status:** ⚠️ Blocked by hash function mismatch
+**Status:** Blocked by hash function mismatch
 
 **Test Implementation:**
 ```cairo
@@ -138,7 +138,7 @@ cd cairo
 scarb build
 ```
 
-**Expected:** ✅ Compiles successfully
+**Expected:** Compiles successfully
 
 ### Step 2: Run Unit Tests
 
@@ -148,8 +148,8 @@ snforge test
 ```
 
 **Expected:** 
-- ✅ Most tests pass
-- ⚠️ DLEQ tests may fail if proof is invalid (expected)
+- Most tests pass
+- DLEQ tests may fail if proof is invalid (expected)
 
 ### Step 3: Test Invalid Proof Rejection
 
@@ -158,7 +158,7 @@ cd cairo
 snforge test test_dleq_invalid_proof_rejected
 ```
 
-**Expected:** ✅ Test panics (proof correctly rejected)
+**Expected:** Test panics (proof correctly rejected)
 
 ### Step 4: Test Rust Proof Generation
 
@@ -167,7 +167,7 @@ cd rust
 cargo test dleq
 ```
 
-**Expected:** ✅ Proof generation works
+**Expected:** Proof generation works
 
 **Note:** These proofs won't verify in Cairo yet (hash mismatch)
 
@@ -251,15 +251,15 @@ cd cairo && scarb build 2>&1 | grep -i error
 ## Expected Test Results
 
 **Current State:**
-- ✅ Contract compiles
-- ✅ Structural validation works
-- ⚠️ Full DLEQ verification needs proper proof generation
-- ⚠️ Integration tests blocked by hash mismatch
+- Contract compiles
+- Structural validation works
+- Full DLEQ verification needs proper proof generation
+- Integration tests blocked by hash mismatch
 
 **After Hash Alignment:**
-- ✅ Full DLEQ verification works
-- ✅ Rust → Cairo integration tests pass
-- ✅ End-to-end tests work
+- Full DLEQ verification works
+- Rust → Cairo integration tests pass
+- End-to-end tests work
 
 ---
 

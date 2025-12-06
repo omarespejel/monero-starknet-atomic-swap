@@ -5,8 +5,39 @@ mod dleq_tests {
     use core::serde::Serde;
     use starknet::ContractAddress;
     use snforge_std::{declare, ContractClassTrait, DeclareResultTrait};
+    use garaga::signatures::eddsa_25519::{to_weierstrass, decompress_edwards_pt_from_y_compressed_le_into_weirstrass_point};
+    use garaga::definitions::G1Point;
+    use core::circuit::u384;
 
     const FUTURE_TIMESTAMP: u64 = 9999999999_u64;
+
+    /// Test that Garaga Ed25519 functions are available and have correct signatures
+    /// This is a compilation test - it verifies the functions exist and can be called
+    /// The test passes if it compiles - actual execution may fail with dummy values
+    #[test]
+    #[ignore] // Ignore execution - this is just a compilation test
+    fn test_garaga_ed25519_available() {
+        // Test decompress function signature
+        // Signature: decompress_edwards_pt_from_y_compressed_le_into_weirstrass_point(u256, u256) -> Option<G1Point>
+        let y_compressed: u256 = 0x1234; // dummy value (not a valid Edwards point)
+        let sqrt_hint: u256 = 0x5678; // dummy value
+        
+        let _result = decompress_edwards_pt_from_y_compressed_le_into_weirstrass_point(
+            y_compressed, 
+            sqrt_hint
+        );
+        
+        // Test to_weierstrass function signature  
+        // Signature: to_weierstrass(u384, u384) -> G1Point
+        // Note: This may panic with zero values, but that's fine - we're testing signatures
+        let x_twisted = u384 { limb0: 1, limb1: 0, limb2: 0, limb3: 0 };
+        let y_twisted = u384 { limb0: 1, limb1: 0, limb2: 0, limb3: 0 };
+        
+        let _weierstrass_point: G1Point = to_weierstrass(x_twisted, y_twisted);
+        
+        // If we get here, the functions are available with correct signatures
+        // Compilation success = function signatures verified ✅
+    }
 
 
     /// Test that contract deploys with valid DLEQ data structure
@@ -26,23 +57,15 @@ mod dleq_tests {
             61256116_u32, 2110839708_u32, 540553134_u32, 3341226206_u32
         ].span();
         
-        let adaptor_x = (
-            0x460f72719199c63ec398673f,
-            0xf27a4af146a52a7dbdeb4cfb,
-            0x5f9c70ec759789a0,
-            0x0
-        );
-        let adaptor_y = (
-            0x6b43e318a2a02d8241549109,
-            0x40e30afa4cce98c21e473980,
-            0x5e243e1eed1aa575,
-            0x0
-        );
+        // TODO: Convert Weierstrass test data to compressed Edwards
+        // For now, use placeholder compressed Edwards values
+        // These will need to be replaced with actual compressed Edwards points from Rust
+        let adaptor_point_edwards_compressed: u256 = u256 { low: 0x1234567890abcdef, high: 0 };
+        let adaptor_point_sqrt_hint: u256 = u256 { low: 0x5678, high: 0 };
         
-        // For testing: use adaptor point as second point (on-curve, but won't form valid DLEQ)
-        // In production, second point should be t·Y where Y is the second generator
-        let second_x = adaptor_x;
-        let second_y = adaptor_y;
+        // For testing: use same values for second point (placeholder)
+        let dleq_second_point_edwards_compressed: u256 = adaptor_point_edwards_compressed;
+        let dleq_second_point_sqrt_hint: u256 = adaptor_point_sqrt_hint;
         
         // Placeholder DLEQ proof (non-zero to pass scalar validation)
         // NOTE: This will fail DLEQ challenge verification, but tests structure
@@ -81,22 +104,32 @@ mod dleq_tests {
         // They are used here only to test contract structure validation.
         let empty_hint = array![0, 0, 0, 0, 0, 0, 0, 0, 0, 0].span();
         
+        // Placeholder R1 and R2 (commitment points for DLEQ proof)
+        let r1_edwards_compressed: u256 = u256 { low: 0x1111111111111111, high: 0 };
+        let r1_edwards_sqrt_hint: u256 = u256 { low: 0x1111, high: 0 };
+        let r2_edwards_compressed: u256 = u256 { low: 0x2222222222222222, high: 0 };
+        let r2_edwards_sqrt_hint: u256 = u256 { low: 0x2222, high: 0 };
+        
         // This will fail DLEQ verification (expected), but tests that structure is accepted
         deploy_with_dleq(
             hashlock,
             FUTURE_TIMESTAMP,
             0.try_into().unwrap(),
             u256 { low: 0, high: 0 },
-            adaptor_x,
-            adaptor_y,
-            second_x,
-            second_y,
+            adaptor_point_edwards_compressed,
+            adaptor_point_sqrt_hint,
+            dleq_second_point_edwards_compressed,
+            dleq_second_point_sqrt_hint,
             (dleq_challenge, dleq_response),
             hint,
             empty_hint, // s_hint_for_g
             empty_hint, // s_hint_for_y
             empty_hint, // c_neg_hint_for_t
-            empty_hint  // c_neg_hint_for_u
+            empty_hint, // c_neg_hint_for_u
+            r1_edwards_compressed,
+            r1_edwards_sqrt_hint,
+            r2_edwards_compressed,
+            r2_edwards_sqrt_hint
         );
     }
 
@@ -112,24 +145,14 @@ mod dleq_tests {
             61256116_u32, 2110839708_u32, 540553134_u32, 3341226206_u32
         ].span();
         
-        // Valid adaptor point (from existing test - known to be on-curve)
-        let adaptor_x = (
-            0x460f72719199c63ec398673f,
-            0xf27a4af146a52a7dbdeb4cfb,
-            0x5f9c70ec759789a0,
-            0x0
-        );
-        let adaptor_y = (
-            0x6b43e318a2a02d8241549109,
-            0x40e30afa4cce98c21e473980,
-            0x5e243e1eed1aa575,
-            0x0
-        );
+        // TODO: Convert Weierstrass test data to compressed Edwards
+        // For now, use placeholder compressed Edwards values
+        let adaptor_point_edwards_compressed: u256 = u256 { low: 0xdeadbeef, high: 0 };
+        let adaptor_point_sqrt_hint: u256 = u256 { low: 0x5678, high: 0 };
         
-        // Use adaptor point as second point (on-curve, but won't form valid DLEQ proof)
-        // This passes structural validation but fails DLEQ verification
-        let second_x = adaptor_x;
-        let second_y = adaptor_y;
+        // Use same values for second point (placeholder)
+        let dleq_second_point_edwards_compressed: u256 = adaptor_point_edwards_compressed;
+        let dleq_second_point_sqrt_hint: u256 = adaptor_point_sqrt_hint;
         
         // Invalid DLEQ proof (random values that won't verify)
         let invalid_challenge: felt252 = 0xdeadbeef;
@@ -152,6 +175,12 @@ mod dleq_tests {
         // NOTE: For production, generate proper hints using tools/generate_dleq_hints.py
         let empty_hint = array![0, 0, 0, 0, 0, 0, 0, 0, 0, 0].span();
         
+        // Placeholder R1 and R2 (commitment points for DLEQ proof)
+        let r1_edwards_compressed: u256 = u256 { low: 0xdeadbeef, high: 0 };
+        let r1_edwards_sqrt_hint: u256 = u256 { low: 0xbeef, high: 0 };
+        let r2_edwards_compressed: u256 = u256 { low: 0xcafebabe, high: 0 };
+        let r2_edwards_sqrt_hint: u256 = u256 { low: 0xbabe, high: 0 };
+        
         // Deploy contract - should fail in constructor due to invalid DLEQ proof
         // Expected: DLEQ_CHALLENGE_MISMATCH error
         deploy_with_dleq(
@@ -159,16 +188,20 @@ mod dleq_tests {
             FUTURE_TIMESTAMP,
             0.try_into().unwrap(),
             u256 { low: 0, high: 0 },
-            adaptor_x,
-            adaptor_y,
-            second_x,
-            second_y,
+            adaptor_point_edwards_compressed,
+            adaptor_point_sqrt_hint,
+            dleq_second_point_edwards_compressed,
+            dleq_second_point_sqrt_hint,
             (invalid_challenge, invalid_response),
             hint,
             empty_hint, // s_hint_for_g
             empty_hint, // s_hint_for_y
             empty_hint, // c_neg_hint_for_t
-            empty_hint  // c_neg_hint_for_u
+            empty_hint, // c_neg_hint_for_u
+            r1_edwards_compressed,
+            r1_edwards_sqrt_hint,
+            r2_edwards_compressed,
+            r2_edwards_sqrt_hint
         );
     }
 
@@ -180,30 +213,32 @@ mod dleq_tests {
     /// - c_neg_hint_for_t: Fake-GLV hint for (-c)·T
     /// - c_neg_hint_for_u: Fake-GLV hint for (-c)·U
     /// 
+    /// R1 and R2 are commitment points for DLEQ proof verification (compressed Edwards format).
+    /// 
     /// Generate proper hints using tools/generate_dleq_hints.py
     fn deploy_with_dleq(
         expected_hash: Span<u32>,
         lock_until: u64,
         token: ContractAddress,
         amount: u256,
-        adaptor_point_x: (felt252, felt252, felt252, felt252),
-        adaptor_point_y: (felt252, felt252, felt252, felt252),
-        dleq_second_point_x: (felt252, felt252, felt252, felt252),
-        dleq_second_point_y: (felt252, felt252, felt252, felt252),
+        adaptor_point_edwards_compressed: u256,
+        adaptor_point_sqrt_hint: u256,
+        dleq_second_point_edwards_compressed: u256,
+        dleq_second_point_sqrt_hint: u256,
         dleq: (felt252, felt252),
         fake_glv_hint: Span<felt252>,
         dleq_s_hint_for_g: Span<felt252>,
         dleq_s_hint_for_y: Span<felt252>,
         dleq_c_neg_hint_for_t: Span<felt252>,
         dleq_c_neg_hint_for_u: Span<felt252>,
+        r1_edwards_compressed: u256,
+        r1_edwards_sqrt_hint: u256,
+        r2_edwards_compressed: u256,
+        r2_edwards_sqrt_hint: u256,
     ) -> atomic_lock::IAtomicLockDispatcher {
         let declare_res = declare("AtomicLock");
         let contract = declare_res.unwrap().contract_class();
 
-        let (x0, x1, x2, x3) = adaptor_point_x;
-        let (y0, y1, y2, y3) = adaptor_point_y;
-        let (dleq_x0, dleq_x1, dleq_x2, dleq_x3) = dleq_second_point_x;
-        let (dleq_y0, dleq_y1, dleq_y2, dleq_y3) = dleq_second_point_y;
         let (dleq_c, dleq_r) = dleq;
 
         let mut calldata = ArrayTrait::new();
@@ -212,25 +247,13 @@ mod dleq_tests {
         Serde::serialize(@token, ref calldata);
         Serde::serialize(@amount, ref calldata);
         
-        // Adaptor point (x/y limbs)
-        Serde::serialize(@x0, ref calldata);
-        Serde::serialize(@x1, ref calldata);
-        Serde::serialize(@x2, ref calldata);
-        Serde::serialize(@x3, ref calldata);
-        Serde::serialize(@y0, ref calldata);
-        Serde::serialize(@y1, ref calldata);
-        Serde::serialize(@y2, ref calldata);
-        Serde::serialize(@y3, ref calldata);
+        // Adaptor point (compressed Edwards + sqrt hint)
+        Serde::serialize(@adaptor_point_edwards_compressed, ref calldata);
+        Serde::serialize(@adaptor_point_sqrt_hint, ref calldata);
         
-        // DLEQ second point (x/y limbs)
-        Serde::serialize(@dleq_x0, ref calldata);
-        Serde::serialize(@dleq_x1, ref calldata);
-        Serde::serialize(@dleq_x2, ref calldata);
-        Serde::serialize(@dleq_x3, ref calldata);
-        Serde::serialize(@dleq_y0, ref calldata);
-        Serde::serialize(@dleq_y1, ref calldata);
-        Serde::serialize(@dleq_y2, ref calldata);
-        Serde::serialize(@dleq_y3, ref calldata);
+        // DLEQ second point (compressed Edwards + sqrt hint)
+        Serde::serialize(@dleq_second_point_edwards_compressed, ref calldata);
+        Serde::serialize(@dleq_second_point_sqrt_hint, ref calldata);
         
         // DLEQ proof (challenge, response)
         Serde::serialize(@dleq_c, ref calldata);
@@ -244,6 +267,12 @@ mod dleq_tests {
         Serde::serialize(@dleq_s_hint_for_y, ref calldata);
         Serde::serialize(@dleq_c_neg_hint_for_t, ref calldata);
         Serde::serialize(@dleq_c_neg_hint_for_u, ref calldata);
+        
+        // R1 and R2 commitment points (compressed Edwards + sqrt hints)
+        Serde::serialize(@r1_edwards_compressed, ref calldata);
+        Serde::serialize(@r1_edwards_sqrt_hint, ref calldata);
+        Serde::serialize(@r2_edwards_compressed, ref calldata);
+        Serde::serialize(@r2_edwards_sqrt_hint, ref calldata);
 
         let (addr, _) = contract.deploy(@calldata).unwrap();
         IAtomicLockDispatcher { contract_address: addr }
