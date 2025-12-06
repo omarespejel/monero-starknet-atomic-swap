@@ -2,7 +2,10 @@
 
 ## Executive Summary
 
-**Current Status:** Using Poseidon in Cairo (10x cheaper than SHA-256)  
+**Current Status:** 
+- **Cairo**: Using Poseidon (10x cheaper than SHA-256) ✅
+- **Rust**: Using SHA-256 (incompatible) ⚠️
+- **Recommended**: Migrate both to BLAKE2s (8x cheaper than Poseidon, strategic for Starknet)  
 **Future Consideration:** BLAKE2s (8x cheaper than Poseidon, aligned with Starknet roadmap)  
 **Monero Compatibility:** ✅ **SAFE** - DLEQ proof is internal to Starknet, does NOT affect Monero handshake
 
@@ -278,15 +281,58 @@ Where `||` means concatenation in the **same byte format**.
 
 ---
 
+## Implementation Status
+
+### Poseidon Implementation (Current)
+
+**Cairo:** ✅ Uses Poseidon (10x cheaper gas)
+- Implemented in `cairo/src/lib.cairo`
+- Uses `core::poseidon::PoseidonTrait`
+- Challenge computation: `compute_dleq_challenge()`
+
+**Rust:** ⚠️ Uses SHA-256 (incompatible with Cairo)
+- Current implementation in `rust/src/dleq.rs`
+- Blocks integration testing
+
+**Challenges:**
+1. Edwards → Weierstrass conversion needed
+2. u384 limb extraction required
+3. Must match Cairo's Poseidon implementation exactly
+
+### BLAKE2s Migration Status
+
+**Rust:** ✅ BLAKE2s implemented
+- Added `blake2 = "0.10"` dependency
+- Updated `compute_challenge()` to use BLAKE2s
+- Tests pass successfully
+- Serialization: compressed Edwards points (32 bytes each)
+
+**Cairo:** ⚠️ Needs BLAKE2s implementation
+- `core::blake` available in stdlib
+- Needs implementation + serialization fix
+- Current: Uses Poseidon
+
+**Critical Issue:** Point Serialization Mismatch
+- **Rust**: Uses compressed Edwards points (32 bytes per point)
+- **Cairo**: Uses Weierstrass points (u384 = 48 bytes per coordinate = 96 bytes per point)
+- **Solution**: Convert Edwards → Weierstrass in Rust, serialize Weierstrass in both
+
+**Next Steps:**
+1. Implement Edwards → Weierstrass conversion in Rust
+2. Update Rust `compute_challenge()` to serialize Weierstrass coordinates
+3. Update Cairo `compute_dleq_challenge()` to use BLAKE2s with Weierstrass serialization
+4. Ensure byte order matches exactly
+
 ## Current Recommendation
 
 ### For Prototype/PoC (Now):
 
 **Keep Poseidon** ✅
-- Already implemented and working
-- Cairo native support via Garaga
+- Already implemented and working in Cairo
+- Cairo native support via `core::poseidon`
 - Production-ready now
 - 10x cheaper than SHA-256
+- ⚠️ Rust needs Poseidon implementation for compatibility
 
 ### For Production (Future):
 
@@ -295,6 +341,7 @@ Where `||` means concatenation in the **same byte format**.
 - Aligned with Starknet roadmap
 - Standard cryptographic primitive
 - Better long-term alignment
+- ⚠️ Requires serialization alignment (Edwards → Weierstrass)
 
 ### Rationale:
 

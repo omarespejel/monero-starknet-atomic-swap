@@ -61,7 +61,8 @@ pub mod AtomicLock {
     use core::integer::u256;
     use core::num::traits::Zero;
     use core::sha256::compute_sha256_byte_array;
-    use core::blake::{blake2s_compress, blake2s_finalize, Blake2sState, Blake2sInput};
+    use core::hash::HashStateTrait;
+    use core::poseidon::PoseidonTrait;
     use core::box::BoxTrait;
     use starknet::contract_address::ContractAddress;
     use starknet::get_contract_address;
@@ -69,9 +70,11 @@ pub mod AtomicLock {
     use starknet::get_caller_address;
     use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
     use super::{IERC20Dispatcher, IERC20DispatcherTrait};
-    use garaga::definitions::{deserialize_u384, G1Point, G1PointZero, get_G};
+    use garaga::definitions::{deserialize_u384, G1Point, G1PointZero, get_G, get_ED25519_modulus, get_ED25519_order_modulus};
     use garaga::ec_ops::{ec_safe_add, msm_g1, G1PointTrait};
     use garaga::utils::neg_3::sign;
+    // TODO: Uncomment when Garaga Ed25519 functions are verified
+    // use garaga::signatures::eddsa_25519::{to_weierstrass, decompress_edwards_pt_from_y_compressed_le_into_weirstrass_point};
     use core::circuit::{u384, u96};
     use openzeppelin::security::ReentrancyGuardComponent;
     

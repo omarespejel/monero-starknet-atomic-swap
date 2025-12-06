@@ -32,17 +32,45 @@ The DLEQ verification performs 4 MSM operations, each requiring its own hint:
 
 ## Generating Hints
 
-### Option 1: Using Python Tool (Testing/Development)
+### Method 1: Using the Python Tool (Recommended for Testing)
 
 The `tools/generate_dleq_hints.py` tool generates hints for given scalars and base points.
 
 **Prerequisites**:
 ```bash
-# Install garaga Python package
-pip install garaga  # or use your Python environment
+cd tools
+# Install garaga Python package if available
+# Or ensure Python can import garaga
 ```
 
 **Usage**:
+```python
+from generate_dleq_hints import generate_dleq_hints
+from garaga.points import G1Point
+
+# Your DLEQ proof values (from Rust)
+s_scalar = 0x...  # Your response scalar
+c_scalar = 0x...  # Your challenge scalar
+T = G1Point(...)  # Your adaptor point
+U = G1Point(...)  # Your DLEQ second point
+
+# Generate hints
+hints = generate_dleq_hints(
+    s_scalar=s_scalar,
+    c_scalar=c_scalar,
+    T=T,
+    U=U,
+    curve_id=CurveID.ED25519,
+)
+
+# Use the hints
+s_hint_for_g = hints["s_hint_for_g"]["cairo_hint"]
+s_hint_for_y = hints["s_hint_for_y"]["cairo_hint"]
+c_neg_hint_for_t = hints["c_neg_hint_for_t"]["cairo_hint"]
+c_neg_hint_for_u = hints["c_neg_hint_for_u"]["cairo_hint"]
+```
+
+**Command Line Usage**:
 ```bash
 cd tools
 python generate_dleq_hints.py <s_scalar_hex> <c_scalar_hex>
@@ -59,7 +87,7 @@ python generate_dleq_hints.py 0xfedcba0987654321 0x1234567890abcdef
 - Currently requires G1Point objects for T and U (not just coordinates)
 - For production, integrate into Rust proof generation pipeline
 
-### Option 2: Generate in Rust (Production)
+### Method 2: Generate in Rust (Production)
 
 For production, generate hints **during DLEQ proof creation** in Rust, where you have access to actual `EdwardsPoint` objects that can be converted to `G1Point`.
 
