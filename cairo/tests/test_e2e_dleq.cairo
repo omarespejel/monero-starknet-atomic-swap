@@ -118,60 +118,61 @@ mod e2e_dleq_tests {
         Span<felt252>,
         Span<felt252>,
     ) {
-        // s_hint_for_g: Fake-GLV hint for s·G
+        // Regenerated DLEQ hints for new test vectors (regenerate_dleq_hints.py)
+        // s_hint_for_g: Fake-GLV hint for s·G (response scalar)
         let s_hint_for_g = array![
-            0xf2bf288299cf161546f6c654,
-            0x7c63f2d98a988397b0168652,
-            0x3bd4e0f4e630bc6c,
+            0x919b46b8f36f2a0f5774ebbf,
+            0x953af75cb11fcf237747ae51,
+            0x576c9bc3c3fc74ca,
             0x0,
-            0xf96c40d29cdbdaa3bdfc5efa,
-            0xfba56d020186cff3d55806f9,
-            0x2dd15eeb55fa6ee8,
+            0x46674c203f672b7f41734e56,
+            0xa14b9e5329a49c91480ddce3,
+            0x1f69ad0f358a24d8,
             0x0,
-            0xbaac684d5613ef1ef37ed994ab7486f,
-            0xa92654992fbc0127c6f6daeb6b41d48
+            0x3594dd685f9e586716cc464e02afc0d4,
+            0x113087b16d5a4a8a30a8146f6423bec15
         ].span();
 
-        // s_hint_for_y: Fake-GLV hint for s·Y
+        // s_hint_for_y: Fake-GLV hint for s·Y (response scalar)
         let s_hint_for_y = array![
-            0xe305f9761837c8281d11b55e,
-            0xc89d984f4d474ecd6b37b38a,
-            0x2482b5c9c4cde335,
+            0x4a51958fcf9259d93b8cac4f,
+            0x6a6043a69fa23dabab1c99ee,
+            0x4fa2ed593bfe19c3,
             0x0,
-            0x4122db657d63fa5aa49c02ad,
-            0xdaa1eaae23b359a56c266ce7,
-            0x6169123b3d5fa28b,
+            0x2dcd871905026332a38033a3,
+            0x6c6baa79fd66874cf3ca43e9,
+            0x46aadce984659ff4,
             0x0,
-            0xbaac684d5613ef1ef37ed994ab7486f,
-            0xa92654992fbc0127c6f6daeb6b41d48
+            0x3594dd685f9e586716cc464e02afc0d4,
+            0x113087b16d5a4a8a30a8146f6423bec15
         ].span();
 
-        // c_neg_hint_for_t: Fake-GLV hint for (-c)·T
+        // c_neg_hint_for_t: Fake-GLV hint for (-c)·T (negated challenge scalar)
         let c_neg_hint_for_t = array![
-            0xd655a4892b61b2a69f6185bd,
-            0xe32deb5ab239bb18e89c8fb4,
-            0x1ad5223f82e2e033,
+            0xc13f0268375a278b7ab4631d,
+            0x2251fcc94e007d45346fccfe,
+            0x290351303d074349,
             0x0,
-            0x1c71fddfe542c48a2d2ac046,
-            0x91066f1ab9d049c93afc20a4,
-            0x13f5ed4eb8d5a9fb,
+            0x8ad99766168bd43f4be122d0,
+            0x571d4c7818229ff39f19efb5,
+            0x42704ac18a9b329c,
             0x0,
-            0x3851bd11b6864deaf04e1e37c22b0b47,
-            0x17558a4907bde82782fba4521c21139f
+            0x30866ae88e236a826d3da3f36d3b9a30,
+            0x21af4955df7d56db671be607c45b17a5
         ].span();
 
-        // c_neg_hint_for_u: Fake-GLV hint for (-c)·U
+        // c_neg_hint_for_u: Fake-GLV hint for (-c)·U (negated challenge scalar)
         let c_neg_hint_for_u = array![
-            0x82f49995a6fdd7dd2e8badfb,
-            0xc892bbba84c5089ac13d80f6,
-            0x555c9178d48b3a2c,
+            0x3645343c9601d454bcdccc71,
+            0xb815f12b909e21eb3a6558d5,
+            0x3847c50bded9e699,
             0x0,
-            0xfdc6138b0895845f7ff260b7,
-            0xb282d7f660d43176c9a07148,
-            0x1ed016cb5b5c0da4,
+            0xe1b71d4bb9958b2828d33847,
+            0xa87fa42c6dffe61174486f97,
+            0x557ff3b2d2f4ae77,
             0x0,
-            0x3851bd11b6864deaf04e1e37c22b0b47,
-            0x17558a4907bde82782fba4521c21139f
+            0x30866ae88e236a826d3da3f36d3b9a30,
+            0x21af4955df7d56db671be607c45b17a5
         ].span();
 
         (s_hint_for_g, s_hint_for_y, c_neg_hint_for_t, c_neg_hint_for_u)
