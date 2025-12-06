@@ -973,6 +973,18 @@ pub mod AtomicLock {
         
         // s_hint_for_g: hint for s·G (Q = s·G)
         // AUDIT: First MSM call - if this fails, error is here
+        // Per auditor recommendation: add detailed validation before MSM call
+        // Verify hint format: [Q.x[4], Q.y[4], s1, s2] = 10 felts
+        assert(s_hint_for_g.len() == 10, Errors::MSM_HINT_LEN_WRONG);
+        // Verify scalar is non-zero and in range
+        assert(!s_scalar.is_zero(), Errors::DLEQ_SCALAR_OUT_OF_RANGE);
+        assert(s_scalar < ED25519_ORDER, Errors::DLEQ_SCALAR_OUT_OF_RANGE);
+        // Verify hint scalars are non-zero (s1 and s2)
+        let s1_g = *s_hint_for_g.at(8);
+        let s2_g = *s_hint_for_g.at(9);
+        assert(s1_g != 0, Errors::ZERO_HINT_SCALARS);
+        assert(s2_g != 0, Errors::ZERO_HINT_SCALARS);
+        
         let sG = msm_g1(
             points_g,
             scalars_s,
@@ -987,6 +999,15 @@ pub mod AtomicLock {
         assert(c_neg_hint_for_t.len() == points_t.len() * 10, Errors::MSM_HINT_LEN_WRONG);
         
         // AUDIT: Second MSM call - if first passed but this fails, error is here
+        // Per auditor recommendation: add detailed validation
+        assert(c_neg_hint_for_t.len() == 10, Errors::MSM_HINT_LEN_WRONG);
+        assert(!c_neg_scalar.is_zero(), Errors::DLEQ_SCALAR_OUT_OF_RANGE);
+        assert(c_neg_scalar < ED25519_ORDER, Errors::DLEQ_SCALAR_OUT_OF_RANGE);
+        let s1_t = *c_neg_hint_for_t.at(8);
+        let s2_t = *c_neg_hint_for_t.at(9);
+        assert(s1_t != 0, Errors::ZERO_HINT_SCALARS);
+        assert(s2_t != 0, Errors::ZERO_HINT_SCALARS);
+        
         let neg_cT = msm_g1(
             points_t,
             scalars_c_neg,
@@ -1004,6 +1025,13 @@ pub mod AtomicLock {
         assert(s_hint_for_y.len() == points_y.len() * 10, Errors::MSM_HINT_LEN_WRONG);
         
         // AUDIT: Third MSM call - if previous passed but this fails, error is here
+        // Per auditor recommendation: add detailed validation
+        assert(s_hint_for_y.len() == 10, Errors::MSM_HINT_LEN_WRONG);
+        let s1_y = *s_hint_for_y.at(8);
+        let s2_y = *s_hint_for_y.at(9);
+        assert(s1_y != 0, Errors::ZERO_HINT_SCALARS);
+        assert(s2_y != 0, Errors::ZERO_HINT_SCALARS);
+        
         let sY = msm_g1(
             points_y,
             scalars_s2,
@@ -1018,6 +1046,13 @@ pub mod AtomicLock {
         assert(c_neg_hint_for_u.len() == points_u.len() * 10, Errors::MSM_HINT_LEN_WRONG);
         
         // AUDIT: Fourth MSM call - if previous passed but this fails, error is here
+        // Per auditor recommendation: add detailed validation
+        assert(c_neg_hint_for_u.len() == 10, Errors::MSM_HINT_LEN_WRONG);
+        let s1_u = *c_neg_hint_for_u.at(8);
+        let s2_u = *c_neg_hint_for_u.at(9);
+        assert(s1_u != 0, Errors::ZERO_HINT_SCALARS);
+        assert(s2_u != 0, Errors::ZERO_HINT_SCALARS);
+        
         let neg_cU = msm_g1(
             points_u,
             scalars_c_neg2,
