@@ -28,20 +28,22 @@ except ImportError:
     sys.exit(1)
 
 
-def hashlock_to_scalar(hashlock_bytes: bytes) -> int:
+def secret_to_scalar(secret_bytes: bytes) -> int:
     """
-    Convert hashlock (32 bytes) to u256 scalar, matching Cairo's hash_to_scalar_u256.
+    Convert secret bytes (32 bytes) to Ed25519 scalar, matching Cairo's secret_to_scalar_u256.
     
-    Interprets bytes as little-endian u256: h0 + h1·2^32 + ... + h7·2^224
+    Interprets bytes as little-endian u256: s0 + s1·2^32 + ... + s7·2^224
     Then reduces mod Ed25519 order.
+    
+    This matches Rust's Scalar::from_bytes_mod_order() behavior.
     """
     # Convert bytes to u32 words (little-endian)
     words = []
     for i in range(0, 32, 4):
-        word = int.from_bytes(hashlock_bytes[i:i+4], byteorder='little')
+        word = int.from_bytes(secret_bytes[i:i+4], byteorder='little')
         words.append(word)
     
-    # Build u256: h0 + h1·2^32 + h2·2^64 + ... + h7·2^224
+    # Build u256: s0 + s1·2^32 + s2·2^64 + ... + s7·2^224
     scalar = 0
     for i, word in enumerate(words):
         scalar += word * (2 ** (32 * i))
@@ -117,18 +119,22 @@ def generate_adaptor_point_hint(
     # Compute adaptor_point = scalar·G (this is what we're verifying)
     adaptor_point = G.scalar_mul(scalar)
     
+    print(f"\nSecret scalar (from secret bytes):")
+    print(f"  0x{scalar:064x}")
+    
     print(f"\nAdaptor point (computed from scalar·G):")
     print(f"  x: {hex(adaptor_point.x)}")
     print(f"  y: {hex(adaptor_point.y)}")
     
     # Generate fake-GLV hint using Garaga's get_fake_glv_hint
     # This generates correct s1/s2 decomposition satisfying s2·scalar ≡ s1 (mod r)
+    # NOTE: scalar is derived from SECRET, not hashlock (per auditor recommendation)
     print(f"\nGenerating fake-GLV hint using get_fake_glv_hint...")
     Q, s1, s2_encoded = get_fake_glv_hint(G, scalar)
     
     # Verify Q matches adaptor_point
     assert Q == adaptor_point, f"Q mismatch: {Q} != {adaptor_point}"
-    print(f"✓ Q matches adaptor_point")
+    print(f"✓ Q matches adaptor_point (secret·G)")
     
     # Convert Q coordinates to u384 limbs (4×96-bit limbs each)
     def u384_to_limbs(value: int) -> list[int]:
