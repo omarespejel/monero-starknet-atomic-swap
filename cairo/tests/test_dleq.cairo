@@ -5,8 +5,38 @@ mod dleq_tests {
     use core::serde::Serde;
     use starknet::ContractAddress;
     use snforge_std::{declare, ContractClassTrait, DeclareResultTrait};
+    use garaga::signatures::eddsa_25519::{to_weierstrass, decompress_edwards_pt_from_y_compressed_le_into_weirstrass_point};
+    use garaga::definitions::G1Point;
+    use core::circuit::u384;
 
     const FUTURE_TIMESTAMP: u64 = 9999999999_u64;
+
+    /// Test that Garaga Ed25519 functions are available and have correct signatures
+    /// This is a compilation test - it verifies the functions exist and can be called
+    #[test]
+    fn test_garaga_ed25519_available() {
+        // Test decompress function signature
+        let y_compressed: u256 = 0x1234; // dummy value
+        let sqrt_hint: u256 = 0x5678; // dummy value
+        
+        let result = decompress_edwards_pt_from_y_compressed_le_into_weirstrass_point(
+            y_compressed, 
+            sqrt_hint
+        );
+        
+        // This test should compile (doesn't need to pass with dummy values)
+        // Just verify the function signature is correct
+        let _is_some = result.is_some();
+        let _is_none = result.is_none();
+        
+        // Test to_weierstrass function signature
+        let x_twisted = u384 { limb0: 0, limb1: 0, limb2: 0, limb3: 0 };
+        let y_twisted = u384 { limb0: 0, limb1: 0, limb2: 0, limb3: 0 };
+        
+        let _weierstrass_point: G1Point = to_weierstrass(x_twisted, y_twisted);
+        
+        // If we get here, the functions are available with correct signatures
+    }
 
 
     /// Test that contract deploys with valid DLEQ data structure

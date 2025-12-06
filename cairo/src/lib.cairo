@@ -73,8 +73,7 @@ pub mod AtomicLock {
     use garaga::definitions::{deserialize_u384, G1Point, G1PointZero, get_G, get_ED25519_modulus, get_ED25519_order_modulus};
     use garaga::ec_ops::{ec_safe_add, msm_g1, G1PointTrait};
     use garaga::utils::neg_3::sign;
-    // TODO: Uncomment when Garaga Ed25519 functions are verified
-    // use garaga::signatures::eddsa_25519::{to_weierstrass, decompress_edwards_pt_from_y_compressed_le_into_weirstrass_point};
+    use garaga::signatures::eddsa_25519::{to_weierstrass, decompress_edwards_pt_from_y_compressed_le_into_weirstrass_point};
     use core::circuit::{u384, u96};
     use openzeppelin::security::ReentrancyGuardComponent;
     
