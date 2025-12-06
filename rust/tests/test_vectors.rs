@@ -18,16 +18,12 @@ fn generate_cairo_test_vectors() {
     let secret_bytes = [0x12; 32];
     let secret = Scalar::from_bytes_mod_order(secret_bytes);
 
-    // Generate adaptor point
+    // Generate adaptor point T = secret·G (correct protocol)
     let adaptor_point = ED25519_BASEPOINT_POINT * secret;
 
-    // Generate hashlock (SHA-256 of "test_hashlock")
-    let hashlock = [
-        0xd7, 0x8e, 0x35, 0x02, 0x10, 0x8c, 0x5b, 0x5a,
-        0x5c, 0x90, 0x2f, 0x24, 0x72, 0x5c, 0xe1, 0x5e,
-        0x14, 0xab, 0x8e, 0x41, 0x1b, 0x93, 0x28, 0x5f,
-        0x9c, 0x5b, 0x14, 0x05, 0xf1, 0x1d, 0xca, 0x4d,
-    ];
+    // Generate hashlock H = SHA-256(secret) (must match secret)
+    use sha2::{Digest, Sha256};
+    let hashlock: [u8; 32] = Sha256::digest(&secret_bytes).into();
 
     // Generate DLEQ proof
     let proof = generate_dleq_proof(&secret, &adaptor_point, &hashlock);
