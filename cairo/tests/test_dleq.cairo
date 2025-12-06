@@ -104,6 +104,12 @@ mod dleq_tests {
         // They are used here only to test contract structure validation.
         let empty_hint = array![0, 0, 0, 0, 0, 0, 0, 0, 0, 0].span();
         
+        // Placeholder R1 and R2 (commitment points for DLEQ proof)
+        let r1_edwards_compressed: u256 = u256 { low: 0x1111111111111111, high: 0 };
+        let r1_edwards_sqrt_hint: u256 = u256 { low: 0x1111, high: 0 };
+        let r2_edwards_compressed: u256 = u256 { low: 0x2222222222222222, high: 0 };
+        let r2_edwards_sqrt_hint: u256 = u256 { low: 0x2222, high: 0 };
+        
         // This will fail DLEQ verification (expected), but tests that structure is accepted
         deploy_with_dleq(
             hashlock,
@@ -119,7 +125,11 @@ mod dleq_tests {
             empty_hint, // s_hint_for_g
             empty_hint, // s_hint_for_y
             empty_hint, // c_neg_hint_for_t
-            empty_hint  // c_neg_hint_for_u
+            empty_hint, // c_neg_hint_for_u
+            r1_edwards_compressed,
+            r1_edwards_sqrt_hint,
+            r2_edwards_compressed,
+            r2_edwards_sqrt_hint
         );
     }
 
@@ -165,6 +175,12 @@ mod dleq_tests {
         // NOTE: For production, generate proper hints using tools/generate_dleq_hints.py
         let empty_hint = array![0, 0, 0, 0, 0, 0, 0, 0, 0, 0].span();
         
+        // Placeholder R1 and R2 (commitment points for DLEQ proof)
+        let r1_edwards_compressed: u256 = u256 { low: 0xdeadbeef, high: 0 };
+        let r1_edwards_sqrt_hint: u256 = u256 { low: 0xbeef, high: 0 };
+        let r2_edwards_compressed: u256 = u256 { low: 0xcafebabe, high: 0 };
+        let r2_edwards_sqrt_hint: u256 = u256 { low: 0xbabe, high: 0 };
+        
         // Deploy contract - should fail in constructor due to invalid DLEQ proof
         // Expected: DLEQ_CHALLENGE_MISMATCH error
         deploy_with_dleq(
@@ -181,7 +197,11 @@ mod dleq_tests {
             empty_hint, // s_hint_for_g
             empty_hint, // s_hint_for_y
             empty_hint, // c_neg_hint_for_t
-            empty_hint  // c_neg_hint_for_u
+            empty_hint, // c_neg_hint_for_u
+            r1_edwards_compressed,
+            r1_edwards_sqrt_hint,
+            r2_edwards_compressed,
+            r2_edwards_sqrt_hint
         );
     }
 
@@ -192,6 +212,8 @@ mod dleq_tests {
     /// - s_hint_for_y: Fake-GLV hint for s·Y
     /// - c_neg_hint_for_t: Fake-GLV hint for (-c)·T
     /// - c_neg_hint_for_u: Fake-GLV hint for (-c)·U
+    /// 
+    /// R1 and R2 are commitment points for DLEQ proof verification (compressed Edwards format).
     /// 
     /// Generate proper hints using tools/generate_dleq_hints.py
     fn deploy_with_dleq(
@@ -209,6 +231,10 @@ mod dleq_tests {
         dleq_s_hint_for_y: Span<felt252>,
         dleq_c_neg_hint_for_t: Span<felt252>,
         dleq_c_neg_hint_for_u: Span<felt252>,
+        r1_edwards_compressed: u256,
+        r1_edwards_sqrt_hint: u256,
+        r2_edwards_compressed: u256,
+        r2_edwards_sqrt_hint: u256,
     ) -> atomic_lock::IAtomicLockDispatcher {
         let declare_res = declare("AtomicLock");
         let contract = declare_res.unwrap().contract_class();
@@ -241,6 +267,12 @@ mod dleq_tests {
         Serde::serialize(@dleq_s_hint_for_y, ref calldata);
         Serde::serialize(@dleq_c_neg_hint_for_t, ref calldata);
         Serde::serialize(@dleq_c_neg_hint_for_u, ref calldata);
+        
+        // R1 and R2 commitment points (compressed Edwards + sqrt hints)
+        Serde::serialize(@r1_edwards_compressed, ref calldata);
+        Serde::serialize(@r1_edwards_sqrt_hint, ref calldata);
+        Serde::serialize(@r2_edwards_compressed, ref calldata);
+        Serde::serialize(@r2_edwards_sqrt_hint, ref calldata);
 
         let (addr, _) = contract.deploy(@calldata).unwrap();
         IAtomicLockDispatcher { contract_address: addr }
