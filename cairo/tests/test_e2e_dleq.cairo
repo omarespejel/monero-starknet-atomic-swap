@@ -203,13 +203,13 @@ mod e2e_dleq_tests {
         let (s_hint_for_g, s_hint_for_y, c_neg_hint_for_t, c_neg_hint_for_u) = get_real_msm_hints();
 
         // Generate fake-GLV hint dynamically from decompressed adaptor point
-        // AUDITOR SOLUTION: Extract Q coordinates from decompressed point to ensure exact match
-        // This solves the "Hint Q mismatch adaptor" error by ensuring hint Q == decompressed point
+        // AUDITOR ANALYSIS: Q coordinates are correct (extracted from decompressed point)
+        // BUT: s1/s2 values are dummy and don't satisfy s2·scalar ≡ s1 (mod r)
+        // TODO: Generate correct hint using garaga_rs.msm_calldata_builder() with proper s1/s2 decomposition
         // Format: [Q.x.limb0, Q.x.limb1, Q.x.limb2, Q.x.limb3,
         //          Q.y.limb0, Q.y.limb1, Q.y.limb2, Q.y.limb3,
-        //          s1, s2]
-        // For production, use garaga_rs.msm_calldata_builder() with decompressed coordinates
-        // For testing, dummy s1/s2 values are acceptable (they don't affect Q matching)
+        //          s1, s2] where s2·scalar ≡ s1 (mod Ed25519_order)
+        // Current: Using dummy s1/s2 - constructor validates Q match, but verify_and_unlock would fail
         const ED25519_CURVE_INDEX: u32 = 4;
         let adaptor_decompressed = decompress_edwards_pt_from_y_compressed_le_into_weirstrass_point(
             TEST_ADAPTOR_POINT_COMPRESSED,
