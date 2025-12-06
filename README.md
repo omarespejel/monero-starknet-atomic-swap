@@ -23,7 +23,7 @@ This project implements a **prototype implementation / reference PoC** of an ato
 - **Compatibility**: Hash function mismatch (Rust: SHA-256, Cairo: Poseidon) - documented in `DLEQ_COMPATIBILITY.md`
 - **Future**: BLAKE2s migration planned (8x cheaper than Poseidon) - see `HASH_FUNCTION_ANALYSIS.md`
 
-**Important**: DLEQ proofs cryptographically bind the hashlock (H) and adaptor point (T) by proving ∃t: SHA-256(t) = H ∧ t·G = T. The current implementation uses different hash functions in Rust and Cairo, requiring alignment for full compatibility (see compatibility docs).
+**Important**: DLEQ proofs cryptographically bind the hashlock (H) and adaptor point (T) by proving ∃t: SHA-256(t) = H ∧ t·G = T. Both Rust and Cairo implementations use BLAKE2s for challenge computation (see `TECHNICAL.md`).
 
 ## Architecture
 
@@ -33,7 +33,7 @@ This project implements a **prototype implementation / reference PoC** of an ato
 2. **Rust Library** (`rust/src/lib.rs`): Secret generation, DLEQ proof generation, and adaptor signature logic
 3. **Python Tool** (`tools/generate_ed25519_test_data.py`): Test data generation using Garaga
 4. **CLI Tools** (`rust/src/bin/`): Maker and taker commands for end-to-end swaps
-5. **Documentation**: Compatibility guides (`DLEQ_COMPATIBILITY.md`, `HASH_FUNCTION_ANALYSIS.md`)
+5. **Documentation**: Technical documentation (`TECHNICAL.md`, `AUDIT.md`, `SECURITY.md`)
 
 ### Protocol Flow
 
