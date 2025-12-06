@@ -84,7 +84,7 @@ mod blake2s_byte_order_tests {
         // Known compressed format: 0x5866666666666666666666666666666666666666666666666666666666666666
         // This should hash to a specific value if byte order is correct
         
-        let zero_point = u256 { low: 0, high: 0 };
+        let _zero_point = u256 { low: 0, high: 0 };
         let zero_hashlock = array![0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32].span();
         
         // Compute challenge with base point G

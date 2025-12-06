@@ -1,0 +1,22 @@
+# Rustfmt configuration
+# Follows Rust community standards and best practices
+
+# Formatting style
+edition = "2021"
+max_width = 100
+tab_spaces = 4
+newline_style = "Unix"
+
+# Imports
+imports_granularity = "Crate"
+group_imports = "StdExternalCrate"
+
+# Comments
+wrap_comments = true
+comment_width = 100
+
+# Other
+use_small_heuristics = "Default"
+format_code_in_doc_comments = true
+format_strings = true
+

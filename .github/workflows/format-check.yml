@@ -1,0 +1,53 @@
+name: Code Formatting Check
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  check-formatting:
+    name: Check Code Formatting
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      # Check Rust formatting
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt
+      
+      - name: Check Rust formatting
+        run: |
+          cd rust
+          cargo fmt --all -- --check
+      
+      # Check Python formatting
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install Black
+        run: pip install black
+      
+      - name: Check Python formatting
+        run: |
+          black --check --diff tools/ rust/tests/ || true
+      
+      # Check Cairo formatting
+      - name: Setup Scarb
+        uses: software-mansion/setup-scarb@v1
+        with:
+          scarb-version: "2.8.2"
+      
+      - name: Check Cairo formatting
+        run: |
+          cd cairo
+          scarb fmt --check || true
+        continue-on-error: true  # Cairo formatter may not be fully stable
+

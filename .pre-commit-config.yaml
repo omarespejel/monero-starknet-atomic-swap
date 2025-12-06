@@ -1,0 +1,30 @@
+# Pre-commit hooks for code formatting
+# Install: pip install pre-commit && pre-commit install
+
+repos:
+  # Rust formatting
+  - repo: https://github.com/doublify/pre-commit-rust
+    rev: v1.0
+    hooks:
+      - id: fmt
+        args: [--all, --]
+  
+  # Python formatting with Black
+  - repo: https://github.com/psf/black
+    rev: 23.12.1
+    hooks:
+      - id: black
+        language_version: python3.11
+        args: [--line-length=100]
+        files: ^(tools/|rust/tests/).*\.py$
+  
+  # Python linting with Ruff (optional, faster)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.8
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+        files: ^(tools/|rust/tests/).*\.py$
+      - id: ruff-format
+        files: ^(tools/|rust/tests/).*\.py$
+
