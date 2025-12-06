@@ -44,22 +44,29 @@ def xrecover_twisted_edwards(y_compressed: int) -> int:
     # Compute x^2
     x_sq = (numerator * pow(denominator, -1, P)) % P
     
-    # Compute x = sqrt(x_sq)
-    # For Ed25519, sqrt is computed as x = x_sq^((p+3)/8)  mod p
+    # Compute x = sqrt(x_sq) using RFC 8032 method
+    # x = x_sq^((p+3)/8) mod p
     x = pow(x_sq, (P + 3) // 8, P)
     
-    # If x^2 != x_sq, multiply by sqrt(-1) = 2^((p-1)/4)
-    if (x * x) % P != x_sq:
-        # sqrt(-1) for Ed25519
+    # Check if x^2 = x_sq or x^2 = -x_sq
+    x_sq_check = (x * x) % P
+    if x_sq_check == x_sq:
+        # x is correct
+        pass
+    elif x_sq_check == (P - x_sq) % P:
+        # Need to multiply by sqrt(-1)
+        # sqrt(-1) mod p = 2^((p-1)/4) mod p
         I = pow(2, (P - 1) // 4, P)
         x = (x * I) % P
-    
-    # Verify that x^2 = x_sq
-    assert (x * x) % P == x_sq, f"Square root verification failed: {hex(x)}^2 != {hex(x_sq)}"
+        # Verify after multiplication
+        assert (x * x) % P == x_sq, f"Square root failed after I multiplication"
+    else:
+        # This shouldn't happen for valid Ed25519 points
+        raise ValueError(f"Invalid square root: x^2 = {hex(x_sq_check)}, expected {hex(x_sq)} or {hex((P - x_sq) % P)}")
     
     # Adjust sign: if sign bit doesn't match x parity, negate x
     if (x & 1) != sign_bit:
-        x = P - x
+        x = (P - x) % P
     
     return x
 
@@ -95,42 +102,85 @@ def int_to_u256(value: int) -> dict:
 
 
 def main():
-    # Load existing test vectors
-    with open("ed25519_test_data.json", "r") as f:
-        test_vectors = json.load(f)
+    import os
+    from pathlib import Path
     
-    updated_vectors = []
+    # Load test vectors from rust/test_vectors.json
+    test_vectors_path = Path(__file__).parent.parent / "rust" / "test_vectors.json"
     
-    for i, vec in enumerate(test_vectors):
-        print(f"\nProcessing vector {i}...")
+    if not test_vectors_path.exists():
+        print(f"Error: {test_vectors_path} not found")
+        sys.exit(1)
+    
+    with open(test_vectors_path, "r") as f:
+        test_vector = json.load(f)
+    
+    print("=" * 80)
+    print("Generating Correct Sqrt Hints for Ed25519 Compressed Points")
+    print("=" * 80)
+    print()
+    print("Root Cause: sqrt_hint must be x-coordinate on TWISTED EDWARDS curve")
+    print("(not Weierstrass x-coordinate)")
+    print()
+    
+    # Points to process
+    points = {
+        "adaptor_point": test_vector["adaptor_point_compressed"],
+        "second_point": test_vector["second_point_compressed"],
+        "r1": test_vector["r1_compressed"],
+        "r2": test_vector["r2_compressed"],
+    }
+    
+    updated_hints = {}
+    
+    for point_name, compressed_hex in points.items():
+        print(f"Processing {point_name}...")
         
-        # Get compressed point from vector
-        compressed_hex = vec["compressed_edwards"]
+        # Remove 0x prefix if present
+        compressed_hex = compressed_hex.replace("0x", "")
         compressed_int = int(compressed_hex, 16)
         
-        print(f"  Compressed point: {compressed_hex}")
+        print(f"  Compressed: {compressed_hex}")
         
         # Recover x-coordinate on twisted Edwards curve
         x_twisted = xrecover_twisted_edwards(compressed_int)
         
-        print(f"  Recovered x_twisted: 0x{x_twisted:064x}")
+        print(f"  x_twisted: 0x{x_twisted:064x}")
         
         # Convert to u256 format
         sqrt_hint_u256 = int_to_u256(x_twisted)
         
         print(f"  sqrt_hint.low:  0x{sqrt_hint_u256['low']:032x}")
         print(f"  sqrt_hint.high: 0x{sqrt_hint_u256['high']:032x}")
+        print()
         
-        # Update vector with correct sqrt hint
-        vec["sqrt_hint"] = sqrt_hint_u256
-        updated_vectors.append(vec)
+        updated_hints[f"{point_name}_sqrt_hint"] = sqrt_hint_u256
     
-    # Write updated vectors
-    with open("ed25519_test_data.json", "w") as f:
-        json.dump(updated_vectors, f, indent=2)
+    # Update test vector
+    for key, hint in updated_hints.items():
+        # Convert to hex string format (for compatibility)
+        hint_hex = f"0x{hint['low']:032x}{hint['high']:032x}"
+        test_vector[key.replace("_sqrt_hint", "_sqrt_hint")] = hint_hex
+        
+        # Also store as u256 dict for Cairo
+        test_vector[f"{key}_u256"] = hint
     
-    print("\n✅ Updated ed25519_test_data.json with correct sqrt hints!")
-    print("\nThe sqrt hints are now x-coordinates on the TWISTED EDWARDS curve,")
+    # Write updated test vectors
+    with open(test_vectors_path, "w") as f:
+        json.dump(test_vector, f, indent=2)
+    
+    print("=" * 80)
+    print("✅ Updated test_vectors.json with correct sqrt hints!")
+    print()
+    print("Cairo u256 format:")
+    for point_name in ["adaptor_point", "second_point", "r1", "r2"]:
+        hint = updated_hints[f"{point_name}_sqrt_hint"]
+        print(f"  {point_name.upper()}_SQRT_HINT: u256 {{")
+        print(f"    low: 0x{hint['low']:x},")
+        print(f"    high: 0x{hint['high']:x},")
+        print(f"  }}")
+    print()
+    print("The sqrt hints are now x-coordinates on the TWISTED EDWARDS curve,")
     print("matching Garaga's exact decompression pattern.")
 
 

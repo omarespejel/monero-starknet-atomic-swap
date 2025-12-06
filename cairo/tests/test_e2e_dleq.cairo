@@ -37,8 +37,8 @@ mod e2e_dleq_tests {
     };
 
     const TEST_ADAPTOR_POINT_SQRT_HINT: u256 = u256 {
-        low: 0xe2a230bd7b352952e060b8e02062c970,
-        high: 0xc73f9428ae5a145d107170f6564a9d32,
+        low: 0xe060b8e02062c970e2a230bd7b352952,
+        high: 0x107170f6564a9d32c73f9428ae5a145d,
     };
 
     const TEST_SECOND_POINT_COMPRESSED: u256 = u256 {
@@ -47,8 +47,8 @@ mod e2e_dleq_tests {
     };
 
     const TEST_SECOND_POINT_SQRT_HINT: u256 = u256 {
-        low: 0x3ce1b4c42b94eb8d579c34966ca8c781,
-        high: 0x39d44d17c4d0c210617cc305f9884514,
+        low: 0x579c34966ca8c7813ce1b4c42b94eb8d,
+        high: 0x617cc305f988451439d44d17c4d0c210,
     };
 
     // Ed25519 order (for challenge computation)
@@ -87,7 +87,7 @@ mod e2e_dleq_tests {
 
     const TEST_R1_SQRT_HINT: u256 = u256 { 
         low: 0x6df0c4dede706b328e6600feba46530d,
-        high: 0x88944eb1010f08e943db84f8ddd3ad3,
+        high: 0x088944eb1010f08e943db84f8ddd3ad3,
     };
     
     const TEST_R2_COMPRESSED: u256 = u256 {
