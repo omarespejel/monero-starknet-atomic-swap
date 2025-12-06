@@ -69,21 +69,27 @@ def generate_adaptor_point_hint(
     with open(test_vectors_path, 'r') as f:
         vectors = json.load(f)
     
-    # Extract hashlock (as hex string, convert to bytes)
-    hashlock_hex = vectors['hashlock']
-    if isinstance(hashlock_hex, str):
-        # Remove '0x' prefix if present
-        hashlock_hex = hashlock_hex.replace('0x', '')
-        hashlock_bytes = bytes.fromhex(hashlock_hex)
+    # Extract SECRET (not hashlock) - the adaptor point is generated from secret, not hashlock
+    # Protocol: adaptor_point = secret·G, and we verify secret·G == adaptor_point
+    secret_hex = vectors['secret']
+    if isinstance(secret_hex, str):
+        secret_hex = secret_hex.replace('0x', '')
+        secret_bytes = bytes.fromhex(secret_hex)
     else:
-        # Assume it's already a list of u32 values
-        hashlock_bytes = b''.join([v.to_bytes(4, 'little') for v in hashlock_hex])
+        secret_bytes = secret_hex.to_bytes(32, 'little')
     
-    # Convert hashlock to scalar (matches Cairo's hash_to_scalar_u256)
-    scalar = hashlock_to_scalar(hashlock_bytes)
+    # Convert secret to scalar (matching how Rust generates adaptor point)
+    # Secret is interpreted as little-endian bytes → scalar mod order
+    secret_int = int.from_bytes(secret_bytes, 'little')
+    curve = CURVES[CurveID.ED25519.value]
+    ed25519_order = curve.n
+    scalar = secret_int % ed25519_order
     
-    print(f"Hashlock scalar: {hex(scalar)}")
+    print(f"Secret: {secret_hex}")
+    print(f"Secret scalar: {hex(scalar)}")
     print(f"Scalar (decimal): {scalar}")
+    print(f"\nNote: Adaptor point is generated from SECRET scalar, not hashlock scalar")
+    print(f"Protocol: adaptor_point = secret·G, verify: secret·G == adaptor_point")
     
     # Get Ed25519 generator G (Weierstrass coordinates)
     curve = CURVES[CurveID.ED25519.value]
