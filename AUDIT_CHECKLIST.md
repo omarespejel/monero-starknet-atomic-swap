@@ -35,28 +35,32 @@
 
 ---
 
-### 2. **BLAKE2s Hash Extraction (CRITICAL)**
+### 2. **BLAKE2s Hash Extraction (CRITICAL) - ✅ FIXED**
 
-**Location**: `cairo/src/blake2s_challenge.cairo` lines 195-207
+**Location**: `cairo/src/blake2s_challenge.cairo` lines 195-220
 
-**Issue**: How we extract the hash from BLAKE2s state
+**Status**: ✅ **FIXED** - Now extracts full 256-bit hash
+
+**What Was Fixed**:
+
+1. **Before (BUG)**: Only extracted first u32 word (32 bits)
+2. **After (FIXED)**: Extracts all 8 u32 words (256 bits) and reconstructs u256
 
 **What to Verify**:
 
-1. **State extraction**:
-   ```cairo
-   let hash_state = state.unbox();
-   let hash_span = hash_state.span();
-   let hash_u32 = *hash_span.at(0);
-   ```
-   - **Question**: Is taking only the first u32 word correct?
-   - BLAKE2s produces 32 bytes (256 bits) of output
-   - We're only using the first 32 bits → **Is this correct?**
-   - **Risk**: If wrong, challenge will be incorrect → DLEQ verification fails
+1. **Hash extraction correctness**:
+   - Now extracts all 8 words: w0-w7
+   - Reconstructs: `low = w0 + w1·2^32 + w2·2^64 + w3·2^96`
+   - Reconstructs: `high = w4 + w5·2^32 + w6·2^64 + w7·2^96`
+   - **Verify**: Does this match Rust's byte interpretation?
 
-2. **Scalar reduction**:
+2. **Word order**:
+   - **Question**: Are words in little-endian order? (w0 = least significant)
+   - **Verify**: Compare with Rust's `finalize()` output byte-by-byte
+
+3. **Scalar reduction**:
    - Hash is converted to u256, then reduced mod Ed25519 order
-   - **Verify**: Is the reduction correct? Does it match Rust's `Scalar::from_bytes_mod_order`?
+   - **Verify**: Does this match Rust's `Scalar::from_bytes_mod_order`?
 
 **Files to Review**:
 - `cairo/src/blake2s_challenge.cairo` lines 195-207
