@@ -1082,7 +1082,7 @@ pub mod AtomicLock {
     /// @security Uses Ed25519 order constant (matches Garaga's get_ED25519_order_modulus())
     /// @invariant Result is always < ED25519_ORDER (enforced by modulo operation)
     /// @invariant Cairo's built-in overflow protection ensures safe arithmetic
-    fn reduce_felt_to_scalar(f: felt252) -> u256 {
+    pub fn reduce_felt_to_scalar(f: felt252) -> u256 {
         // CRITICAL: Extract full felt252 value as u256 (no truncation)
         // felt252 can hold values up to 2^252 - 1, which may exceed u128_max
         // 
