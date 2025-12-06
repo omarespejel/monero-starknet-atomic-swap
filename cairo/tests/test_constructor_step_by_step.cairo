@@ -181,6 +181,119 @@ mod constructor_step_by_step_tests {
     }
 
     #[test]
+    fn test_step3a_msm_sg_only() {
+        // Isolate: Test only s·G MSM call
+        // Use EXACT same approach as test_garaga_msm_all_calls (which works)
+        let G = get_G(ED25519_CURVE_INDEX);
+        // Use direct truncated scalar (matching working test)
+        let s_scalar = u256 {
+            low: RESPONSE_LOW.try_into().unwrap(),
+            high: 0
+        };
+        // Use hardcoded hint (matching test_garaga_msm_all_calls which works)
+        let s_hint_for_g = array![
+            0xd21de05d0b4fe220a6fcca9b,
+            0xa8e827ce9b59e1a5770bd9a,
+            0x4e14ea0d8a7581a1,
+            0x0,
+            0x8cfb1d3e412e174d0ad03ad4,
+            0x4417fe7cc6824de3b328f2a0,
+            0x13f6f393b443ac08,
+            0x0,
+            0x1fd0f994a4c11a4543d86f4578e7b9ed,
+            0x39099b31d1013f73ec51ebd61fdfe2ab
+        ].span();
+        
+        let sG = msm_g1(
+            array![G].span(),
+            array![s_scalar].span(),
+            ED25519_CURVE_INDEX,
+            s_hint_for_g
+        );
+        sG.assert_on_curve_excluding_infinity(ED25519_CURVE_INDEX);
+        assert(true, 'Step 3a: sG OK');
+    }
+
+    #[test]
+    fn test_step3b_msm_negct_only() {
+        // Isolate: Test only (-c)·T MSM call
+        let adaptor = decompress_edwards_pt_from_y_compressed_le_into_weirstrass_point(
+            TEST_ADAPTOR_POINT_COMPRESSED,
+            TEST_ADAPTOR_POINT_SQRT_HINT
+        ).unwrap();
+        let challenge = CHALLENGE_FELT;
+        let c_scalar = reduce_felt_to_scalar(challenge);
+        let c_neg_scalar = (ED25519_ORDER - (c_scalar % ED25519_ORDER)) % ED25519_ORDER;
+        let (_, _, c_neg_hint_for_t, _) = get_real_msm_hints();
+        
+        let neg_cT = msm_g1(
+            array![adaptor].span(),
+            array![c_neg_scalar].span(),
+            ED25519_CURVE_INDEX,
+            c_neg_hint_for_t
+        );
+        neg_cT.assert_on_curve_excluding_infinity(ED25519_CURVE_INDEX);
+        assert(true, 'Step 3b: -cT OK');
+    }
+
+    #[test]
+    fn test_step3c_msm_sy_only() {
+        // Isolate: Test only s·Y MSM call
+        // Use EXACT same approach as test_garaga_msm_all_calls (which works)
+        let G = get_G(ED25519_CURVE_INDEX);
+        let Y = ec_safe_add(G, G, ED25519_CURVE_INDEX);
+        // Use direct truncated scalar (matching working test)
+        let s_scalar = u256 {
+            low: RESPONSE_LOW.try_into().unwrap(),
+            high: 0
+        };
+        // Use hardcoded hint (matching test_garaga_msm_all_calls which works)
+        let s_hint_for_y = array![
+            0xcdb4e41a66188ec060e0e45b,
+            0x1cf0f0ff51495823cad8d964,
+            0x2dcda3d3bbeda8a3,
+            0x0,
+            0x8b8b33d4304cc1bedc45545c,
+            0x5fbf8dbd7bd2029ba859c5bb,
+            0x145b0ef370c62319,
+            0x0,
+            0x1fd0f994a4c11a4543d86f4578e7b9ed,
+            0x39099b31d1013f73ec51ebd61fdfe2ab
+        ].span();
+        
+        let sY = msm_g1(
+            array![Y].span(),
+            array![s_scalar].span(),
+            ED25519_CURVE_INDEX,
+            s_hint_for_y
+        );
+        sY.assert_on_curve_excluding_infinity(ED25519_CURVE_INDEX);
+        assert(true, 'Step 3c: sY OK');
+    }
+
+    #[test]
+    fn test_step3d_msm_negcu_only() {
+        // Isolate: Test only (-c)·U MSM call
+        let second = decompress_edwards_pt_from_y_compressed_le_into_weirstrass_point(
+            TEST_SECOND_POINT_COMPRESSED,
+            TEST_SECOND_POINT_SQRT_HINT
+        ).unwrap();
+        let challenge = CHALLENGE_FELT;
+        let c_scalar = reduce_felt_to_scalar(challenge);
+        let c_neg_scalar = (ED25519_ORDER - (c_scalar % ED25519_ORDER)) % ED25519_ORDER;
+        let (_, _, _, c_neg_hint_for_u) = get_real_msm_hints();
+        
+        let neg_cU = msm_g1(
+            array![second].span(),
+            array![c_neg_scalar].span(),
+            ED25519_CURVE_INDEX,
+            c_neg_hint_for_u
+        );
+        neg_cU.assert_on_curve_excluding_infinity(ED25519_CURVE_INDEX);
+        assert(true, 'Step 3d: -cU OK');
+    }
+
+    #[test]
     fn test_step3_all_msm_calls() {
         // Step 3: Execute all MSM calls in sequence (matching _verify_dleq_proof)
         // Decompress points
