@@ -111,24 +111,85 @@ def main():
     G = G1Point.get_nG(CurveID.ED25519, 1)
     Y = G.scalar_mul(2)  # Y = 2·G
     
-    # For T and U, we need to decompress from test vectors
-    # But we can't easily do that from Python without Garaga bindings
-    # Instead, let's use the fact that T = secret·G and U = secret·Y
-    # We can compute these from the secret scalar
+    # CRITICAL: Decompress T and U from test vectors using sqrt hints
+    # Cairo will decompress these exact compressed points, so hints must match
+    # those decompressed coordinates, not recomputed ones
     
-    secret_hex = vectors['secret']
-    secret_bytes = bytes.fromhex(secret_hex)
-    secret_int = int.from_bytes(secret_bytes, 'little')
-    secret_scalar = secret_int % order
+    def decompress_edwards_point(compressed_hex: str, sqrt_hint_low: int, sqrt_hint_high: int) -> G1Point:
+        """
+        Decompress Edwards point using sqrt hint, matching Garaga's algorithm.
+        
+        This mirrors Cairo's decompress_edwards_pt_from_y_compressed_le_into_weirstrass_point.
+        Uses the same logic as regenerate_garaga_hints.py.
+        """
+        from garaga.curves import CurveID, CURVES
+        
+        curve = CURVES[CurveID.ED25519.value]
+        p = curve.p  # Ed25519 prime
+        d = curve.d_twisted  # Edwards d coefficient
+        
+        # Extract sign bit and y-coordinate from compressed point (little-endian bytes)
+        compressed_hex_clean = compressed_hex.replace('0x', '')
+        compressed_bytes = bytes.fromhex(compressed_hex_clean)
+        compressed_int = int.from_bytes(compressed_bytes, 'little')
+        
+        sign_bit = (compressed_int >> 255) & 1
+        y = compressed_int & ((1 << 255) - 1)
+        
+        # Reconstruct x from sqrt hint (u256 format: low | (high << 128))
+        # The sqrt hint IS the x-coordinate (from regenerate_garaga_hints.py)
+        x = sqrt_hint_low | (sqrt_hint_high << 128)
+        x = x % p
+        
+        # Verify sqrt hint: x^2 should equal (y^2 - 1) / (d*y^2 + 1)
+        y2 = (y * y) % p
+        numerator = (y2 - 1) % p
+        denominator = (d * y2 + 1) % p
+        denominator_inv = pow(denominator, p - 2, p)  # Fermat's little theorem
+        x2_expected = (numerator * denominator_inv) % p
+        x2_actual = (x * x) % p
+        
+        # Garaga checks: sqrt_hint.low % 2 == sign_bit
+        # If mismatch, negate x (Garaga does this internally)
+        if (x % 2) != sign_bit:
+            x = (p - x) % p
+            x2_actual = (x * x) % p
+        
+        # Verify x^2 matches expected value
+        if x2_actual != x2_expected:
+            # Try the other square root
+            x_alt = (p - x) % p
+            x2_alt = (x_alt * x_alt) % p
+            if x2_alt == x2_expected:
+                x = x_alt
+                x2_actual = x2_alt
+            else:
+                raise AssertionError(f"Invalid sqrt hint: x^2 = {hex(x2_actual)}, expected {hex(x2_expected)}")
+        
+        # Convert Edwards (x, y) to Weierstrass coordinates using Garaga's conversion
+        edwards_point = curve.to_weierstrass(x, y)
+        
+        # Create G1Point from Weierstrass coordinates
+        return G1Point(edwards_point[0], edwards_point[1], curve_id=CurveID.ED25519)
     
-    T = G.scalar_mul(secret_scalar)  # T = secret·G
-    U = Y.scalar_mul(secret_scalar)  # U = secret·Y
+    # Decompress adaptor_point (T) using sqrt hint
+    adaptor_compressed_hex = vectors['adaptor_point_compressed']
+    adaptor_sqrt_hint_low = int(vectors['adaptor_point_sqrt_hint_u256']['low'], 16)
+    adaptor_sqrt_hint_high = int(vectors['adaptor_point_sqrt_hint_u256']['high'], 16)
     
-    print(f"Adaptor point T (secret·G):")
+    print("Decompressing adaptor_point (T) from test vectors...")
+    T = decompress_edwards_point(adaptor_compressed_hex, adaptor_sqrt_hint_low, adaptor_sqrt_hint_high)
     print(f"  T.x: 0x{T.x:x}")
     print(f"  T.y: 0x{T.y:x}")
     print()
-    print(f"Second point U (secret·Y):")
+    
+    # Decompress second_point (U) using sqrt hint
+    second_compressed_hex = vectors['second_point_compressed']
+    second_sqrt_hint_low = int(vectors['second_point_sqrt_hint_u256']['low'], 16)
+    second_sqrt_hint_high = int(vectors['second_point_sqrt_hint_u256']['high'], 16)
+    
+    print("Decompressing second_point (U) from test vectors...")
+    U = decompress_edwards_point(second_compressed_hex, second_sqrt_hint_low, second_sqrt_hint_high)
     print(f"  U.x: 0x{U.x:x}")
     print(f"  U.y: 0x{U.y:x}")
     print()
