@@ -80,11 +80,19 @@ mod e2e_dleq_tests {
     
     // DLEQ proof scalars (felt252)
     // NOTE: Challenge is computed from points using BLAKE2s (matches Rust)
-    // Response is reduced mod order to fit in felt252
+    // Response is full scalar reduced mod order (fits in felt252)
     // Updated with regenerated test vectors (secret scalar protocol)
-    // Challenge will be computed in test using compute_dleq_challenge_blake2s
-    // Response mod order: 0x47cff7b5713428a889bfad01f6fa4e00 (low part of reduced value)
-    const TEST_DLEQ_RESPONSE: felt252 = 0x47cff7b5713428a889bfad01f6fa4e00; // Reduced mod order
+    // Challenge will be computed in test using compute_dleq_challenge_blake2s (returns full scalar)
+    // Response: full scalar reduced mod Ed25519 order
+    // Full reduced scalar: 0x0850ef802e40bbd177b22dd7319a9bc047cff7b5713428a889bfad01f6fa4e00
+    // Construct from low and high parts (felt252 constant can't hold full 252-bit value directly)
+    const BASE_128: felt252 = 0x100000000000000000000000000000000; // 2^128
+    const RESPONSE_LOW: felt252 = 0x47cff7b5713428a889bfad01f6fa4e00; // Low 128 bits
+    const RESPONSE_HIGH: felt252 = 0x0850ef802e40bbd177b22dd7319a9bc0; // High 124 bits
+    
+    fn get_test_dleq_response() -> felt252 {
+        RESPONSE_LOW + RESPONSE_HIGH * BASE_128 // Full reduced mod order
+    }
 
     // R1 and R2 commitment points (compressed Edwards)
     // Updated with regenerated test vectors (secret scalar protocol)
@@ -118,64 +126,65 @@ mod e2e_dleq_tests {
         Span<felt252>,
         Span<felt252>,
     ) {
-        // Regenerated DLEQ hints with scalar.low (regenerate_dleq_hints.py)
-        // CRITICAL: Cairo's compute_dleq_challenge_blake2s returns scalar.low (felt252)
-        // reduce_felt_to_scalar uses this scalar.low value directly
-        // Hints must match what Cairo passes to Garaga: scalar.low (not full scalar)
-        // s_hint_for_g: Fake-GLV hint for s·G (response scalar.low)
+        // Regenerated DLEQ hints with full reduced scalars (regenerate_dleq_hints.py)
+        // CRITICAL: Cairo now uses FULL reduced scalars (not scalar.low)
+        // compute_dleq_challenge_blake2s returns full scalar: low + high * 2^128
+        // reduce_felt_to_scalar converts felt252 -> u256 preserving full value
+        // Hints match what Cairo passes to Garaga: full reduced scalars
+        // s_hint_for_g: Fake-GLV hint for s·G (full response scalar)
         let s_hint_for_g = array![
-            0xd21de05d0b4fe220a6fcca9b,
-            0xa8e827ce9b59e1a5770bd9a,
-            0x4e14ea0d8a7581a1,
+            0x919b46b8f36f2a0f5774ebbf,
+            0x953af75cb11fcf237747ae51,
+            0x576c9bc3c3fc74ca,
             0x0,
-            0x8cfb1d3e412e174d0ad03ad4,
-            0x4417fe7cc6824de3b328f2a0,
-            0x13f6f393b443ac08,
+            0x46674c203f672b7f41734e56,
+            0xa14b9e5329a49c91480ddce3,
+            0x1f69ad0f358a24d8,
             0x0,
-            0x1fd0f994a4c11a4543d86f4578e7b9ed,
-            0x39099b31d1013f73ec51ebd61fdfe2ab
+            0x3594dd685f9e586716cc464e02afc0d4,
+            0x113087b16d5a4a8a30a8146f6423bec15
         ].span();
 
-        // s_hint_for_y: Fake-GLV hint for s·Y (response scalar.low)
+        // s_hint_for_y: Fake-GLV hint for s·Y (full response scalar)
         let s_hint_for_y = array![
-            0xcdb4e41a66188ec060e0e45b,
-            0x1cf0f0ff51495823cad8d964,
-            0x2dcda3d3bbeda8a3,
+            0x4a51958fcf9259d93b8cac4f,
+            0x6a6043a69fa23dabab1c99ee,
+            0x4fa2ed593bfe19c3,
             0x0,
-            0x8b8b33d4304cc1bedc45545c,
-            0x5fbf8dbd7bd2029ba859c5bb,
-            0x145b0ef370c62319,
+            0x2dcd871905026332a38033a3,
+            0x6c6baa79fd66874cf3ca43e9,
+            0x46aadce984659ff4,
             0x0,
-            0x1fd0f994a4c11a4543d86f4578e7b9ed,
-            0x39099b31d1013f73ec51ebd61fdfe2ab
+            0x3594dd685f9e586716cc464e02afc0d4,
+            0x113087b16d5a4a8a30a8146f6423bec15
         ].span();
 
-        // c_neg_hint_for_t: Fake-GLV hint for (-c)·T (challenge scalar.low)
+        // c_neg_hint_for_t: Fake-GLV hint for (-c)·T (full challenge scalar)
         let c_neg_hint_for_t = array![
-            0x66000aba4d2a74d47c533178,
-            0x9ea4842ef2f03d53e343a679,
-            0x778e97a0807281b4,
+            0xc13f0268375a278b7ab4631d,
+            0x2251fcc94e007d45346fccfe,
+            0x290351303d074349,
             0x0,
-            0xbfceae318ea33798f6ec61dc,
-            0x372fddb8e594a32a188966e4,
-            0x535c04c5a55bde28,
+            0x8ad99766168bd43f4be122d0,
+            0x571d4c7818229ff39f19efb5,
+            0x42704ac18a9b329c,
             0x0,
-            0x7efceb1a85bf072f5d2f01564ab0e4,
-            0x12787423413e5304eeb23c087f5b6af8f
+            0x30866ae88e236a826d3da3f36d3b9a30,
+            0x21af4955df7d56db671be607c45b17a5
         ].span();
 
-        // c_neg_hint_for_u: Fake-GLV hint for (-c)·U (challenge scalar.low)
+        // c_neg_hint_for_u: Fake-GLV hint for (-c)·U (full challenge scalar)
         let c_neg_hint_for_u = array![
-            0x7969356396fb262f87861a8a,
-            0xc8a44fde74c51c50ca61c539,
-            0x6c3dc2f587df82dc,
+            0x3645343c9601d454bcdccc71,
+            0xb815f12b909e21eb3a6558d5,
+            0x3847c50bded9e699,
             0x0,
-            0x64877e70ff849806fd5b3041,
-            0x79d2f87426e3258bfbb1d244,
-            0x5f21e6d3211d0c61,
+            0xe1b71d4bb9958b2828d33847,
+            0xa87fa42c6dffe61174486f97,
+            0x557ff3b2d2f4ae77,
             0x0,
-            0x7efceb1a85bf072f5d2f01564ab0e4,
-            0x12787423413e5304eeb23c087f5b6af8f
+            0x30866ae88e236a826d3da3f36d3b9a30,
+            0x21af4955df7d56db671be607c45b17a5
         ].span();
 
         (s_hint_for_g, s_hint_for_y, c_neg_hint_for_t, c_neg_hint_for_u)
@@ -248,7 +257,7 @@ mod e2e_dleq_tests {
             TEST_ADAPTOR_POINT_SQRT_HINT,
             TEST_SECOND_POINT_COMPRESSED,
             TEST_SECOND_POINT_SQRT_HINT,
-            (computed_challenge, TEST_DLEQ_RESPONSE),
+            (computed_challenge, get_test_dleq_response()),
             fake_glv_hint,
             s_hint_for_g,
             s_hint_for_y,

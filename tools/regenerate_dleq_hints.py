@@ -94,26 +94,19 @@ def main():
     curve = CURVES[CurveID.ED25519.value]
     order = curve.n
     
-    # CRITICAL: Cairo's compute_dleq_challenge_blake2s returns scalar.low (felt252)
-    # where scalar = hash_u256 % order
-    # Then reduce_felt_to_scalar does: f_u128 = felt252.try_into().unwrap()
-    # So the scalar used in MSM is: scalar.low (not full scalar)
-    #
-    # The test file uses TEST_DLEQ_RESPONSE = scalar.low, which is correct
-    # Hints must be generated with scalar.low to match what Cairo passes to Garaga
+    # CRITICAL: Cairo now uses FULL reduced scalars (not scalar.low)
+    # compute_dleq_challenge_blake2s returns full scalar: low + high * 2^128
+    # reduce_felt_to_scalar converts felt252 -> u256 preserving full value
+    # Hints must be generated with full reduced scalars to match Cairo
     
-    # Reduce mod order first
-    response_scalar_full = response_int % order
-    challenge_scalar_full = challenge_int % order
-    
-    # Extract scalar.low (matching compute_dleq_challenge_blake2s return value)
-    s_scalar = response_scalar_full & ((1 << 128) - 1)  # scalar.low
-    c_scalar = challenge_scalar_full & ((1 << 128) - 1)  # scalar.low
+    # Use full reduced scalars (no truncation)
+    s_scalar = response_int % order  # Full scalar
+    c_scalar = challenge_int % order  # Full scalar
     c_neg_scalar = (order - c_scalar) % order
     
-    print(f"Using scalar.low values (matching Cairo's compute_dleq_challenge_blake2s):")
-    print(f"  Response scalar.low s: 0x{s_scalar:032x}")
-    print(f"  Challenge scalar.low c: 0x{c_scalar:032x}")
+    print(f"Using full reduced scalars (matching Cairo's updated implementation):")
+    print(f"  Response scalar s: 0x{s_scalar:064x}")
+    print(f"  Challenge scalar c: 0x{c_scalar:064x}")
     print(f"  -c mod order: 0x{c_neg_scalar:064x}")
     print()
     

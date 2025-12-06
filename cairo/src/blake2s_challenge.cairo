@@ -221,7 +221,13 @@ pub fn compute_dleq_challenge_blake2s(
     let hash_u256 = u256 { low, high };
     let scalar = hash_u256 % ed25519_order;
     
-    // Convert back to felt252 (scalar % order < order < 2^252, so fits in felt252)
-    scalar.low.try_into().unwrap() // Safe: scalar % order < order < 2^252
+    // CRITICAL: Return full scalar as felt252 (not just scalar.low)
+    // scalar % order < order < 2^252, so fits in felt252
+    // Combine low and high: felt252 = scalar.low + scalar.high * 2^128
+    let base_128: felt252 = 0x100000000000000000000000000000000; // 2^128
+    let low_felt: felt252 = scalar.low.try_into().unwrap();
+    let high_felt: felt252 = scalar.high.try_into().unwrap();
+    let scalar_felt = low_felt + high_felt * base_128;
+    scalar_felt
 }
 

@@ -1083,9 +1083,16 @@ pub mod AtomicLock {
     /// @invariant Result is always < ED25519_ORDER (enforced by modulo operation)
     /// @invariant Cairo's built-in overflow protection ensures safe arithmetic
     fn reduce_felt_to_scalar(f: felt252) -> u256 {
-        // Convert felt252 to u256 (felt252 fits in u128 low)
-        let f_u128: u128 = f.try_into().unwrap();
-        let f_u256 = u256 { low: f_u128, high: 0 };
+        // CRITICAL: Extract full felt252 value as u256 (no truncation)
+        // felt252 can hold values up to 2^252 - 1, which may exceed u128_max
+        // 
+        // Cairo's felt252.into() for u256 preserves the full value:
+        // - If felt252 < 2^128: u256 { low: felt252, high: 0 }
+        // - If felt252 >= 2^128: u256 { low: felt252 % 2^128, high: felt252 / 2^128 }
+        // 
+        // However, the standard conversion might truncate. We use explicit conversion
+        // to ensure we get the full value.
+        let f_u256: u256 = f.into();
         f_u256 % ED25519_ORDER
     }
 
