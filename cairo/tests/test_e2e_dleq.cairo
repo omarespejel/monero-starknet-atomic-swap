@@ -37,8 +37,8 @@ mod e2e_dleq_tests {
     };
 
     const TEST_ADAPTOR_POINT_SQRT_HINT: u256 = u256 {
-        low: 0xe060b8e02062c970e2a230bd7b352952,
-        high: 0x107170f6564a9d32c73f9428ae5a145d,
+        low: 0xbb73e7230cbed81eed006ba59a2103f1,
+        high: 0x689ee25ca0c65d5a1c560224726871b0,
     };
 
     const TEST_SECOND_POINT_COMPRESSED: u256 = u256 {
@@ -47,8 +47,8 @@ mod e2e_dleq_tests {
     };
 
     const TEST_SECOND_POINT_SQRT_HINT: u256 = u256 {
-        low: 0x579c34966ca8c7813ce1b4c42b94eb8d,
-        high: 0x617cc305f988451439d44d17c4d0c210,
+        low: 0xdcad2173817c163b5405cec7698eb4b8,
+        high: 0x742bb3c44b13553c8ddff66565b44cac,
     };
 
     // Ed25519 order (for challenge computation)
@@ -86,8 +86,8 @@ mod e2e_dleq_tests {
     };
 
     const TEST_R1_SQRT_HINT: u256 = u256 { 
-        low: 0x6df0c4dede706b328e6600feba46530d,
-        high: 0x088944eb1010f08e943db84f8ddd3ad3,
+        low: 0x4f1efce2a44c72b5d316cc9b8d8e4673,
+        high: 0x28bde2dde999d287316395d449669102,
     };
     
     const TEST_R2_COMPRESSED: u256 = u256 {
@@ -96,8 +96,8 @@ mod e2e_dleq_tests {
     };
     
     const TEST_R2_SQRT_HINT: u256 = u256 { 
-        low: 0x9f3ee81fe68dcbcf9de661eedd114a9e,
-        high: 0x397c8b3280ddfb2ffe72518d79cc504c,
+        low: 0x96d3389f6ada584d36a9d29f70da2ad3,
+        high: 0x5e96c92c3291ac013f5b1dce022923a3,
     };
 
     // Real MSM hints generated from test vectors (from test_hints.json)
