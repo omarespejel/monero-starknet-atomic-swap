@@ -18,8 +18,8 @@ mod blake2s_challenge_tests {
 
     /// Ed25519 Base Point G (compressed Edwards format)
     const ED25519_BASE_POINT_COMPRESSED: u256 = u256 {
-        low: 0x66666666666666586666666666666666,
-        high: 0x66666666666666666666666666666666,
+        low: 0x66666666666666666666666666666666,
+        high: 0x58666666666666666666666666666666,
     };
 
     /// Ed25519 Second Generator Y = 2·G (compressed Edwards format)

@@ -733,8 +733,8 @@ mod tests {
         // This will decompress successfully but DLEQ verification will fail (expected)
         // For tests that need real DLEQ, use deploy_with_dleq from test_dleq.cairo
         const ED25519_BASE_POINT_COMPRESSED: u256 = u256 {
-            low: 0x66666666666666586666666666666666,
-            high: 0x66666666666666666666666666666666,
+            low: 0x66666666666666666666666666666666,
+            high: 0x58666666666666666666666666666666,
         };
         // Sqrt hint for base point (x-coordinate)
         // Using a placeholder - real tests should compute this properly
