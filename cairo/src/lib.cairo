@@ -953,6 +953,18 @@ pub mod AtomicLock {
         let c_neg_scalar = (ED25519_ORDER - (c_scalar % ED25519_ORDER)) % ED25519_ORDER;
         
         // PRODUCTION: Use provided fake-GLV hints for MSM operations
+        // Pre-MSM validation (per auditor recommendation)
+        assert(!s_scalar.is_zero(), Errors::DLEQ_SCALAR_OUT_OF_RANGE);
+        assert(!c_neg_scalar.is_zero(), Errors::DLEQ_SCALAR_OUT_OF_RANGE);
+        assert(s_scalar < ED25519_ORDER, Errors::DLEQ_SCALAR_OUT_OF_RANGE);
+        assert(c_neg_scalar < ED25519_ORDER, Errors::DLEQ_SCALAR_OUT_OF_RANGE);
+        
+        // Verify points are not zero/infinity (per auditor recommendation)
+        assert(!is_zero_point(@G), Errors::ZERO_ADAPTOR_POINT);
+        assert(!is_zero_point(@Y), Errors::ZERO_ADAPTOR_POINT);
+        assert(!is_zero_point(@T), Errors::ZERO_ADAPTOR_POINT);
+        assert(!is_zero_point(@U), Errors::ZERO_ADAPTOR_POINT);
+        
         // Debug assertions to verify array lengths match (per auditor recommendation)
         let points_g = array![G].span();
         let scalars_s = array![s_scalar].span();
@@ -960,6 +972,7 @@ pub mod AtomicLock {
         assert(s_hint_for_g.len() == points_g.len() * 10, Errors::MSM_HINT_LEN_WRONG);
         
         // s_hint_for_g: hint for s·G (Q = s·G)
+        // AUDIT: First MSM call - if this fails, error is here
         let sG = msm_g1(
             points_g,
             scalars_s,
@@ -973,6 +986,7 @@ pub mod AtomicLock {
         assert(points_t.len() == scalars_c_neg.len(), Errors::MSM_LEN_MISMATCH);
         assert(c_neg_hint_for_t.len() == points_t.len() * 10, Errors::MSM_HINT_LEN_WRONG);
         
+        // AUDIT: Second MSM call - if first passed but this fails, error is here
         let neg_cT = msm_g1(
             points_t,
             scalars_c_neg,
@@ -989,6 +1003,7 @@ pub mod AtomicLock {
         assert(points_y.len() == scalars_s2.len(), Errors::MSM_LEN_MISMATCH);
         assert(s_hint_for_y.len() == points_y.len() * 10, Errors::MSM_HINT_LEN_WRONG);
         
+        // AUDIT: Third MSM call - if previous passed but this fails, error is here
         let sY = msm_g1(
             points_y,
             scalars_s2,
@@ -1002,6 +1017,7 @@ pub mod AtomicLock {
         assert(points_u.len() == scalars_c_neg2.len(), Errors::MSM_LEN_MISMATCH);
         assert(c_neg_hint_for_u.len() == points_u.len() * 10, Errors::MSM_HINT_LEN_WRONG);
         
+        // AUDIT: Fourth MSM call - if previous passed but this fails, error is here
         let neg_cU = msm_g1(
             points_u,
             scalars_c_neg2,
