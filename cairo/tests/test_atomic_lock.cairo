@@ -706,7 +706,15 @@ mod tests {
         );
     }
 
-    /// Helper for future tests that need real adaptor point and hint values from Rust.
+    /// Helper for tests that need adaptor point and hint values.
+    /// 
+    /// NOTE: This helper uses placeholder values for DLEQ parameters since these tests
+    /// focus on atomic lock functionality, not DLEQ verification. Tests that require
+    /// real DLEQ verification should use deploy_with_dleq from test_dleq.cairo instead.
+    /// 
+    /// The x/y limbs are converted to placeholder compressed Edwards format.
+    /// DLEQ verification will fail with these placeholder values, which is expected
+    /// for tests that don't test DLEQ functionality.
     fn deploy_with_full(
         expected_hash: Span<u32>,
         lock_until: u64,
@@ -720,29 +728,56 @@ mod tests {
         let declare_res = declare("AtomicLock");
         let contract = declare_res.unwrap().contract_class();
 
-        let (x0, x1, x2, x3) = adaptor_point_x;
-        let (y0, y1, y2, y3) = adaptor_point_y;
+        // Placeholder compressed Edwards points (will fail DLEQ verification)
+        // For tests that need real DLEQ, use deploy_with_dleq from test_dleq.cairo
+        let adaptor_point_compressed = u256 { low: 0x1234, high: 0 };
+        let adaptor_point_sqrt_hint = u256 { low: 0x5678, high: 0 };
+        let dleq_second_point_compressed = u256 { low: 0x9abc, high: 0 };
+        let dleq_second_point_sqrt_hint = u256 { low: 0xdef0, high: 0 };
+        
         let (dleq_c, dleq_r) = dleq;
+        
+        // Placeholder DLEQ hints (empty - will cause MSM to fail)
+        let empty_hint = array![0, 0, 0, 0, 0, 0, 0, 0, 0, 0].span();
+        
+        // Placeholder R1 and R2 (commitment points)
+        let r1_compressed = u256 { low: 0x1111, high: 0 };
+        let r1_sqrt_hint = u256 { low: 0x2222, high: 0 };
+        let r2_compressed = u256 { low: 0x3333, high: 0 };
+        let r2_sqrt_hint = u256 { low: 0x4444, high: 0 };
 
         let mut calldata = ArrayTrait::new();
         expected_hash.serialize(ref calldata);
         Serde::serialize(@lock_until, ref calldata);
         Serde::serialize(@token, ref calldata);
         Serde::serialize(@amount, ref calldata);
-        // adaptor_point (x/y limbs)
-        Serde::serialize(@x0, ref calldata);
-        Serde::serialize(@x1, ref calldata);
-        Serde::serialize(@x2, ref calldata);
-        Serde::serialize(@x3, ref calldata);
-        Serde::serialize(@y0, ref calldata);
-        Serde::serialize(@y1, ref calldata);
-        Serde::serialize(@y2, ref calldata);
-        Serde::serialize(@y3, ref calldata);
-        // DLEQ placeholders/inputs
+        
+        // Adaptor point (compressed Edwards + sqrt hint)
+        Serde::serialize(@adaptor_point_compressed, ref calldata);
+        Serde::serialize(@adaptor_point_sqrt_hint, ref calldata);
+        
+        // DLEQ second point (compressed Edwards + sqrt hint)
+        Serde::serialize(@dleq_second_point_compressed, ref calldata);
+        Serde::serialize(@dleq_second_point_sqrt_hint, ref calldata);
+        
+        // DLEQ proof (challenge, response)
         Serde::serialize(@dleq_c, ref calldata);
         Serde::serialize(@dleq_r, ref calldata);
-        // fake_glv_hint[10]
+        
+        // Fake-GLV hint (for adaptor point)
         Serde::serialize(@fake_glv_hint, ref calldata);
+        
+        // DLEQ hints (empty placeholders)
+        Serde::serialize(@empty_hint, ref calldata); // s_hint_for_g
+        Serde::serialize(@empty_hint, ref calldata); // s_hint_for_y
+        Serde::serialize(@empty_hint, ref calldata); // c_neg_hint_for_t
+        Serde::serialize(@empty_hint, ref calldata); // c_neg_hint_for_u
+        
+        // R1 and R2 commitment points
+        Serde::serialize(@r1_compressed, ref calldata);
+        Serde::serialize(@r1_sqrt_hint, ref calldata);
+        Serde::serialize(@r2_compressed, ref calldata);
+        Serde::serialize(@r2_sqrt_hint, ref calldata);
 
         let (addr, _) = contract.deploy(@calldata).unwrap();
         IAtomicLockDispatcher { contract_address: addr }
