@@ -8,7 +8,12 @@ mod constructor_flow_tests {
     use core::integer::u256;
     use garaga::signatures::eddsa_25519::decompress_edwards_pt_from_y_compressed_le_into_weirstrass_point;
     use garaga::ec_ops::G1PointTrait;
-    use atomic_lock::AtomicLock::{is_small_order_ed25519, ED25519_CURVE_INDEX, ED25519_ORDER};
+    use atomic_lock::AtomicLock::{is_small_order_ed25519, ED25519_CURVE_INDEX};
+    
+    const ED25519_ORDER: u256 = u256 {
+        low: 0x14def9dea2f79cd65812631a5cf5d3ed,
+        high: 0x10000000000000000000000000000000,
+    };
 
     // Test vector constants (from test_e2e_dleq.cairo)
     const TEST_ADAPTOR_POINT_COMPRESSED: u256 = u256 {
