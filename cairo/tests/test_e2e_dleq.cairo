@@ -18,6 +18,8 @@ mod e2e_dleq_tests {
     use starknet::ContractAddress;
     use snforge_std::{declare, ContractClassTrait, DeclareResultTrait};
     use core::integer::u256;
+    use garaga::signatures::eddsa_25519::decompress_edwards_pt_from_y_compressed_le_into_weirstrass_point;
+    use garaga::ec_ops::G1PointTrait;
 
     const FUTURE_TIMESTAMP: u64 = 9999999999_u64;
 
@@ -200,19 +202,36 @@ mod e2e_dleq_tests {
         // Get real MSM hints (generated from test vectors)
         let (s_hint_for_g, s_hint_for_y, c_neg_hint_for_t, c_neg_hint_for_u) = get_real_msm_hints();
 
-        // Fake-GLV hint for adaptor point (placeholder - would need actual adaptor point for production)
-        // For this test, we use a placeholder since we're testing DLEQ verification, not adaptor point MSM
+        // Generate fake-GLV hint dynamically from decompressed adaptor point
+        // AUDITOR SOLUTION: Extract Q coordinates from decompressed point to ensure exact match
+        // This solves the "Hint Q mismatch adaptor" error by ensuring hint Q == decompressed point
+        // Format: [Q.x.limb0, Q.x.limb1, Q.x.limb2, Q.x.limb3,
+        //          Q.y.limb0, Q.y.limb1, Q.y.limb2, Q.y.limb3,
+        //          s1, s2]
+        // For production, use garaga_rs.msm_calldata_builder() with decompressed coordinates
+        // For testing, dummy s1/s2 values are acceptable (they don't affect Q matching)
+        const ED25519_CURVE_INDEX: u32 = 4;
+        let adaptor_decompressed = decompress_edwards_pt_from_y_compressed_le_into_weirstrass_point(
+            TEST_ADAPTOR_POINT_COMPRESSED,
+            TEST_ADAPTOR_POINT_SQRT_HINT
+        ).unwrap();
+        
+        // Verify point is on curve (same check as constructor)
+        adaptor_decompressed.assert_on_curve_excluding_infinity(ED25519_CURVE_INDEX);
+        
+        // Extract coordinates as felt252 limbs (u384 = 4×u96 limbs)
+        // These are the first 8 felts of the fake-GLV hint (Q.x and Q.y)
         let fake_glv_hint = array![
-            0x460f72719199c63ec398673f,
-            0xf27a4af146a52a7dbdeb4cfb,
-            0x5f9c70ec759789a0,
-            0x0,
-            0x6b43e318a2a02d8241549109,
-            0x40e30afa4cce98c21e473980,
-            0x5e243e1eed1aa575,
-            0x0,
-            0x10b51d41eab43e36d3ac30cda9707f92,
-            0x110538332d2eae09bf756dfd87431ded7
+            adaptor_decompressed.x.limb0.into(),  // Q.x limb0
+            adaptor_decompressed.x.limb1.into(),  // Q.x limb1
+            adaptor_decompressed.x.limb2.into(),  // Q.x limb2
+            adaptor_decompressed.x.limb3.into(),  // Q.x limb3
+            adaptor_decompressed.y.limb0.into(),  // Q.y limb0
+            adaptor_decompressed.y.limb1.into(),  // Q.y limb1
+            adaptor_decompressed.y.limb2.into(),  // Q.y limb2
+            adaptor_decompressed.y.limb3.into(),  // Q.y limb3
+            0x10b51d41eab43e36d3ac30cda9707f92,   // s1 (dummy for testing - non-zero required)
+            0x110538332d2eae09bf756dfd87431ded7  // s2 (dummy for testing - non-zero required)
         ].span();
 
         // Deploy contract with real DLEQ proof from Rust test vectors
