@@ -708,13 +708,14 @@ mod tests {
 
     /// Helper for tests that need adaptor point and hint values.
     /// 
-    /// NOTE: This helper uses placeholder values for DLEQ parameters since these tests
-    /// focus on atomic lock functionality, not DLEQ verification. Tests that require
-    /// real DLEQ verification should use deploy_with_dleq from test_dleq.cairo instead.
+    /// **IMPORTANT**: This helper uses placeholder DLEQ values that will cause DLEQ verification
+    /// to fail in the constructor. Tests that need successful deployment should either:
+    /// 1. Use `deploy_with_dleq` from test_dleq.cairo with real DLEQ proofs
+    /// 2. Be marked with #[should_panic] if testing constructor validation
+    /// 3. Use real DLEQ proof data (see test_e2e_dleq.cairo for example)
     /// 
-    /// The x/y limbs are converted to placeholder compressed Edwards format.
-    /// DLEQ verification will fail with these placeholder values, which is expected
-    /// for tests that don't test DLEQ functionality.
+    /// The x/y limbs are currently ignored (converted to placeholder compressed Edwards).
+    /// For tests that need real adaptor points, convert Weierstrass to Edwards format first.
     fn deploy_with_full(
         expected_hash: Span<u32>,
         lock_until: u64,
