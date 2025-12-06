@@ -1086,13 +1086,21 @@ pub mod AtomicLock {
         // CRITICAL: Extract full felt252 value as u256 (no truncation)
         // felt252 can hold values up to 2^252 - 1, which may exceed u128_max
         // 
-        // Cairo's felt252.into() for u256 preserves the full value:
-        // - If felt252 < 2^128: u256 { low: felt252, high: 0 }
-        // - If felt252 >= 2^128: u256 { low: felt252 % 2^128, high: felt252 / 2^128 }
+        // Cairo's felt252.into() for u256 TRUNCATES to u128 (only keeps low 128 bits)
+        // We must manually extract low and high parts using division and subtraction
         // 
-        // However, the standard conversion might truncate. We use explicit conversion
-        // to ensure we get the full value.
-        let f_u256: u256 = f.into();
+        // Method: f = low + high * 2^128, where:
+        //   high = f / 2^128 (bits 128-251)
+        //   low = f - high * 2^128 (bits 0-127) - avoids modulo which isn't supported
+        let base_128: felt252 = 0x100000000000000000000000000000000; // 2^128
+        let high_felt = f / base_128;
+        let low_felt = f - high_felt * base_128;
+        
+        // Convert to u128 (safe: low_felt < 2^128, high_felt < 2^124)
+        let low: u128 = low_felt.try_into().unwrap();
+        let high: u128 = high_felt.try_into().unwrap();
+        
+        let f_u256 = u256 { low, high };
         f_u256 % ED25519_ORDER
     }
 
