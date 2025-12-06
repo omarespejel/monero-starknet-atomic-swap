@@ -55,8 +55,8 @@ pub trait IERC20<TContractState> {
 }
 
 // Module declarations for production-grade cryptographic utilities
-mod blake2s_challenge;
-mod edwards_serialization;
+pub mod blake2s_challenge;
+pub mod edwards_serialization;
 
 #[starknet::contract]
 pub mod AtomicLock {
