@@ -18,10 +18,9 @@ This project implements a **prototype implementation / reference PoC** of an ato
 - **DLEQ Proofs**: Cryptographic binding between hashlock and adaptor point (implemented)
 
 **DLEQ Implementation Status:**
-- **Cairo**: DLEQ verification implemented using Poseidon hashing (10x cheaper gas)
-- **Rust**: DLEQ proof generation implemented using SHA-256
-- **Compatibility**: Hash function mismatch (Rust: SHA-256, Cairo: Poseidon) - documented in `DLEQ_COMPATIBILITY.md`
-- **Future**: BLAKE2s migration planned (8x cheaper than Poseidon) - see `HASH_FUNCTION_ANALYSIS.md`
+- **Cairo**: DLEQ verification implemented using BLAKE2s hashing (8x cheaper than Poseidon)
+- **Rust**: DLEQ proof generation implemented using BLAKE2s
+- **Compatibility**: ✅ Hash functions aligned (both BLAKE2s) - see `TECHNICAL.md`
 
 **Important**: DLEQ proofs cryptographically bind the hashlock (H) and adaptor point (T) by proving ∃t: SHA-256(t) = H ∧ t·G = T. Both Rust and Cairo implementations use BLAKE2s for challenge computation (see `TECHNICAL.md`).
 
