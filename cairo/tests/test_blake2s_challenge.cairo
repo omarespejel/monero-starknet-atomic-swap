@@ -104,7 +104,7 @@ mod blake2s_challenge_tests {
             ED25519_ORDER,
         );
 
-        assert(challenge1 != challenge2, 'Challenge must differ for different inputs');
+        assert(challenge1 != challenge2, 'Challenges differ');
     }
 
     /// Test that challenge is reduced mod Ed25519 order
@@ -134,7 +134,7 @@ mod blake2s_challenge_tests {
         // Challenge should be a felt252, which is automatically < 2^251
         // Ed25519 order is 2^252 + ..., so challenge is guaranteed < order
         // This test verifies the function completes without panicking
-        assert(challenge != 0, 'Challenge should be non-zero for valid inputs');
+        assert(challenge != 0, 'Challenge non-zero');
     }
 
     /// Test hashlock_to_u256 conversion
