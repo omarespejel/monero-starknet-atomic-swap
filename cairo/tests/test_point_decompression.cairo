@@ -18,8 +18,8 @@ mod point_decompression_tests {
     };
 
     const TEST_ADAPTOR_POINT_SQRT_HINT: u256 = u256 {
-        low: 0xe060b8e02062c970e2a230bd7b352952,
-        high: 0x107170f6564a9d32c73f9428ae5a145d,
+        low: 0xc402f618a49c0d85b51775742039618d,
+        high: 0x5799b1d09a1b508834cdf2b51069065d,
     };
 
     const TEST_SECOND_POINT_COMPRESSED: u256 = u256 {
@@ -28,18 +28,18 @@ mod point_decompression_tests {
     };
 
     const TEST_SECOND_POINT_SQRT_HINT: u256 = u256 {
-        low: 0x579c34966ca8c7813ce1b4c42b94eb8d,
-        high: 0x617cc305f988451439d44d17c4d0c210,
+        low: 0x635b91350975fa3c61a0849aee237a31,
+        high: 0x583d9575cba9ddafe6fdd681b794ab3e,
     };
 
     const TEST_R1_COMPRESSED: u256 = u256 {
-        low: 0x9c289904f3df85b691d32a931f4d239,
-        high: 0xf7926242a14aef11d6c54224331717ae,
+        low: 0x0fa325f321fdf41a1630e19e36ababb8,
+        high: 0xabe2cf84b1246b428bce04d66cdb9b7e,
     };
 
     const TEST_R1_SQRT_HINT: u256 = u256 { 
-        low: 0x6df0c4dede706b328e6600feba46530d,
-        high: 0x088944eb1010f08e943db84f8ddd3ad3,
+        low: 0x47c83b98eed06d904da5bcce527a20ed,
+        high: 0x48e305cd2c95870aea5ff9e5d85864c6,
     };
     
     const TEST_R2_COMPRESSED: u256 = u256 {
