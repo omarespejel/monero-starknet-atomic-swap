@@ -7,7 +7,7 @@ mod garaga_msm_all_calls_tests {
     use core::integer::u256;
     use garaga::definitions::get_G;
     use garaga::signatures::eddsa_25519::decompress_edwards_pt_from_y_compressed_le_into_weirstrass_point;
-    use garaga::ec_ops::{msm_g1, G1PointTrait};
+    use garaga::ec_ops::{msm_g1, G1PointTrait, ec_safe_add};
     use atomic_lock::AtomicLock::reduce_felt_to_scalar;
 
     const ED25519_CURVE_INDEX: u32 = 4;
@@ -76,7 +76,6 @@ mod garaga_msm_all_calls_tests {
         // Test s·Y MSM call
         // CRITICAL: Y is the second generator (2·G), NOT the second_point (U) from test vectors
         // The hint is generated for s·(2·G), so we must compute 2·G directly
-        use garaga::ec_ops::ec_safe_add;
         let G = get_G(ED25519_CURVE_INDEX);
         let Y = ec_safe_add(G, G, ED25519_CURVE_INDEX);  // Y = 2·G
         Y.assert_on_curve_excluding_infinity(ED25519_CURVE_INDEX);
