@@ -194,19 +194,34 @@ pub fn compute_dleq_challenge_blake2s(
     let empty_final = core::box::BoxTrait::new([0_u32; 16]);
     let state = blake2s_finalize(state, byte_count, empty_final);
     
-    // Extract hash from state (first u32 word, convert to felt252)
+    // Extract full 256-bit hash from BLAKE2s state (8 u32 words = 32 bytes)
+    // CRITICAL: Must extract ALL 8 words, not just the first one!
+    // BLAKE2s produces 32-byte (256-bit) output, which we need in full for scalar reduction
     let hash_state = state.unbox();
     let hash_span = hash_state.span();
-    let hash_u32 = *hash_span.at(0);
-    let hash_felt: felt252 = hash_u32.into();
     
-    // Convert to u256 and reduce mod curve order
-    // Note: hash_felt is < 2^251 (felt252 range), so conversion to u256 is safe
-    let hash_u256 = u256 { low: hash_felt.try_into().unwrap(), high: 0 }; // Safe: felt252 < 2^251 < 2^128
+    // Extract all 8 u32 words (little-endian interpretation)
+    // Words 0-3 form the low u128, words 4-7 form the high u128
+    let w0: u128 = (*hash_span.at(0)).into();
+    let w1: u128 = (*hash_span.at(1)).into();
+    let w2: u128 = (*hash_span.at(2)).into();
+    let w3: u128 = (*hash_span.at(3)).into();
+    let w4: u128 = (*hash_span.at(4)).into();
+    let w5: u128 = (*hash_span.at(5)).into();
+    let w6: u128 = (*hash_span.at(6)).into();
+    let w7: u128 = (*hash_span.at(7)).into();
+    
+    // Reconstruct u256: low = w0 + w1·2^32 + w2·2^64 + w3·2^96
+    //                   high = w4 + w5·2^32 + w6·2^64 + w7·2^96
+    let base: u128 = 0x1_0000_0000; // 2^32
+    let low = w0 + base * w1 + base * base * w2 + base * base * base * w3;
+    let high = w4 + base * w5 + base * base * w6 + base * base * base * w7;
+    
+    // Convert to u256 and reduce mod curve order (matches Rust: Scalar::from_bytes_mod_order)
+    let hash_u256 = u256 { low, high };
     let scalar = hash_u256 % ed25519_order;
     
-    // Convert back to felt252 (take low 252 bits)
-    // Note: scalar.low < ed25519_order < 2^252, so fits in felt252
+    // Convert back to felt252 (scalar % order < order < 2^252, so fits in felt252)
     scalar.low.try_into().unwrap() // Safe: scalar % order < order < 2^252
 }
 
