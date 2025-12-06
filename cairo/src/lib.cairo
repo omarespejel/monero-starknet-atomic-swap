@@ -569,45 +569,53 @@ pub mod AtomicLock {
             // Extract secret bytes as u32 words (little-endian, 8 words for 32 bytes)
             // Secret is a ByteArray of 32 bytes, we need to convert to 8 u32 words
             // Format: bytes[0..3] = s0, bytes[4..7] = s1, ..., bytes[28..31] = s7
-            // We extract bytes directly from the ByteArray without desnapping
-            let mut s0_bytes = array![];
-            let mut s1_bytes = array![];
-            let mut s2_bytes = array![];
-            let mut s3_bytes = array![];
-            let mut s4_bytes = array![];
-            let mut s5_bytes = array![];
-            let mut s6_bytes = array![];
-            let mut s7_bytes = array![];
-            let mut i = 0;
-            while i < 32 {
-                if i < 4 {
-                    s0_bytes.append(secret[i].into());
-                } else if i < 8 {
-                    s1_bytes.append(secret[i].into());
-                } else if i < 12 {
-                    s2_bytes.append(secret[i].into());
-                } else if i < 16 {
-                    s3_bytes.append(secret[i].into());
-                } else if i < 20 {
-                    s4_bytes.append(secret[i].into());
-                } else if i < 24 {
-                    s5_bytes.append(secret[i].into());
-                } else if i < 28 {
-                    s6_bytes.append(secret[i].into());
-                } else {
-                    s7_bytes.append(secret[i].into());
-                };
-                i += 1;
-            };
+            // Ensure secret is exactly 32 bytes
+            let secret_len = secret.len();
+            assert(secret_len == 32, Errors::INVALID_HASH_LENGTH);
+            
+            // Extract bytes using .at() method (returns Option<u8>)
+            let byte0 = secret.at(0).unwrap();
+            let byte1 = secret.at(1).unwrap();
+            let byte2 = secret.at(2).unwrap();
+            let byte3 = secret.at(3).unwrap();
+            let byte4 = secret.at(4).unwrap();
+            let byte5 = secret.at(5).unwrap();
+            let byte6 = secret.at(6).unwrap();
+            let byte7 = secret.at(7).unwrap();
+            let byte8 = secret.at(8).unwrap();
+            let byte9 = secret.at(9).unwrap();
+            let byte10 = secret.at(10).unwrap();
+            let byte11 = secret.at(11).unwrap();
+            let byte12 = secret.at(12).unwrap();
+            let byte13 = secret.at(13).unwrap();
+            let byte14 = secret.at(14).unwrap();
+            let byte15 = secret.at(15).unwrap();
+            let byte16 = secret.at(16).unwrap();
+            let byte17 = secret.at(17).unwrap();
+            let byte18 = secret.at(18).unwrap();
+            let byte19 = secret.at(19).unwrap();
+            let byte20 = secret.at(20).unwrap();
+            let byte21 = secret.at(21).unwrap();
+            let byte22 = secret.at(22).unwrap();
+            let byte23 = secret.at(23).unwrap();
+            let byte24 = secret.at(24).unwrap();
+            let byte25 = secret.at(25).unwrap();
+            let byte26 = secret.at(26).unwrap();
+            let byte27 = secret.at(27).unwrap();
+            let byte28 = secret.at(28).unwrap();
+            let byte29 = secret.at(29).unwrap();
+            let byte30 = secret.at(30).unwrap();
+            let byte31 = secret.at(31).unwrap();
+            
             // Combine bytes into u32 words (little-endian)
-            let s0: u32 = *s0_bytes.at(0) + (*s0_bytes.at(1) * 256) + (*s0_bytes.at(2) * 65536) + (*s0_bytes.at(3) * 16777216);
-            let s1: u32 = *s1_bytes.at(0) + (*s1_bytes.at(1) * 256) + (*s1_bytes.at(2) * 65536) + (*s1_bytes.at(3) * 16777216);
-            let s2: u32 = *s2_bytes.at(0) + (*s2_bytes.at(1) * 256) + (*s2_bytes.at(2) * 65536) + (*s2_bytes.at(3) * 16777216);
-            let s3: u32 = *s3_bytes.at(0) + (*s3_bytes.at(1) * 256) + (*s3_bytes.at(2) * 65536) + (*s3_bytes.at(3) * 16777216);
-            let s4: u32 = *s4_bytes.at(0) + (*s4_bytes.at(1) * 256) + (*s4_bytes.at(2) * 65536) + (*s4_bytes.at(3) * 16777216);
-            let s5: u32 = *s5_bytes.at(0) + (*s5_bytes.at(1) * 256) + (*s5_bytes.at(2) * 65536) + (*s5_bytes.at(3) * 16777216);
-            let s6: u32 = *s6_bytes.at(0) + (*s6_bytes.at(1) * 256) + (*s6_bytes.at(2) * 65536) + (*s6_bytes.at(3) * 16777216);
-            let s7: u32 = *s7_bytes.at(0) + (*s7_bytes.at(1) * 256) + (*s7_bytes.at(2) * 65536) + (*s7_bytes.at(3) * 16777216);
+            let s0: u32 = byte0.into() + (byte1.into() * 256) + (byte2.into() * 65536) + (byte3.into() * 16777216);
+            let s1: u32 = byte4.into() + (byte5.into() * 256) + (byte6.into() * 65536) + (byte7.into() * 16777216);
+            let s2: u32 = byte8.into() + (byte9.into() * 256) + (byte10.into() * 65536) + (byte11.into() * 16777216);
+            let s3: u32 = byte12.into() + (byte13.into() * 256) + (byte14.into() * 65536) + (byte15.into() * 16777216);
+            let s4: u32 = byte16.into() + (byte17.into() * 256) + (byte18.into() * 65536) + (byte19.into() * 16777216);
+            let s5: u32 = byte20.into() + (byte21.into() * 256) + (byte22.into() * 65536) + (byte23.into() * 16777216);
+            let s6: u32 = byte24.into() + (byte25.into() * 256) + (byte26.into() * 65536) + (byte27.into() * 16777216);
+            let s7: u32 = byte28.into() + (byte29.into() * 256) + (byte30.into() * 65536) + (byte31.into() * 16777216);
 
             // Compute SHA-256 of provided secret for hashlock verification.
             let computed_hash = compute_sha256_byte_array(@secret);
