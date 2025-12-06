@@ -566,7 +566,50 @@ pub mod AtomicLock {
                 self.fake_glv_hint9.read(),  // s2_encoded
             ];
 
-            // Compute SHA-256 of provided secret.
+            // Extract secret bytes as u32 words (little-endian, 8 words for 32 bytes)
+            // Secret is a ByteArray of 32 bytes, we need to convert to 8 u32 words
+            // Format: bytes[0..3] = s0, bytes[4..7] = s1, ..., bytes[28..31] = s7
+            // We extract bytes directly from the ByteArray without desnapping
+            let mut s0_bytes = array![];
+            let mut s1_bytes = array![];
+            let mut s2_bytes = array![];
+            let mut s3_bytes = array![];
+            let mut s4_bytes = array![];
+            let mut s5_bytes = array![];
+            let mut s6_bytes = array![];
+            let mut s7_bytes = array![];
+            let mut i = 0;
+            while i < 32 {
+                if i < 4 {
+                    s0_bytes.append(secret[i].into());
+                } else if i < 8 {
+                    s1_bytes.append(secret[i].into());
+                } else if i < 12 {
+                    s2_bytes.append(secret[i].into());
+                } else if i < 16 {
+                    s3_bytes.append(secret[i].into());
+                } else if i < 20 {
+                    s4_bytes.append(secret[i].into());
+                } else if i < 24 {
+                    s5_bytes.append(secret[i].into());
+                } else if i < 28 {
+                    s6_bytes.append(secret[i].into());
+                } else {
+                    s7_bytes.append(secret[i].into());
+                };
+                i += 1;
+            };
+            // Combine bytes into u32 words (little-endian)
+            let s0: u32 = *s0_bytes.at(0) + (*s0_bytes.at(1) * 256) + (*s0_bytes.at(2) * 65536) + (*s0_bytes.at(3) * 16777216);
+            let s1: u32 = *s1_bytes.at(0) + (*s1_bytes.at(1) * 256) + (*s1_bytes.at(2) * 65536) + (*s1_bytes.at(3) * 16777216);
+            let s2: u32 = *s2_bytes.at(0) + (*s2_bytes.at(1) * 256) + (*s2_bytes.at(2) * 65536) + (*s2_bytes.at(3) * 16777216);
+            let s3: u32 = *s3_bytes.at(0) + (*s3_bytes.at(1) * 256) + (*s3_bytes.at(2) * 65536) + (*s3_bytes.at(3) * 16777216);
+            let s4: u32 = *s4_bytes.at(0) + (*s4_bytes.at(1) * 256) + (*s4_bytes.at(2) * 65536) + (*s4_bytes.at(3) * 16777216);
+            let s5: u32 = *s5_bytes.at(0) + (*s5_bytes.at(1) * 256) + (*s5_bytes.at(2) * 65536) + (*s5_bytes.at(3) * 16777216);
+            let s6: u32 = *s6_bytes.at(0) + (*s6_bytes.at(1) * 256) + (*s6_bytes.at(2) * 65536) + (*s6_bytes.at(3) * 16777216);
+            let s7: u32 = *s7_bytes.at(0) + (*s7_bytes.at(1) * 256) + (*s7_bytes.at(2) * 65536) + (*s7_bytes.at(3) * 16777216);
+
+            // Compute SHA-256 of provided secret for hashlock verification.
             let computed_hash = compute_sha256_byte_array(@secret);
             let [h0, h1, h2, h3, h4, h5, h6, h7] = computed_hash;
 
@@ -582,11 +625,12 @@ pub mod AtomicLock {
 
             // INVARIANT: Mandatory MSM check - t·G must equal stored adaptor point
             // AUDIT: This is the core cryptographic guarantee - cannot be bypassed
-            // Scalar derivation: SHA-256(secret) → 8×u32 words (little-endian) → u256 big integer → mod Ed25519 order
+            // Scalar derivation: secret bytes → 8×u32 words (little-endian) → u256 big integer → mod Ed25519 order
             // This ensures the scalar is in the valid range for Ed25519 operations.
             // AUDIT: All arithmetic has Cairo's built-in overflow protection
-            let mut scalar = hash_to_scalar_u256(h0, h1, h2, h3, h4, h5, h6, h7);
-            scalar = reduce_scalar_ed25519(scalar);
+            // NOTE: s0...s7 represent the SECRET bytes (not hashlock), as per auditor recommendation
+            // The hashlock check happens above to verify SHA-256(secret) == stored_hashlock
+            let scalar = secret_to_scalar_u256(s0, s1, s2, s3, s4, s5, s6, s7);
             
             // Compute t·G using Garaga's MSM with fake-GLV optimization.
             // MSM verifies: scalar·G == adaptor_point, proving knowledge of t without revealing it.
@@ -705,6 +749,30 @@ pub mod AtomicLock {
             + base * base * u256 { low: h6.into(), high: 0 }
             + base * base * base * u256 { low: h7.into(), high: 0 };
         u256 { low: low.low, high: high.low }
+    }
+
+    /// Convert secret bytes to Ed25519 scalar (matches Rust's Scalar::from_bytes_mod_order).
+    ///
+    /// This is different from hash_to_scalar_u256 which processes a hashlock.
+    /// Interprets secret bytes as little-endian u256: s0 + s1·2^32 + ... + s7·2^224
+    /// Then reduces mod Ed25519 order.
+    ///
+    /// @param s0-s7: Secret bytes (32 bytes total, 8×u32 words, little-endian)
+    /// @return Scalar reduced mod Ed25519 order
+    /// @invariant Result is always < ED25519_ORDER (enforced by modulo operation)
+    fn secret_to_scalar_u256(s0: u32, s1: u32, s2: u32, s3: u32, s4: u32, s5: u32, s6: u32, s7: u32) -> u256 {
+        let base: u256 = u256 { low: 0x1_0000_0000, high: 0 };
+        let low = u256 { low: s0.into(), high: 0 }
+            + base * u256 { low: s1.into(), high: 0 }
+            + base * base * u256 { low: s2.into(), high: 0 }
+            + base * base * base * u256 { low: s3.into(), high: 0 };
+        let high = u256 { low: s4.into(), high: 0 }
+            + base * u256 { low: s5.into(), high: 0 }
+            + base * base * u256 { low: s6.into(), high: 0 }
+            + base * base * base * u256 { low: s7.into(), high: 0 };
+        let secret_u256 = u256 { low: low.low, high: high.low };
+        // Reduce mod Ed25519 order
+        secret_u256 % ED25519_ORDER
     }
 
     /// Reduce scalar modulo Ed25519 curve order.
