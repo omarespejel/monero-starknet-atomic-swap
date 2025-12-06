@@ -3,9 +3,6 @@
 
 #[cfg(test)]
 mod extract_coordinates_tests {
-    use core::debug::print_felt252;
-    use core::array::ArrayTrait;
-    use garaga::definitions::{deserialize_u384, G1Point};
     use garaga::signatures::eddsa_25519::decompress_edwards_pt_from_y_compressed_le_into_weirstrass_point;
     use garaga::ec_ops::G1PointTrait;
     use core::integer::u256;
@@ -48,15 +45,9 @@ mod extract_coordinates_tests {
         
         // Extract u384 limbs for x and y coordinates
         // u384 is stored as 4 u96 limbs: [limb0, limb1, limb2, limb3]
-        // We need to serialize to get the limbs
-        let mut x_limbs = array![];
-        let mut y_limbs = array![];
-        
-        // For now, we'll use a workaround: print the point
-        // In production, we'd serialize the u384 values
-        // This test is just to verify decompression works
-        
+        // These can be accessed directly: point.x.limb0, point.x.limb1, etc.
         // The actual extraction will be done in Python using Garaga's decompression
+        // This test just verifies decompression works
         assert(true, 'Extract coords');
     }
     
