@@ -249,6 +249,10 @@ pub mod AtomicLock {
         pub const DLEQ_SMALL_ORDER_POINT: felt252 = 'DLEQ: small order point';
         pub const MSM_LEN_MISMATCH: felt252 = 'MSM len mismatch';
         pub const MSM_HINT_LEN_WRONG: felt252 = 'MSM hint len wrong';
+        pub const MSM_SG_FAILED: felt252 = 'MSM sG failed';
+        pub const MSM_SY_FAILED: felt252 = 'MSM sY failed';
+        pub const MSM_NEGCT_FAILED: felt252 = 'MSM -cT failed';
+        pub const MSM_NEGCU_FAILED: felt252 = 'MSM -cU failed';
         // Decompression failure errors (for debugging)
         pub const ADAPTOR_POINT_DECOMPRESS_FAILED: felt252 = 'Adaptor point decompress failed';
         pub const SECOND_POINT_DECOMPRESS_FAILED: felt252 = 'Second point decompress failed';
@@ -1005,12 +1009,17 @@ pub mod AtomicLock {
         assert(s1_g != 0, Errors::ZERO_HINT_SCALARS);
         assert(s2_g != 0, Errors::ZERO_HINT_SCALARS);
         
+        // AUDIT: First MSM call - s·G
+        // If this fails, error will be "Option::unwrap failed" from Garaga
+        // We validate result to ensure MSM succeeded
         let sG = msm_g1(
             points_g,
             scalars_s,
             curve_idx,
             s_hint_for_g
         );
+        // Verify MSM result is valid (on curve, not infinity)
+        sG.assert_on_curve_excluding_infinity(curve_idx);
         
         // c_neg_hint_for_t: hint for (-c)·T (Q = (-c)·T)
         let points_t = array![T].span();
@@ -1028,12 +1037,16 @@ pub mod AtomicLock {
         assert(s1_t != 0, Errors::ZERO_HINT_SCALARS);
         assert(s2_t != 0, Errors::ZERO_HINT_SCALARS);
         
+        // AUDIT: Second MSM call - (-c)·T
         let neg_cT = msm_g1(
             points_t,
             scalars_c_neg,
             curve_idx,
             c_neg_hint_for_t
         );
+        // Verify MSM result is valid
+        neg_cT.assert_on_curve_excluding_infinity(curve_idx);
+        
         // Add: R1' = sG + (-c)·T = sG - cT
         let _R1_prime = ec_safe_add(sG, neg_cT, curve_idx);
 
@@ -1052,12 +1065,15 @@ pub mod AtomicLock {
         assert(s1_y != 0, Errors::ZERO_HINT_SCALARS);
         assert(s2_y != 0, Errors::ZERO_HINT_SCALARS);
         
+        // AUDIT: Third MSM call - s·Y
         let sY = msm_g1(
             points_y,
             scalars_s2,
             curve_idx,
             s_hint_for_y
         );
+        // Verify MSM result is valid
+        sY.assert_on_curve_excluding_infinity(curve_idx);
         
         // c_neg_hint_for_u: hint for (-c)·U (Q = (-c)·U)
         let points_u = array![U].span();
@@ -1073,12 +1089,16 @@ pub mod AtomicLock {
         assert(s1_u != 0, Errors::ZERO_HINT_SCALARS);
         assert(s2_u != 0, Errors::ZERO_HINT_SCALARS);
         
+        // AUDIT: Fourth MSM call - (-c)·U
         let neg_cU = msm_g1(
             points_u,
             scalars_c_neg2,
             curve_idx,
             c_neg_hint_for_u
         );
+        // Verify MSM result is valid
+        neg_cU.assert_on_curve_excluding_infinity(curve_idx);
+        
         // Add: R2' = sY + (-c)·U = sY - cU
         let _R2_prime = ec_safe_add(sY, neg_cU, curve_idx);
 
