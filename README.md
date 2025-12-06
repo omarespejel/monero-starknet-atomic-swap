@@ -11,13 +11,13 @@ This project implements a **prototype implementation / reference PoC** of an ato
 - **SHA-256 Hashlock**: Cryptographic lock on Starknet
 - **Ed25519 Adaptor Signatures**: Monero-side signature binding (simplified demo, not full CLSAG)
 - **Garaga MSM Verification**: Efficient on-chain Ed25519 point verification (`t·G == adaptor_point`)
-- **✅ DLEQ Proofs**: Cryptographic binding between hashlock and adaptor point (implemented)
+- **DLEQ Proofs**: Cryptographic binding between hashlock and adaptor point (implemented)
 
 **DLEQ Implementation Status:**
-- ✅ **Cairo**: DLEQ verification implemented using Poseidon hashing (10x cheaper gas)
-- ✅ **Rust**: DLEQ proof generation implemented using SHA-256
-- ⚠️ **Compatibility**: Hash function mismatch (Rust: SHA-256, Cairo: Poseidon) - documented in `DLEQ_COMPATIBILITY.md`
-- 📋 **Future**: BLAKE2s migration planned (8x cheaper than Poseidon) - see `HASH_FUNCTION_ANALYSIS.md`
+- **Cairo**: DLEQ verification implemented using Poseidon hashing (10x cheaper gas)
+- **Rust**: DLEQ proof generation implemented using SHA-256
+- **Compatibility**: Hash function mismatch (Rust: SHA-256, Cairo: Poseidon) - documented in `DLEQ_COMPATIBILITY.md`
+- **Future**: BLAKE2s migration planned (8x cheaper than Poseidon) - see `HASH_FUNCTION_ANALYSIS.md`
 
 **Important**: DLEQ proofs cryptographically bind the hashlock (H) and adaptor point (T) by proving ∃t: SHA-256(t) = H ∧ t·G = T. The current implementation uses different hash functions in Rust and Cairo, requiring alignment for full compatibility (see compatibility docs).
 
@@ -49,7 +49,7 @@ This project implements a **prototype implementation / reference PoC** of an ato
    - Finalizes simplified Monero signature using revealed `t`
    - Broadcasts transaction (demo implementation, not production wallet)
 
-**⚠️ Important**: The Monero integration is a **minimal adaptor-signature demo**, not a production wallet integration. It does not implement full CLSAG, key image handling, change outputs, or multi-output transactions. This is a proof-of-concept demonstration, not a drop-in module for production wallets.
+**Important**: The Monero integration is a **minimal adaptor-signature demo**, not a production wallet integration. It does not implement full CLSAG, key image handling, change outputs, or multi-output transactions. This is a proof-of-concept demonstration, not a drop-in module for production wallets.
 
 ## Quick Start
 
@@ -159,16 +159,16 @@ cargo test --test integration_test
 
 ## Status: Prototype Implementation / Reference PoC
 
-**⚠️ This is a prototype implementation and reference proof-of-concept. It is NOT production-ready.**
+**This is a prototype implementation and reference proof-of-concept. It is NOT production-ready.**
 
 **Production-ready status requires:**
-- ✅ Security audit by qualified auditors
-- ✅ DLEQ proof implementation (implemented, hash function alignment pending)
-- ⚠️ Hash function alignment (Rust↔Cairo compatibility)
-- ⚠️ Full end-to-end testing on testnets
-- ⚠️ Complete integration with Starknet and Monero networks
+- Security audit by qualified auditors
+- DLEQ proof implementation (implemented, hash function alignment pending)
+- Hash function alignment (Rust↔Cairo compatibility)
+- Full end-to-end testing on testnets
+- Complete integration with Starknet and Monero networks
 
-**DLEQ Implementation Status**: ✅ **IMPLEMENTED**
+**DLEQ Implementation Status**: **IMPLEMENTED**
 
 - **Cairo**: Full DLEQ verification in constructor using Poseidon hashing
 - **Rust**: DLEQ proof generation with SHA-256 (needs Poseidon for compatibility)
@@ -179,27 +179,27 @@ cargo test --test integration_test
 ### Current Implementation Status
 
 **Completed:**
-- ✅ Cairo contract with hard invariants (MSM verification, timelock, refund rules)
-- ✅ **DLEQ proof verification in Cairo** (Poseidon hashing, comprehensive validation)
-- ✅ **DLEQ proof generation in Rust** (SHA-256, needs Poseidon for compatibility)
-- ✅ Rust adaptor signature logic
-- ✅ Integration scaffold for Starknet and Monero
-- ✅ Comprehensive test suite
-- ✅ Production-grade validation (on-curve, small-order, scalar range checks)
-- ✅ Events and error handling
+- Cairo contract with hard invariants (MSM verification, timelock, refund rules)
+- **DLEQ proof verification in Cairo** (Poseidon hashing, comprehensive validation)
+- **DLEQ proof generation in Rust** (SHA-256, needs Poseidon for compatibility)
+- Rust adaptor signature logic
+- Integration scaffold for Starknet and Monero
+- Comprehensive test suite
+- Production-grade validation (on-curve, small-order, scalar range checks)
+- Events and error handling
 
 **In Progress:**
-- ⚠️ Account signing implementation
-- ⚠️ Monero transaction serialization (minimal demo, not production wallet)
-- ⚠️ End-to-end testnet testing
+- Account signing implementation
+- Monero transaction serialization (minimal demo, not production wallet)
+- End-to-end testnet testing
 
 **Monero Integration Status:**
-- ⚠️ **Current**: Minimal adaptor-signature demo (simplified, not full CLSAG)
-- ⚠️ **Not Implemented**: Full CLSAG, key image handling, change outputs, multi-output transactions
-- ⚠️ **Purpose**: Proof-of-concept demonstration, not production wallet integration
+- **Current**: Minimal adaptor-signature demo (simplified, not full CLSAG)
+- **Not Implemented**: Full CLSAG, key image handling, change outputs, multi-output transactions
+- **Purpose**: Proof-of-concept demonstration, not production wallet integration
 
 **In Progress:**
-- ⚠️ Hash function alignment (Rust↔Cairo compatibility)
+- Hash function alignment (Rust↔Cairo compatibility)
   - **Current**: Rust uses SHA-256, Cairo uses Poseidon (incompatible)
   - **Impact**: Proofs generated in Rust won't verify in Cairo until aligned
   - **Solutions**: See `DLEQ_COMPATIBILITY.md` (both Poseidon or both SHA-256)
@@ -221,7 +221,7 @@ cargo test --test integration_test
   - No robust handling of key images, change outputs, or multi-output transactions
   - This is a proof-of-concept demonstration, not a drop-in module for production wallets
   - For production use, integrate with a proper Monero wallet stack
-- **DLEQ Proofs**: ✅ **IMPLEMENTED** (hash function alignment pending)
+- **DLEQ Proofs**: **IMPLEMENTED** (hash function alignment pending)
   - **Current state**: DLEQ verification in Cairo, proof generation in Rust
   - **What's working**: Cryptographic proof binding hashlock (H) and adaptor point (T)
   - **Current limitation**: Hash function mismatch (Rust: SHA-256, Cairo: Poseidon)
@@ -235,7 +235,7 @@ cargo test --test integration_test
 - [x] Phase 3: Pre-audit Hardening
 - [x] Phase 4: On-chain Protocol Lock-in
 - [x] Phase 5: Full Integration Scaffold (v0.4.0)
-- [x] Phase 6: DLEQ Proof Implementation (✅ Implemented, alignment pending)
+- [x] Phase 6: DLEQ Proof Implementation (Implemented, alignment pending)
 - [ ] Phase 7: Hash Function Alignment (Rust↔Cairo compatibility)
 - [ ] Phase 8: Account Signing Implementation
 - [ ] Phase 9: End-to-End Testing on Testnets
@@ -245,10 +245,10 @@ cargo test --test integration_test
 ## v0.4.0 Status
 
 **Full Integration Modules** (scaffolded, ready for implementation):
-- ✅ `starknet_full.rs`: Contract deployment, event watching, function calls
-- ✅ `monero_full.rs`: Transaction creation, signature finalization, broadcasting
-- ✅ Maker/Taker binaries updated to use full integrations
-- ⚠️ Account signing still requires implementation (use Starknet CLI for now)
+- `starknet_full.rs`: Contract deployment, event watching, function calls
+- `monero_full.rs`: Transaction creation, signature finalization, broadcasting
+- Maker/Taker binaries updated to use full integrations
+- Account signing still requires implementation (use Starknet CLI for now)
 
 **Next Steps for Full Functionality**:
 1. Implement account key loading and signing in `StarknetAccount`
