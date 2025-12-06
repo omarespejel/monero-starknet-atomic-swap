@@ -76,13 +76,12 @@ pub mod AtomicLock {
     use garaga::definitions::{deserialize_u384, G1Point, G1PointZero, get_G};
     use garaga::ec_ops::{ec_safe_add, msm_g1, G1PointTrait};
     use garaga::utils::neg_3::sign;
-    use garaga::signatures::eddsa_25519::{to_weierstrass, decompress_edwards_pt_from_y_compressed_le_into_weirstrass_point};
+    use garaga::signatures::eddsa_25519::decompress_edwards_pt_from_y_compressed_le_into_weirstrass_point;
     use core::circuit::{u384, u96};
     use openzeppelin::security::ReentrancyGuardComponent;
     
     // Import production-grade cryptographic modules (using audited libraries)
     use super::blake2s_challenge::compute_dleq_challenge_blake2s;
-    use super::edwards_serialization::{serialize_weierstrass_to_compressed_edwards, is_valid_compressed_edwards};
     
     /// Ed25519 curve order (from RFC 8032)
     /// This matches Garaga's get_ED25519_order_modulus() value
@@ -94,6 +93,22 @@ pub mod AtomicLock {
     
     /// Ed25519 curve index in Garaga (curve_index = 4)
     const ED25519_CURVE_INDEX: u32 = 4;
+    
+    /// Ed25519 Base Point G (compressed Edwards format)
+    /// Generated from Rust: ED25519_BASEPOINT_POINT.compress()
+    /// Hex: 5866666666666666666666666666666666666666666666666666666666666666
+    const ED25519_BASE_POINT_COMPRESSED: u256 = u256 {
+        low: 0x66666666666666586666666666666666,
+        high: 0x66666666666666666666666666666666,
+    };
+    
+    /// Ed25519 Second Generator Y = 2·G (compressed Edwards format)
+    /// Generated from Rust: (ED25519_BASEPOINT_POINT * Scalar::from(2u64)).compress()
+    /// Hex: c9a3f86aae465f0e56513864510f3997561fa2c9e85ea21dc2292309f3cd6022
+    const ED25519_SECOND_GENERATOR_COMPRESSED: u256 = u256 {
+        low: 0x0e5f46ae6af8a3c997390f5164385156,
+        high: 0x1da25ee8c9a21f562260cdf3092329c2,
+    };
 
     // PRODUCTION: OpenZeppelin ReentrancyGuard component for audited reentrancy protection
     component!(
@@ -876,11 +891,8 @@ pub mod AtomicLock {
         // Recompute challenge using BLAKE2s with compressed Edwards points
         // PRODUCTION: Uses audited Cairo core BLAKE2s functions via blake2s_challenge module
         // Get G and Y as compressed Edwards (constants)
-        // TODO: Add constants for G and Y compressed Edwards
-        // For now, we'll need to compute them or pass them as parameters
-        // Placeholder: using zero for G and Y compressed (will be updated)
-        let G_compressed = u256 { low: 0x5866666666666666, high: 0x6666666666666666 }; // Ed25519 G compressed
-        let Y_compressed = u256 { low: 0, high: 0 }; // TODO: Compute from 2·G
+        let G_compressed = ED25519_BASE_POINT_COMPRESSED;
+        let Y_compressed = ED25519_SECOND_GENERATOR_COMPRESSED;
         
         // Compute challenge using production-grade BLAKE2s module (audited Cairo core)
         let c_prime = compute_dleq_challenge_blake2s(

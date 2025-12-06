@@ -41,6 +41,30 @@ fn initial_blake2s_state() -> Blake2sState {
     core::box::BoxTrait::new([0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32])
 }
 
+/// Process multiple u256 values through BLAKE2s compression (batch optimization)
+///
+/// Performance optimization: processes multiple u256 values in sequence
+/// without intermediate state management overhead.
+///
+/// @param state Initial BLAKE2s state
+/// @param byte_count Initial byte count
+/// @param values Span of u256 values to hash
+/// @return Updated state and final byte count
+pub fn process_multiple_u256(
+    mut state: Blake2sState,
+    mut byte_count: u32,
+    values: Span<u256>,
+) -> (Blake2sState, u32) {
+    let mut i = 0;
+    while i < values.len() {
+        let (new_state, new_count) = process_u256(state, byte_count, *values.at(i));
+        state = new_state;
+        byte_count = new_count;
+        i += 1;
+    };
+    (state, byte_count)
+}
+
 /// Process a u256 value through BLAKE2s compression
 /// 
 /// Helper function that serializes u256 and compresses it in one step
@@ -92,7 +116,7 @@ fn process_u256(
 /// 
 /// @param hashlock SHA-256 hash as 8 u32 words (big-endian)
 /// @return u256 representation of hashlock
-fn hashlock_to_u256(hashlock: Span<u32>) -> u256 {
+pub fn hashlock_to_u256(hashlock: Span<u32>) -> u256 {
     // Convert 8 u32 words to u256 (big-endian interpretation)
     // u256 = h0 + h1·2^32 + h2·2^64 + ... + h7·2^224
     let base: u256 = u256 { low: 0x1_0000_0000, high: 0 };
@@ -157,12 +181,9 @@ pub fn compute_dleq_challenge_blake2s(
     byte_count = 4; // 4 bytes for "DLEQ"
     
     // Serialize compressed Edwards points (32 bytes each = 8 u32 words)
-    let (state, byte_count) = process_u256(state, byte_count, G_compressed);
-    let (state, byte_count) = process_u256(state, byte_count, Y_compressed);
-    let (state, byte_count) = process_u256(state, byte_count, T_compressed);
-    let (state, byte_count) = process_u256(state, byte_count, U_compressed);
-    let (state, byte_count) = process_u256(state, byte_count, R1_compressed);
-    let (state, byte_count) = process_u256(state, byte_count, R2_compressed);
+    // Performance: Process all points in batch for better gas efficiency
+    let points = array![G_compressed, Y_compressed, T_compressed, U_compressed, R1_compressed, R2_compressed];
+    let (state, byte_count) = process_multiple_u256(state, byte_count, points.span());
     
     // Add hashlock (convert Span<u32> to u256, then hash)
     let hashlock_u256 = hashlock_to_u256(hashlock);

@@ -14,3 +14,4 @@ snforge_std = "0.53.0"
 
 [[target.starknet-contract]]
 sierra = true
+allowed-libfuncs-list.name = "experimental"
