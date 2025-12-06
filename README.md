@@ -1,8 +1,8 @@
 <div align="center">
-  <img src="assets/project-banner.png" alt="XMR↔Starknet Atomic Swap" width="800"/>
+  <img src="assets/project-banner.png" alt="Monero Atomic Swap" width="800"/>
 </div>
 
-# XMR↔Starknet Atomic Swap
+# Monero Atomic Swap
 
 Prototype implementation of a trustless atomic swap protocol between Monero and Starknet. 
 Uses hashlock + MSM verification + **DLEQ proofs** for cryptographic binding.

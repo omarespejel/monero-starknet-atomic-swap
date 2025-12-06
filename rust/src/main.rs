@@ -1,4 +1,4 @@
-//! XMR-Starknet Atomic Swap - Secret Generator CLI.
+//! Monero Atomic Swap - Secret Generator CLI.
 //!
 //! Generates a Monero-compatible scalar and its SHA-256 hash formatted for
 //! consumption by the Cairo AtomicLock contract/tests.

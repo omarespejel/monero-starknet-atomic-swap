@@ -1,4 +1,4 @@
-//! XMR-Starknet Atomic Swap - Secret Generator library.
+//! Monero Atomic Swap - Secret Generator library.
 //!
 //! Provides a function to sample a Monero-compatible scalar, compute its
 //! SHA-256 digest, and format outputs for Cairo tests.

@@ -1,4 +1,4 @@
-# XMR-Starknet Test Data Generator (Python + uv)
+# Monero Test Data Generator (Python + uv)
 
 Python tooling to generate Ed25519 test vectors for the Cairo AtomicLock MSM check.
 

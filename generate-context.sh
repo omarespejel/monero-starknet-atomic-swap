@@ -8,14 +8,14 @@ set -euo pipefail
 export TMPDIR="$(pwd)"
 
 DATE="$(date '+%Y-%m-%d_%H-%M-%S_%Z')"
-OUTPUT_FILE="xmr-starknet-swap-context-${DATE}.txt"
+OUTPUT_FILE="monero-swap-context-${DATE}.txt"
 
 rm -f "$OUTPUT_FILE"
 echo "📦 Building context bundle -> $OUTPUT_FILE"
 echo ""
 
 {
-  printf '%s\n' "# XMR ↔️ Starknet Atomic Lock Context"
+  printf '%s\n' "# Monero Atomic Swap Context"
   printf '%s\n' ""
   printf '%s\n' "## Goal for the LLM"
   printf '%s\n' "You are reviewing a repo that:"

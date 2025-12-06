@@ -1,7 +1,7 @@
 [project]
-name = "xmr-starknet-tools"
+name = "monero-tools"
 version = "0.1.0"
-description = "Test data generation tools for XMR-Starknet atomic swaps"
+description = "Test data generation tools for Monero atomic swaps"
 requires-python = ">=3.10,<3.11"
 readme = "README.md"
 license = { text = "MIT" }

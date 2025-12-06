@@ -2,7 +2,7 @@
 name = "xmr_secret_gen"
 version = "0.1.0"
 edition = "2021"
-description = "Monero scalar generator for XMR-Starknet atomic swaps"
+description = "Monero scalar generator for atomic swaps"
 
 [dependencies]
 curve25519-dalek = { version = "4.1.3", features = ["rand_core"] }
