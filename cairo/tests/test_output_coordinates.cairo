@@ -1,12 +1,13 @@
-/// Diagnostic test to output decompressed Weierstrass coordinates
-/// Run this test and capture output to regenerate hints in Python
+/// Diagnostic test to verify decompressed Weierstrass coordinates
+/// This test verifies decompression works correctly.
+/// To extract coordinates for hint regeneration, use regenerate_dleq_hints.py
+/// which already decompresses from test vectors.
 
 #[cfg(test)]
 mod output_coordinates_tests {
     use garaga::signatures::eddsa_25519::decompress_edwards_pt_from_y_compressed_le_into_weirstrass_point;
     use garaga::ec_ops::G1PointTrait;
     use core::integer::u256;
-    use core::debug::print_felt252;
 
     const ED25519_CURVE_INDEX: u32 = 4;
 
@@ -30,8 +31,7 @@ mod output_coordinates_tests {
     };
 
     #[test]
-    #[available_gas(99999999999999999)]
-    fn output_adaptor_point_coordinates() {
+    fn verify_adaptor_point_decompression() {
         // Decompress adaptor point (T)
         let adaptor_result = decompress_edwards_pt_from_y_compressed_le_into_weirstrass_point(
             TEST_ADAPTOR_POINT_COMPRESSED,
@@ -45,47 +45,14 @@ mod output_coordinates_tests {
         let adaptor = adaptor_result.unwrap();
         adaptor.assert_on_curve_excluding_infinity(ED25519_CURVE_INDEX);
         
-        // Output u384 limbs for x and y coordinates
-        // Format: [limb0, limb1, limb2, limb3] for each coordinate
-        // These values can be used to regenerate hints in Python
-        
-        // X coordinate limbs
-        let x0: felt252 = adaptor.x.limb0.into();
-        let x1: felt252 = adaptor.x.limb1.into();
-        let x2: felt252 = adaptor.x.limb2.into();
-        let x3: felt252 = adaptor.x.limb3.into();
-        
-        // Y coordinate limbs
-        let y0: felt252 = adaptor.y.limb0.into();
-        let y1: felt252 = adaptor.y.limb1.into();
-        let y2: felt252 = adaptor.y.limb2.into();
-        let y3: felt252 = adaptor.y.limb3.into();
-        
-        // Print coordinates (for Python hint regeneration)
-        print_felt252('T_x_limb0');
-        print_felt252(x0);
-        print_felt252('T_x_limb1');
-        print_felt252(x1);
-        print_felt252('T_x_limb2');
-        print_felt252(x2);
-        print_felt252('T_x_limb3');
-        print_felt252(x3);
-        
-        print_felt252('T_y_limb0');
-        print_felt252(y0);
-        print_felt252('T_y_limb1');
-        print_felt252(y1);
-        print_felt252('T_y_limb2');
-        print_felt252(y2);
-        print_felt252('T_y_limb3');
-        print_felt252(y3);
-        
-        assert(true, 'Output coords');
+        // Verify decompression succeeded
+        // Coordinates can be accessed via: adaptor.x.limb0, adaptor.x.limb1, etc.
+        // To extract for hint regeneration, use regenerate_dleq_hints.py
+        assert(true, 'Decompress OK');
     }
     
     #[test]
-    #[available_gas(99999999999999999)]
-    fn output_second_point_coordinates() {
+    fn verify_second_point_decompression() {
         // Decompress second point (U)
         let second_result = decompress_edwards_pt_from_y_compressed_le_into_weirstrass_point(
             TEST_SECOND_POINT_COMPRESSED,
@@ -99,37 +66,8 @@ mod output_coordinates_tests {
         let second = second_result.unwrap();
         second.assert_on_curve_excluding_infinity(ED25519_CURVE_INDEX);
         
-        // Output u384 limbs for x and y coordinates
-        let x0: felt252 = second.x.limb0.into();
-        let x1: felt252 = second.x.limb1.into();
-        let x2: felt252 = second.x.limb2.into();
-        let x3: felt252 = second.x.limb3.into();
-        
-        let y0: felt252 = second.y.limb0.into();
-        let y1: felt252 = second.y.limb1.into();
-        let y2: felt252 = second.y.limb2.into();
-        let y3: felt252 = second.y.limb3.into();
-        
-        // Print coordinates (for Python hint regeneration)
-        print_felt252('U_x_limb0');
-        print_felt252(x0);
-        print_felt252('U_x_limb1');
-        print_felt252(x1);
-        print_felt252('U_x_limb2');
-        print_felt252(x2);
-        print_felt252('U_x_limb3');
-        print_felt252(x3);
-        
-        print_felt252('U_y_limb0');
-        print_felt252(y0);
-        print_felt252('U_y_limb1');
-        print_felt252(y1);
-        print_felt252('U_y_limb2');
-        print_felt252(y2);
-        print_felt252('U_y_limb3');
-        print_felt252(y3);
-        
-        assert(true, 'Output coords');
+        // Verify decompression succeeded
+        assert(true, 'Decompress OK');
     }
 }
 
