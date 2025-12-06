@@ -927,6 +927,13 @@ pub mod AtomicLock {
 
         // PRODUCTION: Comprehensive input validation
         validate_dleq_inputs(T, U, c, s, curve_idx);
+        
+        // AUDIT: Verify all points are valid before MSM calls (per auditor recommendation)
+        // Check that points are on curve and not infinity
+        G.assert_on_curve_excluding_infinity(curve_idx);
+        Y.assert_on_curve_excluding_infinity(curve_idx);
+        T.assert_on_curve_excluding_infinity(curve_idx);
+        U.assert_on_curve_excluding_infinity(curve_idx);
 
         // Convert challenge and response to u256 scalars (reduced mod curve order)
         // AUDIT: All scalar operations have Cairo's built-in overflow protection
