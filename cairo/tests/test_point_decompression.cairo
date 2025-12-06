@@ -18,8 +18,8 @@ mod point_decompression_tests {
     };
 
     const TEST_ADAPTOR_POINT_SQRT_HINT: u256 = u256 {
-        low: 0x3bfd09e75b63f27a4ae88a8bdfc69e60,
-        high: 0x28664e2f65e4af77cb320d4aef96f9a2,
+        low: 0xbb73e7230cbed81eed006ba59a2103f1,
+        high: 0x689ee25ca0c65d5a1c560224726871b0,
     };
 
     const TEST_SECOND_POINT_COMPRESSED: u256 = u256 {
@@ -28,8 +28,8 @@ mod point_decompression_tests {
     };
 
     const TEST_SECOND_POINT_SQRT_HINT: u256 = u256 {
-        low: 0x635b91350975fa3c61a0849aee237a31,
-        high: 0x583d9575cba9ddafe6fdd681b794ab3e,
+        low: 0xdcad2173817c163b5405cec7698eb4b8,
+        high: 0x742bb3c44b13553c8ddff66565b44cac,
     };
 
     const TEST_R1_COMPRESSED: u256 = u256 {
@@ -38,8 +38,8 @@ mod point_decompression_tests {
     };
 
     const TEST_R1_SQRT_HINT: u256 = u256 { 
-        low: 0x47c83b98eed06d904da5bcce527a20ed,
-        high: 0x48e305cd2c95870aea5ff9e5d85864c6,
+        low: 0x4f1efce2a44c72b5d316cc9b8d8e4673,
+        high: 0x28bde2dde999d287316395d449669102,
     };
     
     // R2 uses Ed25519 base point (R2 from test_vectors.json is invalid)
@@ -49,8 +49,8 @@ mod point_decompression_tests {
     };
     
     const TEST_R2_SQRT_HINT: u256 = u256 { 
-        low: 0x9f3ee81fe68dcbcf9de661eedd114a9e,
-        high: 0x397c8b3280ddfb2ffe72518d79cc504c,
+        low: 0x96d3389f6ada584d36a9d29f70da2ad3,
+        high: 0x5e96c92c3291ac013f5b1dce022923a3,
     };
 
     #[test]
