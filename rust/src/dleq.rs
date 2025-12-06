@@ -260,6 +260,9 @@ fn compute_challenge(
     hasher.update(R2.compress().as_bytes());
 
     // Add hashlock (32 bytes)
+    // NOTE: Rust's hashlock is already a [u8; 32] byte array, so BLAKE2s sees it correctly.
+    // Cairo needs byte-swapping because it stores hashlock as Big-Endian u32 words.
+    // The byte-swap fix is in Cairo, not here.
     hasher.update(hashlock);
 
     // Reduce hash to scalar mod curve order

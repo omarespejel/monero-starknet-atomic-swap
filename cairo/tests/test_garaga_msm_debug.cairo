@@ -4,7 +4,7 @@
 #[cfg(test)]
 mod garaga_msm_debug_tests {
     use core::array::ArrayTrait;
-    use garaga::definitions::{get_G, G1Point};
+    use garaga::definitions::get_G;
     use garaga::ec_ops::{msm_g1, G1PointTrait};
     use core::integer::u256;
 
