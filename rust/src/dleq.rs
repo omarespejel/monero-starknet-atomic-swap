@@ -18,14 +18,14 @@
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar;
-use sha2::{Digest, Sha256, Sha512};
+use sha2::{Digest, Sha256};
 use blake2::{Blake2s256, Digest as Blake2Digest};
 
 // TODO: Uncomment when Poseidon is fully implemented
 // mod poseidon;
 // use poseidon::compute_poseidon_challenge;
 
-/// DLEQ proof structure containing the second point, challenge, and response.
+/// DLEQ proof structure containing the second point, challenge, response, and commitments.
 pub struct DleqProof {
     /// Second point U = t·Y
     pub second_point: EdwardsPoint,
@@ -33,6 +33,35 @@ pub struct DleqProof {
     pub challenge: Scalar,
     /// Response scalar s = k + c·t mod n
     pub response: Scalar,
+    /// First commitment R1 = k·G (needed for Cairo challenge computation)
+    pub r1: EdwardsPoint,
+    /// Second commitment R2 = k·Y (needed for Cairo challenge computation)
+    pub r2: EdwardsPoint,
+}
+
+/// Cairo-compatible format for DLEQ proof data.
+/// Contains compressed Edwards points and sqrt hints needed for Cairo decompression.
+pub struct DleqProofForCairo {
+    /// Adaptor point T = t·G (compressed Edwards, 32 bytes)
+    pub adaptor_point_compressed: [u8; 32],
+    /// Sqrt hint for adaptor point decompression (x-coordinate as u256)
+    pub adaptor_point_sqrt_hint: [u8; 32],
+    /// DLEQ second point U = t·Y (compressed Edwards, 32 bytes)
+    pub second_point_compressed: [u8; 32],
+    /// Sqrt hint for second point decompression (x-coordinate as u256)
+    pub second_point_sqrt_hint: [u8; 32],
+    /// Challenge scalar c (32 bytes)
+    pub challenge: [u8; 32],
+    /// Response scalar s (32 bytes)
+    pub response: [u8; 32],
+    /// Standard generator G (compressed Edwards, 32 bytes)
+    pub g_compressed: [u8; 32],
+    /// Second generator Y (compressed Edwards, 32 bytes)
+    pub y_compressed: [u8; 32],
+    /// First commitment R1 = k·G (compressed Edwards, 32 bytes)
+    pub r1_compressed: [u8; 32],
+    /// Second commitment R2 = k·Y (compressed Edwards, 32 bytes)
+    pub r2_compressed: [u8; 32],
 }
 
 /// Generate a DLEQ proof for the given secret and adaptor point.
@@ -76,6 +105,79 @@ pub fn generate_dleq_proof(
         second_point: U,
         challenge: c,
         response: s,
+        r1: R1,
+        r2: R2,
+    }
+}
+
+/// Convert an Edwards point to compressed format and sqrt hint.
+///
+/// The sqrt hint is the x-coordinate of the point, stored as a u256 (32 bytes, little-endian).
+/// This is needed by Cairo's `decompress_edwards_pt_from_y_compressed_le_into_weirstrass_point`.
+///
+/// # Arguments
+///
+/// * `point` - The Edwards point to compress
+///
+/// # Returns
+///
+/// A tuple of (compressed_point, sqrt_hint) where:
+/// - compressed_point: 32-byte compressed Edwards format (y-coordinate + sign bit)
+/// - sqrt_hint: 32-byte x-coordinate as u256 (little-endian)
+fn edwards_point_to_cairo_format(point: &EdwardsPoint) -> ([u8; 32], [u8; 32]) {
+    // Compress the point (standard Ed25519 format: y-coordinate + sign bit)
+    let compressed = point.compress().to_bytes();
+    
+    // Extract x-coordinate for sqrt hint
+    // Convert point to Montgomery form to get x-coordinate
+    // The Montgomery form's x-coordinate corresponds to the Edwards x-coordinate
+    let montgomery = point.to_montgomery();
+    let x_bytes = montgomery.to_bytes();
+    
+    // The sqrt hint is the x-coordinate as u256 (little-endian, 32 bytes)
+    let mut sqrt_hint = [0u8; 32];
+    sqrt_hint.copy_from_slice(&x_bytes);
+    
+    (compressed, sqrt_hint)
+}
+
+impl DleqProof {
+    /// Convert DLEQ proof to Cairo-compatible format.
+    ///
+    /// This method generates all compressed Edwards points and sqrt hints needed
+    /// for Cairo contract deployment and DLEQ verification.
+    ///
+    /// # Arguments
+    ///
+    /// * `adaptor_point` - The adaptor point T = t·G
+    ///
+    /// # Returns
+    ///
+    /// A `DleqProofForCairo` containing all data needed for Cairo.
+    pub fn to_cairo_format(&self, adaptor_point: &EdwardsPoint) -> DleqProofForCairo {
+        let G = ED25519_BASEPOINT_POINT;
+        let Y = get_second_generator();
+        
+        // Convert all points to compressed format with sqrt hints
+        let (adaptor_compressed, adaptor_sqrt_hint) = edwards_point_to_cairo_format(adaptor_point);
+        let (second_compressed, second_sqrt_hint) = edwards_point_to_cairo_format(&self.second_point);
+        let (g_compressed, _) = edwards_point_to_cairo_format(&G);
+        let (y_compressed, _) = edwards_point_to_cairo_format(&Y);
+        let (r1_compressed, _) = edwards_point_to_cairo_format(&self.r1);
+        let (r2_compressed, _) = edwards_point_to_cairo_format(&self.r2);
+        
+        DleqProofForCairo {
+            adaptor_point_compressed: adaptor_compressed,
+            adaptor_point_sqrt_hint: adaptor_sqrt_hint,
+            second_point_compressed: second_compressed,
+            second_point_sqrt_hint: second_sqrt_hint,
+            challenge: self.challenge.to_bytes(),
+            response: self.response.to_bytes(),
+            g_compressed,
+            y_compressed,
+            r1_compressed,
+            r2_compressed,
+        }
     }
 }
 
