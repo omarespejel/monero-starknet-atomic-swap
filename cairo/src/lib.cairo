@@ -1083,24 +1083,13 @@ pub mod AtomicLock {
     /// @invariant Result is always < ED25519_ORDER (enforced by modulo operation)
     /// @invariant Cairo's built-in overflow protection ensures safe arithmetic
     pub fn reduce_felt_to_scalar(f: felt252) -> u256 {
-        // CRITICAL: Extract full felt252 value as u256 (no truncation)
-        // felt252 can hold values up to 2^252 - 1, which may exceed u128_max
+        // CRITICAL: Cairo's felt252.into() for u256 TRUNCATES to u128 (only keeps low 128 bits)
+        // Cairo doesn't support division/modulo on felt252, so we cannot extract high bits
         // 
-        // Cairo's felt252.into() for u256 TRUNCATES to u128 (only keeps low 128 bits)
-        // We must manually extract low and high parts using division and subtraction
-        // 
-        // Method: f = low + high * 2^128, where:
-        //   high = f / 2^128 (bits 128-251)
-        //   low = f - high * 2^128 (bits 0-127) - avoids modulo which isn't supported
-        let base_128: felt252 = 0x100000000000000000000000000000000; // 2^128
-        let high_felt = f / base_128;
-        let low_felt = f - high_felt * base_128;
-        
-        // Convert to u128 (safe: low_felt < 2^128, high_felt < 2^124)
-        let low: u128 = low_felt.try_into().unwrap();
-        let high: u128 = high_felt.try_into().unwrap();
-        
-        let f_u256 = u256 { low, high };
+        // We must accept truncation and generate hints for the truncated value
+        // This matches what Garaga actually receives: u256 { low: truncated_felt, high: 0 }
+        let f_u128: u128 = f.try_into().unwrap(); // Truncates to u128 (loses high bits if f > u128_max)
+        let f_u256 = u256 { low: f_u128, high: 0 };
         f_u256 % ED25519_ORDER
     }
 

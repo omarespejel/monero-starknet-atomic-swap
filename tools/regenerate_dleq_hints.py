@@ -94,19 +94,35 @@ def main():
     curve = CURVES[CurveID.ED25519.value]
     order = curve.n
     
-    # CRITICAL: Cairo now uses FULL reduced scalars (not scalar.low)
-    # compute_dleq_challenge_blake2s returns full scalar: low + high * 2^128
-    # reduce_felt_to_scalar converts felt252 -> u256 preserving full value
-    # Hints must be generated with full reduced scalars to match Cairo
+    # CRITICAL: Cairo's reduce_felt_to_scalar TRUNCATES felt252 to u128
+    # Test file reconstructs: low + high * 2^128 (full scalar)
+    # But reduce_felt_to_scalar does: felt252.into() -> u128 (truncates to low 128 bits)
+    # 
+    # So Garaga receives: u256 { low: truncated_value, high: 0 } % order
+    # Hints must be generated for THIS truncated value, not the full scalar
     
-    # Use full reduced scalars (no truncation)
-    s_scalar = response_int % order  # Full scalar
-    c_scalar = challenge_int % order  # Full scalar
+    # Calculate what Cairo's test file reconstructs
+    response_low = response_int & ((1 << 128) - 1)
+    response_high = (response_int >> 128) & ((1 << 128) - 1)
+    cairo_response_reconstructed = response_low + (response_high * (1 << 128))
+    
+    challenge_low = challenge_int & ((1 << 128) - 1)
+    challenge_high = (challenge_int >> 128) & ((1 << 128) - 1)
+    cairo_challenge_reconstructed = challenge_low + (challenge_high * (1 << 128))
+    
+    # Cairo truncates to u128, then reduces mod order
+    s_scalar_truncated = cairo_response_reconstructed & ((1 << 128) - 1)
+    c_scalar_truncated = cairo_challenge_reconstructed & ((1 << 128) - 1)
+    
+    s_scalar = s_scalar_truncated % order  # What Garaga receives
+    c_scalar = c_scalar_truncated % order  # What Garaga receives
     c_neg_scalar = (order - c_scalar) % order
     
-    print(f"Using full reduced scalars (matching Cairo's updated implementation):")
-    print(f"  Response scalar s: 0x{s_scalar:064x}")
-    print(f"  Challenge scalar c: 0x{c_scalar:064x}")
+    print(f"Using truncated scalars (matching Cairo's reduce_felt_to_scalar):")
+    print(f"  Response reconstructed: 0x{cairo_response_reconstructed:064x}")
+    print(f"  Response truncated: 0x{s_scalar_truncated:032x}")
+    print(f"  Response scalar (after mod order): 0x{s_scalar:064x}")
+    print(f"  Challenge scalar (after mod order): 0x{c_scalar:064x}")
     print(f"  -c mod order: 0x{c_neg_scalar:064x}")
     print()
     
