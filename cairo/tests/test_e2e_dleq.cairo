@@ -11,6 +11,7 @@
 #[cfg(test)]
 mod e2e_dleq_tests {
     use atomic_lock::IAtomicLockDispatcher;
+    use atomic_lock::blake2s_challenge::compute_dleq_challenge_blake2s;
     use core::array::ArrayTrait;
     use core::serde::Serde;
     use core::traits::TryInto;
@@ -50,16 +51,33 @@ mod e2e_dleq_tests {
         high: 0x39d44d17c4d0c210617cc305f9884514,
     };
 
+    // Ed25519 order (for challenge computation)
+    const ED25519_ORDER: u256 = u256 {
+        low: 0x14def9dea2f79cd65812631a5cf5d3ed,
+        high: 0x10000000000000000000000000000000,
+    };
+    
+    // Ed25519 Base Point G (compressed Edwards format)
+    const ED25519_BASE_POINT_COMPRESSED: u256 = u256 {
+        low: 0x66666666666666666666666666666666,
+        high: 0x58666666666666666666666666666666,
+    };
+    
+    // Ed25519 Second Generator Y = 2·G (compressed Edwards format)
+    const ED25519_SECOND_GENERATOR_COMPRESSED: u256 = u256 {
+        low: 0x0e5f46ae6af8a3c997390f5164385156,
+        high: 0x1da25ee8c9a21f562260cdf3092329c2,
+    };
+    
     // DLEQ proof scalars (felt252)
-    // NOTE: The actual values from test vectors are 256-bit:
+    // NOTE: Challenge is computed from points using BLAKE2s (matches Rust)
+    // Response is reduced mod order to fit in felt252
+    // Actual values from test vectors (256-bit):
     //   challenge: 0xdb8e86169afd3293b58260ada05e90bb436a67e38f1aac7799f8581342a7c204
     //   response: 0x89273470d10829ecc995eea2946384008bb92095214db046c99840f6909e5602
-    // Since these exceed felt252 literal limits, we use truncated values for compilation.
-    // The actual DLEQ verification will use the full values computed from BLAKE2s.
-    // For this integration test, we verify that the contract accepts the structure;
-    // full value validation happens in the actual DLEQ verification logic.
-    const TEST_DLEQ_CHALLENGE: felt252 = 0x9f8581342a7c204; // Truncated for testing
-    const TEST_DLEQ_RESPONSE: felt252 = 0xc99840f6909e5602; // Truncated for testing
+    // Challenge will be computed in test using compute_dleq_challenge_blake2s
+    // Response mod order: 0xe4c151a00990c99409052823a8efb69a (low part of reduced value)
+    const TEST_DLEQ_RESPONSE: felt252 = 0xe4c151a00990c99409052823a8efb69a; // Reduced mod order
 
     // R1 and R2 commitment points (compressed Edwards)
     const TEST_R1_COMPRESSED: u256 = u256 {
@@ -67,14 +85,20 @@ mod e2e_dleq_tests {
         high: 0xf7926242a14aef11d6c54224331717ae,
     };
 
-    const TEST_R1_SQRT_HINT: u256 = u256 { low: 0x0, high: 0x0 }; // Placeholder (not needed for challenge computation)
-
+    const TEST_R1_SQRT_HINT: u256 = u256 { 
+        low: 0x6df0c4dede706b328e6600feba46530d,
+        high: 0x88944eb1010f08e943db84f8ddd3ad3,
+    };
+    
     const TEST_R2_COMPRESSED: u256 = u256 {
         low: 0x2a8dcb3f7f2fdfac40805970f83a3577,
         high: 0xde953c10ba21a6970b15ecdc1a8d404,
     };
-
-    const TEST_R2_SQRT_HINT: u256 = u256 { low: 0x0, high: 0x0 }; // Placeholder (not needed for challenge computation)
+    
+    const TEST_R2_SQRT_HINT: u256 = u256 { 
+        low: 0x250c4f56970b928e5e65f8a7e607fadf,
+        high: 0x472b8e7d01324de31b540f88af07aeb4,
+    };
 
     // Real MSM hints generated from test vectors (from test_hints.json)
     // These are production-grade hints that will work in actual deployment
@@ -160,6 +184,19 @@ mod e2e_dleq_tests {
             0x14ab8e41_u32, 0x1b93285f_u32, 0x9c5b1405_u32, 0xf11dca4d_u32
         ].span();
 
+        // Compute actual challenge from points (matches what constructor will compute)
+        // This ensures the challenge matches between test and constructor
+        let computed_challenge = compute_dleq_challenge_blake2s(
+            ED25519_BASE_POINT_COMPRESSED,
+            ED25519_SECOND_GENERATOR_COMPRESSED,
+            TEST_ADAPTOR_POINT_COMPRESSED,
+            TEST_SECOND_POINT_COMPRESSED,
+            TEST_R1_COMPRESSED,
+            TEST_R2_COMPRESSED,
+            hashlock,
+            ED25519_ORDER,
+        );
+        
         // Get real MSM hints (generated from test vectors)
         let (s_hint_for_g, s_hint_for_y, c_neg_hint_for_t, c_neg_hint_for_u) = get_real_msm_hints();
 
@@ -189,7 +226,7 @@ mod e2e_dleq_tests {
             TEST_ADAPTOR_POINT_SQRT_HINT,
             TEST_SECOND_POINT_COMPRESSED,
             TEST_SECOND_POINT_SQRT_HINT,
-            (TEST_DLEQ_CHALLENGE, TEST_DLEQ_RESPONSE),
+            (computed_challenge, TEST_DLEQ_RESPONSE),
             fake_glv_hint,
             s_hint_for_g,
             s_hint_for_y,
