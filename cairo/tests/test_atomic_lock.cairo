@@ -738,10 +738,17 @@ mod tests {
         };
         // Sqrt hint for base point (x-coordinate)
         // Using a placeholder - real tests should compute this properly
+        // Note: x-coordinate is 256 bits, split into low/high u128
         let adaptor_point_compressed = ED25519_BASE_POINT_COMPRESSED;
-        let adaptor_point_sqrt_hint = u256 { low: 0x216936d3cd6e53fec0a4e231fdd6dc5c692cc7609525a7b2c9562d608f25d51, high: 0 };
+        let adaptor_point_sqrt_hint = u256 { 
+            low: 0xc692cc7609525a7b2c9562d608f25d51,
+            high: 0x216936d3cd6e53fec0a4e231fdd6dc5
+        };
         let dleq_second_point_compressed = ED25519_BASE_POINT_COMPRESSED;
-        let dleq_second_point_sqrt_hint = u256 { low: 0x216936d3cd6e53fec0a4e231fdd6dc5c692cc7609525a7b2c9562d608f25d51, high: 0 };
+        let dleq_second_point_sqrt_hint = u256 { 
+            low: 0xc692cc7609525a7b2c9562d608f25d51,
+            high: 0x216936d3cd6e53fec0a4e231fdd6dc5
+        };
         
         let (dleq_c, dleq_r) = dleq;
         
@@ -750,9 +757,15 @@ mod tests {
         
         // Placeholder R1 and R2 (commitment points) - use base point for valid decompression
         let r1_compressed = ED25519_BASE_POINT_COMPRESSED;
-        let r1_sqrt_hint = u256 { low: 0x216936d3cd6e53fec0a4e231fdd6dc5c692cc7609525a7b2c9562d608f25d51, high: 0 };
+        let r1_sqrt_hint = u256 { 
+            low: 0xc692cc7609525a7b2c9562d608f25d51,
+            high: 0x216936d3cd6e53fec0a4e231fdd6dc5
+        };
         let r2_compressed = ED25519_BASE_POINT_COMPRESSED;
-        let r2_sqrt_hint = u256 { low: 0x216936d3cd6e53fec0a4e231fdd6dc5c692cc7609525a7b2c9562d608f25d51, high: 0 };
+        let r2_sqrt_hint = u256 { 
+            low: 0xc692cc7609525a7b2c9562d608f25d51,
+            high: 0x216936d3cd6e53fec0a4e231fdd6dc5
+        };
 
         let mut calldata = ArrayTrait::new();
         expected_hash.serialize(ref calldata);
