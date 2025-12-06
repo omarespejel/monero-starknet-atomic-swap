@@ -8,7 +8,7 @@ mod serde_hint_roundtrip_tests {
     use core::integer::u256;
     use garaga::definitions::get_G;
     use garaga::ec_ops::{msm_g1, G1PointTrait};
-    use atomic_lock::AtomicLock::ED25519_CURVE_INDEX;
+    const ED25519_CURVE_INDEX: u32 = 4;
 
     const ED25519_ORDER: u256 = u256 {
         low: 0x14def9dea2f79cd65812631a5cf5d3ed,
