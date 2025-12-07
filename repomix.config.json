@@ -25,6 +25,8 @@
   },
   "include": [
     "README.md",
+    "CLAUDE.md",
+    ".cursorrules",
     "rust/Cargo.toml",
     "rust/src/lib.rs",
     "rust/src/dleq.rs",

@@ -1,0 +1,36 @@
+---
+description: Python tooling rules
+globs: ["tools/**/*.py", "*.py"]
+alwaysApply: false
+---
+
+# Python Tooling Rules
+
+## Purpose
+
+Python scripts generate hints for Cairo MSM operations.
+They are NOT part of the production system.
+
+## Key Scripts
+
+- `generate_hints_exact.py` - MSM hints with Garaga decompression
+- `hex_to_cairo_u256.py` - Convert hex to Cairo format
+- `verify_full_compatibility.py` - Cross-platform verification
+
+## Dependencies
+
+```bash
+cd tools && uv sync  # Use uv for dependency management
+```
+
+## Garaga Integration
+
+```python
+from garaga.definitions import G1Point, CurveID
+from garaga.hints import get_msm_hint
+```
+
+## Output Format
+
+- All hints output as JSON
+- Match exact format expected by Cairo tests

@@ -1,0 +1,48 @@
+---
+description: Cairo/Starknet development rules
+globs: ["**/*.cairo"]
+alwaysApply: true
+---
+
+# Cairo Development Rules
+
+## EC Operations
+
+- ALWAYS use Garaga for elliptic curve operations
+- NEVER implement custom point arithmetic
+- Use `msm_g1` for scalar multiplication
+
+## Point Validation
+
+```cairo
+use garaga::ec_ops::assert_on_curve_excluding_infinity;
+
+// ALWAYS validate points from external input
+assert_on_curve_excluding_infinity(point);
+```
+
+## u256 Byte Order
+
+- Cairo u256 has `low` and `high` fields
+- Use `tools/hex_to_cairo_u256.py` for conversions
+- NEVER manually swap bytes without the tool
+
+## Testing
+
+- Use `snforge` for all tests
+- Test naming: `test_{category}_{description}.cairo`
+- Security tests: `test_security_*.cairo`
+
+## Imports
+
+```cairo
+use garaga::ec_ops::{msm_g1, G1Point};
+use openzeppelin::security::ReentrancyGuardComponent;
+use core::blake::blake2s;
+```
+
+## Gas Optimization
+
+- Prefer BLAKE2s over Poseidon (8x cheaper)
+- Batch MSM operations where possible
+- Use hints for expensive computations
