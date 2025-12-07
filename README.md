@@ -7,7 +7,7 @@
 Prototype implementation of a trustless atomic swap protocol between Monero and Starknet. 
 Uses hashlock + MSM verification + DLEQ proofs for cryptographic binding.
 
-**Status**: v0.7.0 - Key splitting approach implemented. E2E Rust↔Cairo compatibility test passes.
+**Status**: v0.7.1 - Key splitting approach implemented. E2E Rust↔Cairo compatibility test passes. CI workflows fixed.
 
 ## Overview
 

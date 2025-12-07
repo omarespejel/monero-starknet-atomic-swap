@@ -4,7 +4,7 @@
 
 ### Version
 
-0.7.0 - Key Splitting Approach (replaces custom CLSAG)
+0.7.1 - Key Splitting Approach (replaces custom CLSAG)
 
 ### What Works ✅
 

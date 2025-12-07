@@ -4,7 +4,7 @@
 
 Trustless atomic swap between Monero (XMR) and Starknet tokens using DLEQ proofs.
 
-- **Version**: 0.7.0 (Key Splitting Approach)
+- **Version**: 0.7.1 (Key Splitting Approach)
 - **Status**: E2E tests passing, production prototype
 
 ## Architecture
