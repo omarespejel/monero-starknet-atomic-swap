@@ -14,7 +14,7 @@ use xmr_secret_gen::adaptor::{split_monero_key, create_adaptor_signature};
 use xmr_secret_gen::{
     generate_swap_secret,
     starknet::StarknetClient,
-    monero::MoneroClient,
+    // monero::MoneroClient,  // Removed - using key splitting approach instead
 };
 #[cfg(feature = "full-integration")]
 use xmr_secret_gen::{starknet_full::StarknetAccount, monero_full::MoneroRpcClient};

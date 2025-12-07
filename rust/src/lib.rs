@@ -6,7 +6,6 @@
 //! Also includes adaptor signature support for Monero atomic swaps.
 
 pub mod adaptor;
-pub mod clsag;
 pub mod dleq;
 pub mod starknet;
 pub mod monero;
@@ -14,11 +13,7 @@ pub mod monero;
 // pub mod poseidon;
 
 pub use dleq::{generate_dleq_proof, DleqProof};
-pub use clsag::{
-    ClsagAdaptorSignature, ClsagAdaptorSigner, 
-    ClsagSignature, RingMember,
-    extract_adaptor_scalar,
-};
+pub use monero::SwapKeyPair;
 #[cfg(feature = "full-integration")]
 pub mod starknet_full;
 #[cfg(feature = "full-integration")]
@@ -31,8 +26,6 @@ use std::env;
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar;
-use num_bigint::BigUint;
-use num_traits::Num;
 use rand::rngs::OsRng;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
@@ -114,10 +107,13 @@ where
                                 num_str
                             )))
                         } else {
-                            match BigUint::from_str_radix(&num_str, 10) {
-                                Ok(big) => Ok(format!("0x{:x}", big)),
-                                Err(_) => Err(D::Error::custom(format!("Invalid number: {}", num_str))),
-                            }
+                            // Large numbers should be strings in JSON (Python outputs them as strings)
+                            // If we get here, it's a number that doesn't fit in u64 but isn't scientific notation
+                            // Return error - Python tool should output as string
+                            Err(D::Error::custom(format!(
+                                "Number too large: {}. Python tool should output large numbers as strings.",
+                                num_str
+                            )))
                         }
                     }
                 }

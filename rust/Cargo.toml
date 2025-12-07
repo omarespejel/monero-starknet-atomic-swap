@@ -2,38 +2,37 @@
 name = "xmr_secret_gen"
 version = "0.1.0"
 edition = "2021"
-description = "Monero scalar generator for atomic swaps"
+description = "Monero key splitting for Starknet atomic swaps"
+license = "MIT"
 
 [dependencies]
 # ===== AUDITED CRYPTOGRAPHY =====
 # Quarkslab-audited elliptic curve operations (2023)
 curve25519-dalek = { version = "4.1", features = ["serde", "zeroize", "rand_core"] }
 
-# Monero CLSAG - Cypher Stack audit in progress (CCS-funded)
-# Using git source directly from serai-dex/serai (official source being audited)
-# The -mirror crates are unofficial; use the source of truth for audit traceability
-# NOTE: Package names are reserved but not yet published - using mirror temporarily
-# TODO: Switch to git when packages are available: monero-clsag = { git = "https://github.com/serai-dex/serai", package = "monero-clsag" }
-monero-clsag-mirror = "0.1"  # TEMPORARY: Unofficial mirror (same code as serai-dex/serai)
-# The mirror contains the same code being audited, just published by community member sneurlax
-
-# RustCrypto suite (NCC Group audited)
+# Hashing (RustCrypto audited)
 blake2 = "0.10"
 sha2 = "0.10"
-sha3 = "0.10"
+keccak = "0.1"    # For Monero's Keccak256 (NOT standard SHA3-256!)
 zeroize = { version = "1.8", features = ["derive"] }
 
-# ===== OTHER DEPENDENCIES =====
-rand = "0.8"
-rand_core = "0.6"
-hex = "0.4"
+# ===== SERIALIZATION & UTILITIES =====
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+hex = "0.4"
+bs58 = "0.5"  # For Monero address encoding
+
+# ===== RANDOM NUMBER GENERATION =====
+rand = "0.8"
+rand_core = "0.6"
+getrandom = "0.2"  # Ensure cryptographically secure randomness
+
+# ===== CLI & ASYNC =====
 clap = { version = "4.5", features = ["derive"] }
-num-bigint = "0.4"
-num-traits = "0.2"
 tokio = { version = "1", features = ["full"] }
 reqwest = { version = "0.11", features = ["json"] }
+
+# ===== ERROR HANDLING =====
 anyhow = "1"
 thiserror = "1"
 url = "2"
@@ -54,6 +53,44 @@ path = "src/bin/taker.rs"
 name = "get_constants"
 path = "src/bin/get_constants.rs"
 
+[[bin]]
+name = "generate_test_vector"
+path = "src/bin/generate_test_vector.rs"
+
+[[bin]]
+name = "generate_second_base"
+path = "src/bin/generate_second_base.rs"
+
+[[bin]]
+name = "generate_all_sqrt_hints"
+path = "src/bin/generate_all_sqrt_hints.rs"
+
+[[bin]]
+name = "generate_sqrt_hints"
+path = "src/bin/generate_sqrt_hints.rs"
+
+[[bin]]
+name = "get_all_sqrt_hints"
+path = "src/bin/get_all_sqrt_hints.rs"
+
+[[bin]]
+name = "regenerate_r1"
+path = "src/bin/regenerate_r1.rs"
+
 [dev-dependencies]
 assert_cmd = "2.0"
 proptest = "1"  # Property-based testing for cryptographic code
+criterion = "0.5"  # Benchmarking
+tempfile = "3"  # Temporary files for testing
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+
+[profile.dev]
+opt-level = 0
+
+[package.metadata.cargo-audit]
+ignore = []
