@@ -608,14 +608,15 @@ pub mod AtomicLock {
         // 2. Challenge comparison issue (felt252 comparison)
         // 3. Challenge passed via calldata differs from computed
         // 
-        // CRITICAL: Compare truncated challenges (matching what MSM uses)
-        // Hints were generated for truncated scalars, so we compare truncated values
+        // CRITICAL: Compare truncated FULL challenges (before reduction)
+        // Hints were generated for truncated FULL challenge scalars (not reduced)
+        // TEST_VECTOR_C_TRUNCATED is the low 128 bits of the FULL challenge
+        // So we compare the truncated FULL challenge, not the truncated reduced challenge
         // Convert felt252 to u256 first (always succeeds), then extract low 128 bits
-        // This avoids try_into::<u128>() failure when value > 2^128
         let c_prime_u256: u256 = c_prime.into();
         let dleq_challenge_u256: u256 = dleq_challenge.into();
         
-        // Compare low 128 bits (matching what MSM uses)
+        // Compare low 128 bits of FULL challenge (matching hints and test vector)
         if c_prime_u256.low != dleq_challenge_u256.low {
             // The challenge mismatch indicates either:
             // 1. Challenge computation difference (BLAKE2s implementation?)

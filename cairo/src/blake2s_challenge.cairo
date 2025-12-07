@@ -349,15 +349,33 @@ pub fn compute_dleq_challenge_blake2s(
     // CRITICAL: Validate span length before accessing elements
     assert(hash_span.len() == 8, 'BLAKE2s state must have 8 words');
     
-    // Extract all 8 u32 words (little-endian interpretation)
-    let w0: u128 = (*hash_span.at(0)).into();
-    let w1: u128 = (*hash_span.at(1)).into();
-    let w2: u128 = (*hash_span.at(2)).into();
-    let w3: u128 = (*hash_span.at(3)).into();
-    let w4: u128 = (*hash_span.at(4)).into();
-    let w5: u128 = (*hash_span.at(5)).into();
-    let w6: u128 = (*hash_span.at(6)).into();
-    let w7: u128 = (*hash_span.at(7)).into();
+    // CRITICAL FIX: BLAKE2s state words need byte-swapping AND word order reversal
+    // Rust's Scalar::from_bytes_mod_order treats the 32-byte digest as little-endian
+    // BLAKE2s state words are in order [h0, h1, ..., h7] where h0 is first 4 bytes
+    // But Rust expects bytes in order: [byte0, byte1, ..., byte31] where byte0 is LSB
+    // So we need to:
+    // 1. Reverse word order (h7 becomes LSB, h0 becomes MSB)
+    // 2. Byte-swap each word (BLAKE2s words are little-endian u32, but Rust expects bytes)
+    
+    // Extract words in reverse order and byte-swap each
+    let w0_swapped = byte_swap_u32(*hash_span.at(7));  // Word 7 (last) becomes LSB
+    let w1_swapped = byte_swap_u32(*hash_span.at(6));
+    let w2_swapped = byte_swap_u32(*hash_span.at(5));
+    let w3_swapped = byte_swap_u32(*hash_span.at(4));
+    let w4_swapped = byte_swap_u32(*hash_span.at(3));
+    let w5_swapped = byte_swap_u32(*hash_span.at(2));
+    let w6_swapped = byte_swap_u32(*hash_span.at(1));
+    let w7_swapped = byte_swap_u32(*hash_span.at(0));  // Word 0 (first) becomes MSB
+    
+    // Convert to u128 for combination
+    let w0: u128 = w0_swapped.into();
+    let w1: u128 = w1_swapped.into();
+    let w2: u128 = w2_swapped.into();
+    let w3: u128 = w3_swapped.into();
+    let w4: u128 = w4_swapped.into();
+    let w5: u128 = w5_swapped.into();
+    let w6: u128 = w6_swapped.into();
+    let w7: u128 = w7_swapped.into();
     
     // Reconstruct u256: low = w0 + w1·2^32 + w2·2^64 + w3·2^96
     //                   high = w4 + w5·2^32 + w6·2^64 + w7·2^96
@@ -365,22 +383,19 @@ pub fn compute_dleq_challenge_blake2s(
     let low = w0 + base * w1 + base * base * w2 + base * base * base * w3;
     let high = w4 + base * w5 + base * base * w6 + base * base * base * w7;
     
-    // Convert to u256 and reduce mod curve order (matches Rust: Scalar::from_bytes_mod_order)
+    // Convert to u256
+    // CRITICAL: Return the FULL hash (before reduction) as felt252
+    // The reduction happens in the constructor where it's used for MSM
+    // But for challenge comparison, we need the truncated FULL challenge
+    // (matching what hints were generated with)
     let hash_u256 = u256 { low, high };
-    let scalar = hash_u256 % ed25519_order;
     
-    // CRITICAL: Convert scalar to felt252 safely
-    let scalar_felt_option: Option<felt252> = scalar.try_into();
-    
-    if scalar_felt_option.is_some() {
-        return scalar_felt_option.unwrap();
-    }
-    
-    // Fallback: Convert scalar mod felt252 prime by reducing again
+    // Convert full hash to felt252 (for challenge comparison)
+    // The constructor will reduce it mod order when using it for MSM
     let base_128: felt252 = 0x100000000000000000000000000000000; // 2^128
-    let low_felt: felt252 = scalar.low.try_into().unwrap();
-    let high_felt: felt252 = scalar.high.try_into().unwrap();
-    let scalar_felt = low_felt + high_felt * base_128;
-    scalar_felt
+    let low_felt: felt252 = hash_u256.low.try_into().unwrap();
+    let high_felt: felt252 = hash_u256.high.try_into().unwrap();
+    let hash_felt = low_felt + high_felt * base_128;
+    hash_felt
 }
 
