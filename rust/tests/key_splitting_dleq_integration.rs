@@ -19,7 +19,8 @@ fn test_swap_keypair_with_dleq_proof() {
     let hashlock: [u8; 32] = Sha256::digest(keys.adaptor_scalar_bytes()).into();
 
     // 3. Generate DLEQ proof - THIS IS THE CONFIRMED API
-    let proof = generate_dleq_proof(&keys.adaptor_scalar, &keys.adaptor_point, &hashlock);
+    let proof = generate_dleq_proof(&keys.adaptor_scalar, &keys.adaptor_point, &hashlock)
+        .expect("DLEQ proof generation should succeed with valid inputs");
 
     // 4. Basic proof validity checks
     assert!(proof.challenge.to_bytes() != [0u8; 32], "Challenge is zero");

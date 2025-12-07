@@ -28,7 +28,7 @@ fn test_full_atomic_swap_flow() {
         &alice_keys.adaptor_scalar,
         &alice_keys.adaptor_point,
         &hashlock,
-    );
+    ).expect("DLEQ proof generation should succeed with valid inputs");
     
     // Verify proof is valid (non-zero challenge and response)
     assert!(dleq_proof.challenge.to_bytes() != [0u8; 32], "Challenge must be non-zero");
@@ -94,7 +94,7 @@ fn test_swap_fails_with_wrong_secret() {
         &alice_keys.adaptor_scalar,
         &alice_keys.adaptor_point,
         &hashlock,
-    );
+    ).expect("DLEQ proof generation should succeed with valid inputs");
     
     // Bob tries wrong secret
     let wrong_secret = alice_keys.adaptor_scalar + curve25519_dalek::scalar::Scalar::from(1u64);

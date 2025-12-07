@@ -78,7 +78,8 @@ fn generate_multiple_test_vectors() {
         let mut hashlock = [0u8; 32];
         hashlock[0] = i as u8;
 
-        let proof = generate_dleq_proof(&secret, &adaptor_point, &hashlock);
+        let proof = generate_dleq_proof(&secret, &adaptor_point, &hashlock)
+            .expect("Proof generation should succeed for valid inputs");
         let cairo_format = proof.to_cairo_format(&adaptor_point);
 
         test_vectors.push(json!({

@@ -20,10 +20,24 @@ use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar;
 use sha2::{Digest, Sha256};
+use thiserror::Error;
 
 // TODO: Uncomment when Poseidon is fully implemented
 // mod poseidon;
 // use poseidon::compute_poseidon_challenge;
+
+/// DLEQ proof generation errors.
+#[derive(Debug, Error, Clone, PartialEq)]
+pub enum DleqError {
+    #[error("Secret scalar cannot be zero")]
+    ZeroScalar,
+    #[error("Adaptor point does not match secret: expected T = t·G")]
+    PointMismatch,
+    #[error("Hashlock does not match secret: expected H = SHA256(t)")]
+    HashlockMismatch,
+    #[error("Failed to generate valid nonce after maximum attempts")]
+    NonceGenerationFailed,
+}
 
 /// DLEQ proof structure containing the second point, challenge, response, and commitments.
 pub struct DleqProof {
@@ -66,6 +80,13 @@ pub struct DleqProofForCairo {
 
 /// Generate a DLEQ proof for the given secret and adaptor point.
 ///
+/// # Security: Input Validation
+///
+/// This function validates all inputs before generating the proof:
+/// - Secret must be non-zero
+/// - Adaptor point must equal secret * G
+/// - Hashlock must equal SHA256(secret)
+///
 /// # Arguments
 ///
 /// * `secret` - The secret scalar t
@@ -74,40 +95,69 @@ pub struct DleqProofForCairo {
 ///
 /// # Returns
 ///
-/// A `DleqProof` containing U, c, and s.
+/// A `Result` containing either:
+/// - `Ok(DleqProof)` - Valid proof containing U, c, and s
+/// - `Err(DleqError)` - Input validation error
+///
+/// # Errors
+///
+/// Returns `DleqError::ZeroScalar` if secret is zero.
+/// Returns `DleqError::PointMismatch` if adaptor_point ≠ secret * G.
+/// Returns `DleqError::HashlockMismatch` if hashlock ≠ SHA256(secret).
 pub fn generate_dleq_proof(
     secret: &Scalar,
     adaptor_point: &EdwardsPoint,
     hashlock: &[u8; 32],
-) -> DleqProof {
-    // 1. Get generators
-    let G = ED25519_BASEPOINT_POINT; // Standard Ed25519 generator
+) -> Result<DleqProof, DleqError> {
+    // SECURITY: Validate inputs before generating proof
+    
+    // 1. Check secret is non-zero
+    if *secret == Scalar::ZERO {
+        return Err(DleqError::ZeroScalar);
+    }
+    
+    // 2. Verify adaptor_point = secret * G
+    let G = ED25519_BASEPOINT_POINT;
+    let computed_point = G * secret;
+    if computed_point != *adaptor_point {
+        return Err(DleqError::PointMismatch);
+    }
+    
+    // 3. Verify hashlock = SHA256(secret)
+    let computed_hash: [u8; 32] = Sha256::digest(secret.to_bytes()).into();
+    if computed_hash != *hashlock {
+        return Err(DleqError::HashlockMismatch);
+    }
+    
+    // 4. Get generators
     let Y = get_second_generator(); // Derived second base
 
-    // 2. Compute U = t·Y
+    // 5. Compute U = t·Y
     let U = Y * secret;
 
-    // 3. Generate nonce k (deterministic for reproducibility in tests)
-    // Using RFC6979-style deterministic nonce generation
-    let k = generate_deterministic_nonce(secret, hashlock);
+    // 6. Generate nonce k (deterministic for reproducibility in tests)
+    // Using RFC6979-style deterministic nonce generation with domain separation
+    let k = generate_deterministic_nonce(secret, hashlock)?;
 
-    // 4. Compute commitments
+    // 7. Compute commitments
     let R1 = G * k; // k·G
     let R2 = Y * k; // k·Y
 
-    // 5. Compute Fiat-Shamir challenge
+    // 8. Compute Fiat-Shamir challenge
     let c = compute_challenge(&G, &Y, adaptor_point, &U, &R1, &R2, hashlock);
 
-    // 6. Compute response s = k + c·t mod n
+    // 9. Compute response s = k + c·t mod n
+    // SECURITY: Uses curve25519-dalek's constant-time scalar arithmetic
+    // to prevent timing attacks. DO NOT replace with standard operators.
     let s = k + (c * secret);
 
-    DleqProof {
+    Ok(DleqProof {
         second_point: U,
         challenge: c,
         response: s,
         r1: R1,
         r2: R2,
-    }
+    })
 }
 
 /// Convert an Edwards point to compressed format and sqrt hint.
@@ -201,20 +251,54 @@ fn get_second_generator() -> EdwardsPoint {
 
 /// Generate a deterministic nonce k for DLEQ proof generation.
 ///
-/// Uses RFC6979-style deterministic nonce generation based on the secret and hashlock.
+/// Uses RFC6979-style deterministic nonce generation with domain separation.
 /// This ensures reproducibility in tests while maintaining security.
-fn generate_deterministic_nonce(secret: &Scalar, hashlock: &[u8; 32]) -> Scalar {
-    // RFC6979-style: k = SHA256(secret || hashlock || counter)
-    // For simplicity, use single hash (can be extended with counter if needed)
-    let mut hasher = Sha256::new();
-    hasher.update(secret.to_bytes());
-    hasher.update(hashlock);
-    hasher.update(&[0u8; 1]); // Counter (can be incremented if k is invalid)
+///
+/// # Security Features
+///
+/// - Domain separation: Uses "DLEQ_NONCE_V1" prefix to prevent hash collisions
+/// - Counter-based retry: Increments counter if nonce is zero (invalid)
+/// - Maximum attempts: Fails after 100 attempts to prevent infinite loops
+///
+/// # Arguments
+///
+/// * `secret` - The secret scalar t
+/// * `hashlock` - The hashlock (32-byte SHA-256 hash of the secret)
+///
+/// # Returns
+///
+/// A `Result` containing either:
+/// - `Ok(Scalar)` - Valid non-zero nonce
+/// - `Err(DleqError::NonceGenerationFailed)` - Failed to generate valid nonce
+fn generate_deterministic_nonce(
+    secret: &Scalar,
+    hashlock: &[u8; 32],
+) -> Result<Scalar, DleqError> {
+    let mut counter = 0u32;
+    
+    loop {
+        let mut hasher = Sha256::new();
+        // Domain separation: prevents hash collisions with other protocol hashes
+        hasher.update(b"DLEQ_NONCE_V1");
+        hasher.update(secret.to_bytes());
+        hasher.update(hashlock);
+        hasher.update(&counter.to_le_bytes()); // Counter for retry if k is invalid
 
-    let hash = hasher.finalize();
-    let mut scalar_bytes = [0u8; 32];
-    scalar_bytes.copy_from_slice(&hash);
-    Scalar::from_bytes_mod_order(scalar_bytes)
+        let hash = hasher.finalize();
+        let mut scalar_bytes = [0u8; 32];
+        scalar_bytes.copy_from_slice(&hash);
+        let k = Scalar::from_bytes_mod_order(scalar_bytes);
+
+        // Validate nonce is non-zero
+        if k != Scalar::ZERO {
+            return Ok(k);
+        }
+
+        counter += 1;
+        if counter >= 100 {
+            return Err(DleqError::NonceGenerationFailed);
+        }
+    }
 }
 
 /// Compute the Fiat-Shamir challenge for DLEQ verification.
@@ -288,7 +372,8 @@ mod tests {
         let adaptor_point = ED25519_BASEPOINT_POINT * secret;
 
         // Generate DLEQ proof
-        let proof = generate_dleq_proof(&secret, &adaptor_point, &hashlock);
+        let proof = generate_dleq_proof(&secret, &adaptor_point, &hashlock)
+            .expect("Proof generation should succeed for valid inputs");
 
         // Verify proof structure: U should equal t·Y
         let Y = get_second_generator();

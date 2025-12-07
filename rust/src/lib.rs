@@ -12,7 +12,7 @@ pub mod starknet;
 // TODO: Uncomment when Poseidon is fully implemented
 // pub mod poseidon;
 
-pub use dleq::{generate_dleq_proof, DleqProof};
+pub use dleq::{generate_dleq_proof, DleqProof, DleqError};
 pub use monero::SwapKeyPair;
 #[cfg(feature = "full-integration")]
 pub mod monero_full;
@@ -261,7 +261,8 @@ pub fn generate_swap_secret() -> SwapSecret {
 
     // Generate DLEQ proof
     let adaptor_point_edwards = ED25519_BASEPOINT_POINT * scalar;
-    let dleq_proof = generate_dleq_proof(&scalar, &adaptor_point_edwards, &hashlock);
+    let dleq_proof = generate_dleq_proof(&scalar, &adaptor_point_edwards, &hashlock)
+        .expect("DLEQ proof generation should succeed for valid test inputs");
 
     // Convert DLEQ second point to Weierstrass and get limbs
     // TODO: Use Python tool to convert Edwards to Weierstrass for consistency
