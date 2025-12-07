@@ -11,8 +11,8 @@ mod ed25519_base_point_tests {
 
     // Ed25519 base point (generator G) - guaranteed valid
     const ED25519_BASE_POINT_COMPRESSED: u256 = u256 {
-        low: 0x66666666666666666666666666666666,
-        high: 0x58666666666666666666666666666666,
+        low: 0x66666666666666666666666666666658,
+        high: 0x66666666666666666666666666666666,
     };
 
     // Twisted Edwards sqrt hint (from Python RFC 8032)

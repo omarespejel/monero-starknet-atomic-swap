@@ -28,9 +28,14 @@ type Blake2sState = core::box::Box<[u32; 8]>;
 /// BLAKE2s input block type (16 u32 words = 512 bits)
 type Blake2sInput = core::box::Box<[u32; 16]>;
 
-/// Domain separator tag for DLEQ proofs: "DLEQ" (4 bytes, little-endian)
-/// Value: 0x444c4551
-const DLEQ_TAG: u32 = 0x444c4551;
+/// Domain separator tag for DLEQ proofs: "DLEQ" (4 bytes)
+/// 
+/// CRITICAL: BLAKE2s reads u32 as little-endian bytes, so we must store
+/// the tag in little-endian format: byte0='D', byte1='L', byte2='E', byte3='Q'
+/// As u32: 0x44 + (0x4C << 8) + (0x45 << 16) + (0x51 << 24) = 0x51454c44
+/// 
+/// Previous value (0x444c4551) was wrong - it produced "QELD" when read as bytes
+const DLEQ_TAG: u32 = 0x51454c44_u32;
 
 /// Initialize BLAKE2s state with standard RFC 7693 IV
 /// 
@@ -62,75 +67,8 @@ fn initial_blake2s_state() -> Blake2sState {
     ])
 }
 
-/// Process multiple u256 values through BLAKE2s compression (batch optimization)
-///
-/// Performance optimization: processes multiple u256 values in sequence
-/// without intermediate state management overhead.
-///
-/// @param state Initial BLAKE2s state
-/// @param byte_count Initial byte count
-/// @param values Span of u256 values to hash
-/// @return Updated state and final byte count
-pub fn process_multiple_u256(
-    mut state: Blake2sState,
-    mut byte_count: u32,
-    values: Span<u256>,
-) -> (Blake2sState, u32) {
-    let mut i = 0;
-    while i < values.len() {
-        let (new_state, new_count) = process_u256(state, byte_count, *values.at(i));
-        state = new_state;
-        byte_count = new_count;
-        i += 1;
-    };
-    (state, byte_count)
-}
-
-/// Process a u256 value through BLAKE2s compression
-/// 
-/// Helper function that serializes u256 and compresses it in one step
-/// 
-/// @param state Current BLAKE2s state
-/// @param byte_count Current byte count (total bytes hashed so far)
-/// @param value u256 value to hash (32 bytes)
-/// @return Updated state and new byte count
-fn process_u256(
-    state: Blake2sState,
-    byte_count: u32,
-    value: u256,
-) -> (Blake2sState, u32) {
-    let u32_mask_u128: u128 = 0x100000000; // 2^32
-    
-    // Extract u32 words directly and build fixed array
-    // Low part (u128): extract 4 u32 words
-    // Note: u128 % 2^32 and division are safe - result always fits in u32
-    let mut remaining_low = value.low;
-    let low0: u32 = (remaining_low % u32_mask_u128).try_into().unwrap(); // Safe: u128 % 2^32 < 2^32
-    remaining_low = remaining_low / u32_mask_u128;
-    let low1: u32 = (remaining_low % u32_mask_u128).try_into().unwrap(); // Safe: u128 / 2^32 < 2^96, % 2^32 < 2^32
-    remaining_low = remaining_low / u32_mask_u128;
-    let low2: u32 = (remaining_low % u32_mask_u128).try_into().unwrap(); // Safe: u128 / 2^64 < 2^64, % 2^32 < 2^32
-    remaining_low = remaining_low / u32_mask_u128;
-    let low3: u32 = remaining_low.try_into().unwrap(); // Safe: u128 / 2^96 < 2^32
-    
-    // High part (u128): extract 4 u32 words
-    let mut remaining_high = value.high;
-    let high0: u32 = (remaining_high % u32_mask_u128).try_into().unwrap(); // Safe: u128 % 2^32 < 2^32
-    remaining_high = remaining_high / u32_mask_u128;
-    let high1: u32 = (remaining_high % u32_mask_u128).try_into().unwrap(); // Safe: u128 / 2^32 < 2^96, % 2^32 < 2^32
-    remaining_high = remaining_high / u32_mask_u128;
-    let high2: u32 = (remaining_high % u32_mask_u128).try_into().unwrap(); // Safe: u128 / 2^64 < 2^64, % 2^32 < 2^32
-    remaining_high = remaining_high / u32_mask_u128;
-    let high3: u32 = remaining_high.try_into().unwrap(); // Safe: u128 / 2^96 < 2^32
-    
-    // Create BLAKE2s input block directly as fixed array
-    let msg: Blake2sInput = core::box::BoxTrait::new([
-        low0, low1, low2, low3, high0, high1, high2, high3,
-        0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32
-    ]);
-    let new_state = blake2s_compress(state, byte_count + 32, msg);
-    (new_state, byte_count + 32) // 32 bytes per u256
-}
+// Note: We extract u32 words directly inline in compute_dleq_challenge_blake2s
+// to avoid array indexing issues in Cairo
 
 /// Byte-swap a u32 word (Big-Endian -> Little-Endian)
 /// 
@@ -202,11 +140,15 @@ pub fn hashlock_to_u256(hashlock: Span<u32>) -> u256 {
 /// **Challenge Format**: BLAKE2s("DLEQ" || G || Y || T || U || R1 || R2 || hashlock)
 ///
 /// **Serialization Order** (RFC 8032 compliant):
-/// 1. Tag: "DLEQ" (4 bytes = 0x444c4551)
+/// 1. Tag: "DLEQ" (4 bytes)
 /// 2. Points: G, Y, T, U, R1, R2 (each 32 bytes compressed Edwards, little-endian)
 /// 3. Hashlock: 32 bytes (SHA-256 hash)
 ///
 /// **Total Input**: 4 + (6 × 32) + 32 = 228 bytes
+///
+/// **CRITICAL FIX**: Accumulate all bytes into a continuous buffer before compressing.
+/// Rust's BLAKE2s accumulates bytes and only compresses when it has a full 64-byte block.
+/// Previous implementation compressed each item separately, causing block misalignment.
 ///
 /// @param G_compressed Standard Ed25519 generator (compressed Edwards, u256)
 /// @param Y_compressed Second generator for DLEQ (compressed Edwards, u256)
@@ -230,44 +172,184 @@ pub fn compute_dleq_challenge_blake2s(
     hashlock: Span<u32>,
     ed25519_order: u256,
 ) -> felt252 {
+    // CRITICAL FIX: Build continuous byte buffer first (matches Rust's accumulation)
+    // Total: 228 bytes = 57 u32 words
+    // Process in 4 blocks of 16 u32 words (64 bytes) each
+    
+    // Helper to extract u32 words from u256
+    let u32_mask_u128: u128 = 0x100000000; // 2^32
+    
+    // Extract G words
+    let mut g_low = G_compressed.low;
+    let g0: u32 = (g_low % u32_mask_u128).try_into().unwrap();
+    g_low = g_low / u32_mask_u128;
+    let g1: u32 = (g_low % u32_mask_u128).try_into().unwrap();
+    g_low = g_low / u32_mask_u128;
+    let g2: u32 = (g_low % u32_mask_u128).try_into().unwrap();
+    g_low = g_low / u32_mask_u128;
+    let g3: u32 = g_low.try_into().unwrap();
+    let mut g_high = G_compressed.high;
+    let g4: u32 = (g_high % u32_mask_u128).try_into().unwrap();
+    g_high = g_high / u32_mask_u128;
+    let g5: u32 = (g_high % u32_mask_u128).try_into().unwrap();
+    g_high = g_high / u32_mask_u128;
+    let g6: u32 = (g_high % u32_mask_u128).try_into().unwrap();
+    g_high = g_high / u32_mask_u128;
+    let g7: u32 = g_high.try_into().unwrap();
+    
+    // Extract Y words
+    let mut y_low = Y_compressed.low;
+    let y0: u32 = (y_low % u32_mask_u128).try_into().unwrap();
+    y_low = y_low / u32_mask_u128;
+    let y1: u32 = (y_low % u32_mask_u128).try_into().unwrap();
+    y_low = y_low / u32_mask_u128;
+    let y2: u32 = (y_low % u32_mask_u128).try_into().unwrap();
+    y_low = y_low / u32_mask_u128;
+    let y3: u32 = y_low.try_into().unwrap();
+    let mut y_high = Y_compressed.high;
+    let y4: u32 = (y_high % u32_mask_u128).try_into().unwrap();
+    y_high = y_high / u32_mask_u128;
+    let y5: u32 = (y_high % u32_mask_u128).try_into().unwrap();
+    y_high = y_high / u32_mask_u128;
+    let y6: u32 = (y_high % u32_mask_u128).try_into().unwrap();
+    y_high = y_high / u32_mask_u128;
+    let y7: u32 = y_high.try_into().unwrap();
+    
+    // Extract T words
+    let mut t_low = T_compressed.low;
+    let t0: u32 = (t_low % u32_mask_u128).try_into().unwrap();
+    t_low = t_low / u32_mask_u128;
+    let t1: u32 = (t_low % u32_mask_u128).try_into().unwrap();
+    t_low = t_low / u32_mask_u128;
+    let t2: u32 = (t_low % u32_mask_u128).try_into().unwrap();
+    t_low = t_low / u32_mask_u128;
+    let t3: u32 = t_low.try_into().unwrap();
+    let mut t_high = T_compressed.high;
+    let t4: u32 = (t_high % u32_mask_u128).try_into().unwrap();
+    t_high = t_high / u32_mask_u128;
+    let t5: u32 = (t_high % u32_mask_u128).try_into().unwrap();
+    t_high = t_high / u32_mask_u128;
+    let t6: u32 = (t_high % u32_mask_u128).try_into().unwrap();
+    t_high = t_high / u32_mask_u128;
+    let t7: u32 = t_high.try_into().unwrap();
+    
+    // Extract U words
+    let mut u_low = U_compressed.low;
+    let u0: u32 = (u_low % u32_mask_u128).try_into().unwrap();
+    u_low = u_low / u32_mask_u128;
+    let u1: u32 = (u_low % u32_mask_u128).try_into().unwrap();
+    u_low = u_low / u32_mask_u128;
+    let u2: u32 = (u_low % u32_mask_u128).try_into().unwrap();
+    u_low = u_low / u32_mask_u128;
+    let u3: u32 = u_low.try_into().unwrap();
+    let mut u_high = U_compressed.high;
+    let u4: u32 = (u_high % u32_mask_u128).try_into().unwrap();
+    u_high = u_high / u32_mask_u128;
+    let u5: u32 = (u_high % u32_mask_u128).try_into().unwrap();
+    u_high = u_high / u32_mask_u128;
+    let u6: u32 = (u_high % u32_mask_u128).try_into().unwrap();
+    u_high = u_high / u32_mask_u128;
+    let u7: u32 = u_high.try_into().unwrap();
+    
+    // Extract R1 words
+    let mut r1_low = R1_compressed.low;
+    let r1_0: u32 = (r1_low % u32_mask_u128).try_into().unwrap();
+    r1_low = r1_low / u32_mask_u128;
+    let r1_1: u32 = (r1_low % u32_mask_u128).try_into().unwrap();
+    r1_low = r1_low / u32_mask_u128;
+    let r1_2: u32 = (r1_low % u32_mask_u128).try_into().unwrap();
+    r1_low = r1_low / u32_mask_u128;
+    let r1_3: u32 = r1_low.try_into().unwrap();
+    let mut r1_high = R1_compressed.high;
+    let r1_4: u32 = (r1_high % u32_mask_u128).try_into().unwrap();
+    r1_high = r1_high / u32_mask_u128;
+    let r1_5: u32 = (r1_high % u32_mask_u128).try_into().unwrap();
+    r1_high = r1_high / u32_mask_u128;
+    let r1_6: u32 = (r1_high % u32_mask_u128).try_into().unwrap();
+    r1_high = r1_high / u32_mask_u128;
+    let r1_7: u32 = r1_high.try_into().unwrap();
+    
+    // Extract R2 words
+    let mut r2_low = R2_compressed.low;
+    let r2_0: u32 = (r2_low % u32_mask_u128).try_into().unwrap();
+    r2_low = r2_low / u32_mask_u128;
+    let r2_1: u32 = (r2_low % u32_mask_u128).try_into().unwrap();
+    r2_low = r2_low / u32_mask_u128;
+    let r2_2: u32 = (r2_low % u32_mask_u128).try_into().unwrap();
+    r2_low = r2_low / u32_mask_u128;
+    let r2_3: u32 = r2_low.try_into().unwrap();
+    let mut r2_high = R2_compressed.high;
+    let r2_4: u32 = (r2_high % u32_mask_u128).try_into().unwrap();
+    r2_high = r2_high / u32_mask_u128;
+    let r2_5: u32 = (r2_high % u32_mask_u128).try_into().unwrap();
+    r2_high = r2_high / u32_mask_u128;
+    let r2_6: u32 = (r2_high % u32_mask_u128).try_into().unwrap();
+    r2_high = r2_high / u32_mask_u128;
+    let r2_7: u32 = r2_high.try_into().unwrap();
+    
+    // Convert hashlock to u256 and extract words
+    let hashlock_u256 = hashlock_to_u256(hashlock);
+    let mut h_low = hashlock_u256.low;
+    let h0: u32 = (h_low % u32_mask_u128).try_into().unwrap();
+    h_low = h_low / u32_mask_u128;
+    let h1: u32 = (h_low % u32_mask_u128).try_into().unwrap();
+    h_low = h_low / u32_mask_u128;
+    let h2: u32 = (h_low % u32_mask_u128).try_into().unwrap();
+    h_low = h_low / u32_mask_u128;
+    let h3: u32 = h_low.try_into().unwrap();
+    let mut h_high = hashlock_u256.high;
+    let h4: u32 = (h_high % u32_mask_u128).try_into().unwrap();
+    h_high = h_high / u32_mask_u128;
+    let h5: u32 = (h_high % u32_mask_u128).try_into().unwrap();
+    h_high = h_high / u32_mask_u128;
+    let h6: u32 = (h_high % u32_mask_u128).try_into().unwrap();
+    h_high = h_high / u32_mask_u128;
+    let h7: u32 = h_high.try_into().unwrap();
+    
+    // Build message buffer directly: [DLEQ_TAG(1) + points(6*8) + hashlock(8) + padding(7)] = 64 words
+    // Block 0: words 0-15 (bytes 0-63) - contains DLEQ_TAG + G + Y[0-6]
+    let block0 = core::box::BoxTrait::new([
+        DLEQ_TAG, g0, g1, g2, g3, g4, g5, g6,
+        g7, y0, y1, y2, y3, y4, y5, y6
+    ]);
+    
+    // Block 1: words 16-31 (bytes 64-127) - contains Y[7] + T + U[0-6]
+    let block1 = core::box::BoxTrait::new([
+        y7, t0, t1, t2, t3, t4, t5, t6,
+        t7, u0, u1, u2, u3, u4, u5, u6
+    ]);
+    
+    // Block 2: words 32-47 (bytes 128-191) - contains U[7] + R1 + R2[0-6]
+    let block2 = core::box::BoxTrait::new([
+        u7, r1_0, r1_1, r1_2, r1_3, r1_4, r1_5, r1_6,
+        r1_7, r2_0, r2_1, r2_2, r2_3, r2_4, r2_5, r2_6
+    ]);
+    
+    // Block 3: words 48-63 (bytes 192-255) - contains R2[7] + hashlock + padding
+    // This is the final block with remaining 36 bytes (words 48-56) + padding
+    let block3 = core::box::BoxTrait::new([
+        r2_7, h0, h1, h2, h3, h4, h5, h6,
+        h7, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32
+    ]);
+    
     // Initialize BLAKE2s state
     let mut state = initial_blake2s_state();
-    let mut byte_count = 0_u32;
+    let total_bytes = 228_u32; // 4 + 6*32 + 32
     
-    // Domain separator: "DLEQ" (4 bytes = 0x444c4551)
-    // Convert to u32 array: [0x444c4551, 0, 0, 0, ...] padded to 16 u32
-    let tag_msg = core::box::BoxTrait::new([
-        DLEQ_TAG, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32,
-        0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32, 0_u32
-    ]);
-    state = blake2s_compress(state, 4, tag_msg);
-    byte_count = 4; // 4 bytes for "DLEQ"
-    
-    // Serialize compressed Edwards points (32 bytes each = 8 u32 words)
-    // Performance: Process all points in batch for better gas efficiency
-    let points = array![G_compressed, Y_compressed, T_compressed, U_compressed, R1_compressed, R2_compressed];
-    let (state, byte_count) = process_multiple_u256(state, byte_count, points.span());
-    
-    // Add hashlock (convert Span<u32> to u256, then hash)
-    let hashlock_u256 = hashlock_to_u256(hashlock);
-    let (state, byte_count) = process_u256(state, byte_count, hashlock_u256);
-    
-    // Finalize BLAKE2s (empty final block since we've processed all data)
-    let empty_final = core::box::BoxTrait::new([0_u32; 16]);
-    let state = blake2s_finalize(state, byte_count, empty_final);
+    // Process blocks sequentially (matches Rust's accumulation)
+    state = blake2s_compress(state, 64, block0);
+    state = blake2s_compress(state, 128, block1);
+    state = blake2s_compress(state, 192, block2);
+    state = blake2s_finalize(state, total_bytes, block3);
     
     // Extract full 256-bit hash from BLAKE2s state (8 u32 words = 32 bytes)
-    // CRITICAL: Must extract ALL 8 words, not just the first one!
-    // BLAKE2s produces 32-byte (256-bit) output, which we need in full for scalar reduction
     let hash_state = state.unbox();
     let hash_span = hash_state.span();
     
     // CRITICAL: Validate span length before accessing elements
-    // BLAKE2s state should always have exactly 8 u32 words
     assert(hash_span.len() == 8, 'BLAKE2s state must have 8 words');
     
     // Extract all 8 u32 words (little-endian interpretation)
-    // Words 0-3 form the low u128, words 4-7 form the high u128
     let w0: u128 = (*hash_span.at(0)).into();
     let w1: u128 = (*hash_span.at(1)).into();
     let w2: u128 = (*hash_span.at(2)).into();
@@ -288,24 +370,16 @@ pub fn compute_dleq_challenge_blake2s(
     let scalar = hash_u256 % ed25519_order;
     
     // CRITICAL: Convert scalar to felt252 safely
-    // Since scalar < ed25519_order and ed25519_order is close to 2^252,
-    // we need to handle the conversion carefully to avoid overflow
-    // Try converting the full scalar directly first
     let scalar_felt_option: Option<felt252> = scalar.try_into();
     
-    // If direct conversion fails (scalar >= felt252 prime), we need to reduce further
-    // This should be rare but can happen if scalar is very close to ed25519_order
     if scalar_felt_option.is_some() {
         return scalar_felt_option.unwrap();
     }
     
     // Fallback: Convert scalar mod felt252 prime by reducing again
-    // This ensures we always return a valid felt252
-    // Note: This is safe because felt252 arithmetic wraps modulo the prime
     let base_128: felt252 = 0x100000000000000000000000000000000; // 2^128
-    let low_felt: felt252 = scalar.low.try_into().unwrap(); // Always succeeds (u128 < felt252)
-    let high_felt: felt252 = scalar.high.try_into().unwrap(); // Always succeeds (u128 < felt252)
-    // Arithmetic wraps modulo felt252 prime, so this is safe
+    let low_felt: felt252 = scalar.low.try_into().unwrap();
+    let high_felt: felt252 = scalar.high.try_into().unwrap();
     let scalar_felt = low_felt + high_felt * base_128;
     scalar_felt
 }
