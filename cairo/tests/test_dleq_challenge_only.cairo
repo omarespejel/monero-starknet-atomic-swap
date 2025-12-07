@@ -48,6 +48,9 @@ mod dleq_challenge_only_tests {
     ///
     /// **Critical**: This test isolates challenge computation from point decompression,
     /// allowing us to verify byte-order independently.
+    ///
+    /// DEBUG: This test will fail intentionally to print the computed challenge value.
+    /// Compare the printed value with Rust's expected challenge to identify byte-order issues.
     #[test]
     fn test_challenge_computation_with_rust_vectors() {
         // Use constants from single source of truth (test_vectors.cairo)

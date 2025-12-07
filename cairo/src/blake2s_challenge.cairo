@@ -349,33 +349,22 @@ pub fn compute_dleq_challenge_blake2s(
     // CRITICAL: Validate span length before accessing elements
     assert(hash_span.len() == 8, 'BLAKE2s state must have 8 words');
     
-    // CRITICAL FIX: BLAKE2s state words need byte-swapping AND word order reversal
-    // Rust's Scalar::from_bytes_mod_order treats the 32-byte digest as little-endian
-    // BLAKE2s state words are in order [h0, h1, ..., h7] where h0 is first 4 bytes
-    // But Rust expects bytes in order: [byte0, byte1, ..., byte31] where byte0 is LSB
-    // So we need to:
-    // 1. Reverse word order (h7 becomes LSB, h0 becomes MSB)
-    // 2. Byte-swap each word (BLAKE2s words are little-endian u32, but Rust expects bytes)
-    
-    // Extract words in reverse order and byte-swap each
-    let w0_swapped = byte_swap_u32(*hash_span.at(7));  // Word 7 (last) becomes LSB
-    let w1_swapped = byte_swap_u32(*hash_span.at(6));
-    let w2_swapped = byte_swap_u32(*hash_span.at(5));
-    let w3_swapped = byte_swap_u32(*hash_span.at(4));
-    let w4_swapped = byte_swap_u32(*hash_span.at(3));
-    let w5_swapped = byte_swap_u32(*hash_span.at(2));
-    let w6_swapped = byte_swap_u32(*hash_span.at(1));
-    let w7_swapped = byte_swap_u32(*hash_span.at(0));  // Word 0 (first) becomes MSB
-    
-    // Convert to u128 for combination
-    let w0: u128 = w0_swapped.into();
-    let w1: u128 = w1_swapped.into();
-    let w2: u128 = w2_swapped.into();
-    let w3: u128 = w3_swapped.into();
-    let w4: u128 = w4_swapped.into();
-    let w5: u128 = w5_swapped.into();
-    let w6: u128 = w6_swapped.into();
-    let w7: u128 = w7_swapped.into();
+    // Extract all 8 u32 words in original order (no reversal, no byte-swap)
+    // Rust's Scalar::from_bytes_mod_order treats 32 bytes as little-endian u256:
+    // - h[0] contains bytes[0..4] (little-endian u32)
+    // - h[1] contains bytes[4..8] (little-endian u32)
+    // - ...
+    // - h[7] contains bytes[28..32] (little-endian u32)
+    // So: low = h[0] + h[1]*2^32 + h[2]*2^64 + h[3]*2^96
+    //     high = h[4] + h[5]*2^32 + h[6]*2^64 + h[7]*2^96
+    let w0: u128 = (*hash_span.at(0)).into();
+    let w1: u128 = (*hash_span.at(1)).into();
+    let w2: u128 = (*hash_span.at(2)).into();
+    let w3: u128 = (*hash_span.at(3)).into();
+    let w4: u128 = (*hash_span.at(4)).into();
+    let w5: u128 = (*hash_span.at(5)).into();
+    let w6: u128 = (*hash_span.at(6)).into();
+    let w7: u128 = (*hash_span.at(7)).into();
     
     // Reconstruct u256: low = w0 + w1·2^32 + w2·2^64 + w3·2^96
     //                   high = w4 + w5·2^32 + w6·2^64 + w7·2^96
