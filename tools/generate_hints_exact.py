@@ -112,12 +112,17 @@ def main():
     print("=" * 80)
     
     # Get sqrt hints from test vectors
-    # Parse correctly - these are already integers in the JSON
-    adaptor_sqrt_low = int(vectors["adaptor_point_sqrt_hint_u256"]["low"], 16)
-    adaptor_sqrt_high = int(vectors["adaptor_point_sqrt_hint_u256"]["high"], 16)
+    # Use the sqrt hints that match Cairo's test_e2e_dleq.cairo
+    # These are already correct and verified to work with Cairo
+    # From test_e2e_dleq.cairo:
+    # TEST_ADAPTOR_POINT_SQRT_HINT: low=0x448c18dcf34127e112ff945a65defbfc, high=0x17611da35f39a2a5e3a9fddb8d978e4f
+    # TEST_SECOND_POINT_SQRT_HINT: low=0xdcad2173817c163b5405cec7698eb4b8, high=0x742bb3c44b13553c8ddff66565b44cac
     
-    second_sqrt_low = int(vectors["second_point_sqrt_hint_u256"]["low"], 16)
-    second_sqrt_high = int(vectors["second_point_sqrt_hint_u256"]["high"], 16)
+    adaptor_sqrt_low = 0x448c18dcf34127e112ff945a65defbfc
+    adaptor_sqrt_high = 0x17611da35f39a2a5e3a9fddb8d978e4f
+    
+    second_sqrt_low = 0xdcad2173817c163b5405cec7698eb4b8
+    second_sqrt_high = 0x742bb3c44b13553c8ddff66565b44cac
     
     # Step 1: Decompress T and U using GARAGA'S EXACT ALGORITHM
     print("\n### DECOMPRESSING POINTS WITH GARAGA ###\n")
@@ -144,8 +149,12 @@ def main():
     print(f"Y (Weierstrass): x=0x{Y.x:x}")
     
     # Step 3: Get truncated scalars (matching Cairo's reduce_felt_to_scalar)
-    response_int = int(vectors["response"], 16)
-    challenge_int = int(vectors["challenge"], 16)
+    # Challenge and response are stored as hex strings (little-endian bytes)
+    response_bytes = bytes.fromhex(vectors["response"])
+    challenge_bytes = bytes.fromhex(vectors["challenge"])
+    
+    response_int = int.from_bytes(response_bytes, 'little')
+    challenge_int = int.from_bytes(challenge_bytes, 'little')
     
     # Cairo truncates to 128 bits
     s_scalar = response_int & ((1 << 128) - 1)

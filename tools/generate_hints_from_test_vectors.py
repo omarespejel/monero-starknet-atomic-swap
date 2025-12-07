@@ -71,11 +71,22 @@ def main():
     challenge_hex = test_vector["challenge"]
     response_hex = test_vector["response"]
     
-    c_scalar = hex_to_int(challenge_hex)
-    s_scalar = hex_to_int(response_hex)
+    # Convert hex to integer (little-endian bytes, as Rust stores them)
+    challenge_bytes = bytes.fromhex(challenge_hex)
+    response_bytes = bytes.fromhex(response_hex)
     
-    print(f"Challenge (c): {challenge_hex}")
-    print(f"Response (s): {response_hex}")
+    c_scalar_full = int.from_bytes(challenge_bytes, 'little')
+    s_scalar_full = int.from_bytes(response_bytes, 'little')
+    
+    # CRITICAL: Cairo truncates to 128 bits before using scalars
+    # We must generate hints with truncated scalars to match Cairo's behavior
+    c_scalar = c_scalar_full & ((1 << 128) - 1)  # Truncate to 128 bits
+    s_scalar = s_scalar_full & ((1 << 128) - 1)  # Truncate to 128 bits
+    
+    print(f"Challenge (c) full: {challenge_hex}")
+    print(f"Response (s) full:  {response_hex}")
+    print(f"Challenge (c) truncated: 0x{c_scalar:032x}")
+    print(f"Response (s) truncated:  0x{s_scalar:032x}")
     print()
     
     # Extract points (compressed Edwards format)
