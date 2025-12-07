@@ -42,3 +42,8 @@ Thumbs.db
 /target
 
 # Generated context bundles
+
+# Context generation outputs
+context.xml
+context-*.xml
+monero-swap-context-*.txt

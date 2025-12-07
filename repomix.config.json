@@ -1,0 +1,44 @@
+{
+  "output": {
+    "filePath": "context.xml",
+    "style": "xml"
+  },
+  "ignore": {
+    "customPatterns": [
+      "target/**",
+      "*.lock",
+      "monero-swap-context-*.txt",
+      "context.xml",
+      "cairo/tests/test_debug_*",
+      "cairo/tests/test_unit_*",
+      "tools/**",
+      "rust/src/bin/*",
+      "node_modules/**",
+      ".git/**",
+      "__pycache__/**",
+      "*.pyc",
+      ".cursor/**",
+      "terminals/**"
+    ]
+  },
+  "include": [
+    "rust/src/monero/**",
+    "rust/src/dleq.rs",
+    "rust/src/lib.rs",
+    "rust/src/adaptor/**",
+    "rust/tests/key_splitting_dleq_integration.rs",
+    "rust/tests/atomic_swap_e2e.rs",
+    "rust/tests/dleq_properties.rs",
+    "cairo/src/**",
+    "cairo/tests/test_e2e_*",
+    "cairo/tests/test_security_*",
+    "cairo/tests/test_integration_*",
+    "README.md",
+    "AUDITOR_RECOMMENDATIONS.md",
+    "rust/AUDIT_DEPENDENCIES.md",
+    "rust/Cargo.toml",
+    "cairo/Scarb.toml",
+    "deny.toml"
+  ]
+}
+
