@@ -15,11 +15,11 @@
 //! - 8x cheaper proving cost than Poseidon
 //! - Native Cairo stdlib support via core::blake
 
+use blake2::{Blake2s256, Digest as Blake2Digest};
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar;
 use sha2::{Digest, Sha256};
-use blake2::{Blake2s256, Digest as Blake2Digest};
 
 // TODO: Uncomment when Poseidon is fully implemented
 // mod poseidon;
@@ -127,17 +127,17 @@ pub fn generate_dleq_proof(
 fn edwards_point_to_cairo_format(point: &EdwardsPoint) -> ([u8; 32], [u8; 32]) {
     // Compress the point (standard Ed25519 format: y-coordinate + sign bit)
     let compressed = point.compress().to_bytes();
-    
+
     // Extract x-coordinate for sqrt hint
     // Convert point to Montgomery form to get x-coordinate
     // The Montgomery form's x-coordinate corresponds to the Edwards x-coordinate
     let montgomery = point.to_montgomery();
     let x_bytes = montgomery.to_bytes();
-    
+
     // The sqrt hint is the x-coordinate as u256 (little-endian, 32 bytes)
     let mut sqrt_hint = [0u8; 32];
     sqrt_hint.copy_from_slice(&x_bytes);
-    
+
     (compressed, sqrt_hint)
 }
 
@@ -157,15 +157,16 @@ impl DleqProof {
     pub fn to_cairo_format(&self, adaptor_point: &EdwardsPoint) -> DleqProofForCairo {
         let G = ED25519_BASEPOINT_POINT;
         let Y = get_second_generator();
-        
+
         // Convert all points to compressed format with sqrt hints
         let (adaptor_compressed, adaptor_sqrt_hint) = edwards_point_to_cairo_format(adaptor_point);
-        let (second_compressed, second_sqrt_hint) = edwards_point_to_cairo_format(&self.second_point);
+        let (second_compressed, second_sqrt_hint) =
+            edwards_point_to_cairo_format(&self.second_point);
         let (g_compressed, _) = edwards_point_to_cairo_format(&G);
         let (y_compressed, _) = edwards_point_to_cairo_format(&Y);
         let (r1_compressed, _) = edwards_point_to_cairo_format(&self.r1);
         let (r2_compressed, _) = edwards_point_to_cairo_format(&self.r2);
-        
+
         DleqProofForCairo {
             adaptor_point_compressed: adaptor_compressed,
             adaptor_point_sqrt_hint: adaptor_sqrt_hint,
@@ -209,7 +210,7 @@ fn generate_deterministic_nonce(secret: &Scalar, hashlock: &[u8; 32]) -> Scalar 
     hasher.update(secret.to_bytes());
     hasher.update(hashlock);
     hasher.update(&[0u8; 1]); // Counter (can be incremented if k is invalid)
-    
+
     let hash = hasher.finalize();
     let mut scalar_bytes = [0u8; 32];
     scalar_bytes.copy_from_slice(&hash);
@@ -303,4 +304,3 @@ mod tests {
         assert_eq!(Y1, Y2, "Second generator should be deterministic");
     }
 }
-

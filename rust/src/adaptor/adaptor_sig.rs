@@ -63,24 +63,24 @@ pub fn create_adaptor_signature(
 ) -> AdaptorSignature {
     // Simplified: create a nonce and partial signature
     // In real CLSAG, this would be more complex with ring signatures
-    
+
     // Generate nonce (in practice, use RFC 6979 or similar)
     let nonce = Scalar::from_bytes_mod_order(Sha256::digest(message).into());
-    
+
     // Nonce commitment: R = nonce·G
     let nonce_commitment = &nonce * &ED25519_BASEPOINT_POINT;
-    
+
     // Challenge: H(message || R || adaptor_point)
     let mut challenge_input = Vec::new();
     challenge_input.extend_from_slice(message);
     challenge_input.extend_from_slice(&nonce_commitment.compress().to_bytes());
     challenge_input.extend_from_slice(&adaptor_point.compress().to_bytes());
     let challenge = Scalar::from_bytes_mod_order(Sha256::digest(&challenge_input).into());
-    
+
     // Partial signature: s = nonce + challenge·base_key
     // This is partial because it doesn't include the adaptor component yet
     let partial_sig = nonce + challenge * base_key;
-    
+
     AdaptorSignature {
         adaptor_point: *adaptor_point,
         partial_sig,
@@ -113,16 +113,16 @@ pub fn finalize_signature(
     challenge_input.extend_from_slice(&adaptor_sig.nonce_commitment.compress().to_bytes());
     challenge_input.extend_from_slice(&adaptor_sig.adaptor_point.compress().to_bytes());
     let challenge = Scalar::from_bytes_mod_order(Sha256::digest(&challenge_input).into());
-    
+
     // Finalize signature: s_final = partial_sig + challenge·t
     let s_final = adaptor_sig.partial_sig + challenge * adaptor_scalar;
-    
+
     // Extract full spend key: full_key = base_key + t
     // In practice, we'd extract this from the signature, but for this
     // simplified version, we compute it from the adaptor scalar
     // (In real CLSAG, the extraction is more complex)
     let full_key = adaptor_scalar; // Simplified - in practice, extract from signature
-    
+
     (s_final, *adaptor_scalar)
 }
 
@@ -155,27 +155,27 @@ pub fn verify_signature(
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_adaptor_signature_flow() {
         // Simulate a swap round
         let message = b"test transaction";
-        
+
         // 1. Split Monero key
         let full_key = Scalar::from_bytes_mod_order([1u8; 32]);
         let base_key = Scalar::from_bytes_mod_order([2u8; 32]);
         let adaptor_scalar = full_key - base_key;
-        
+
         // 2. Create adaptor point T = t·G
         let adaptor_point = &adaptor_scalar * &ED25519_BASEPOINT_POINT;
-        
+
         // 3. Create adaptor signature (Monero side)
         let adaptor_sig = create_adaptor_signature(&base_key, &adaptor_point, message);
-        
+
         // 4. Simulate: t is revealed on Starknet (via verify_and_unlock)
         // 5. Finalize signature using revealed t
         let (s_final, extracted_key) = finalize_signature(&adaptor_sig, &adaptor_scalar, message);
-        
+
         // 6. Verify signature is valid
         let public_key = &full_key * &ED25519_BASEPOINT_POINT;
         let mut challenge_input = Vec::new();
@@ -183,12 +183,16 @@ mod tests {
         challenge_input.extend_from_slice(&adaptor_sig.nonce_commitment.compress().to_bytes());
         challenge_input.extend_from_slice(&adaptor_sig.adaptor_point.compress().to_bytes());
         let challenge = Scalar::from_bytes_mod_order(Sha256::digest(&challenge_input).into());
-        
-        assert!(verify_signature(&s_final, &adaptor_sig.nonce_commitment, &challenge, &public_key));
-        
+
+        assert!(verify_signature(
+            &s_final,
+            &adaptor_sig.nonce_commitment,
+            &challenge,
+            &public_key
+        ));
+
         // 7. Verify extracted key matches (simplified check)
         // In real CLSAG, extraction would be more complex
         assert_eq!(extracted_key, adaptor_scalar);
     }
 }
-

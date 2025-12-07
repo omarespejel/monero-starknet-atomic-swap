@@ -26,7 +26,10 @@ fn main() {
 }
 
 fn print_json(secret: &SwapSecret) {
-    println!("{}", serde_json::to_string_pretty(secret).expect("serialize"));
+    println!(
+        "{}",
+        serde_json::to_string_pretty(secret).expect("serialize")
+    );
 }
 
 fn print_human_readable(secret: &SwapSecret) {

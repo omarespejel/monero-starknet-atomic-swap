@@ -11,18 +11,16 @@
 //! This is the approach used by Serai DEX (audited by Cypher Stack).
 
 use curve25519_dalek::{
-    constants::ED25519_BASEPOINT_POINT as G,
-    edwards::EdwardsPoint,
-    scalar::Scalar,
+    constants::ED25519_BASEPOINT_POINT as G, edwards::EdwardsPoint, scalar::Scalar,
 };
 use rand::rngs::OsRng;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// Atomic swap key pair for Monero side.
-/// 
+///
 /// Alice generates this, keeps `partial_key` secret, and sends
 /// `adaptor_point` (T = t·G) to Starknet with a DLEQ proof.
-/// 
+///
 /// Uses KEY SPLITTING approach: x = x_partial + t
 /// When t is revealed on Starknet, recover x = x_partial + t
 #[derive(Clone, Zeroize, ZeroizeOnDrop)]
@@ -48,10 +46,10 @@ impl SwapKeyPair {
         let partial_key = Scalar::random(&mut rng);
         let adaptor_scalar = Scalar::random(&mut rng);
         let full_spend_key = partial_key + adaptor_scalar;
-        
+
         let adaptor_point = adaptor_scalar * G;
         let public_key = full_spend_key * G;
-        
+
         Self {
             partial_key,
             adaptor_scalar,
@@ -60,19 +58,19 @@ impl SwapKeyPair {
             public_key,
         }
     }
-    
+
     /// Recover full spend key when t is revealed from Starknet.
     pub fn recover(partial_key: Scalar, revealed_t: Scalar) -> Scalar {
         partial_key + revealed_t
     }
-    
+
     /// Verify the key splitting math is correct.
     pub fn verify(&self) -> bool {
         // T + P_partial = P_full
         let partial_public = self.partial_key * G;
         self.adaptor_point + partial_public == self.public_key
     }
-    
+
     /// Get adaptor scalar bytes (for hashlock computation).
     pub fn adaptor_scalar_bytes(&self) -> [u8; 32] {
         self.adaptor_scalar.to_bytes()
@@ -101,11 +99,10 @@ mod tests {
         let keys = SwapKeyPair::generate();
         assert_eq!(keys.adaptor_point, keys.adaptor_scalar * G);
     }
-    
+
     #[test]
     fn test_public_key_derivation() {
         let keys = SwapKeyPair::generate();
         assert_eq!(keys.public_key, keys.full_spend_key * G);
     }
 }
-

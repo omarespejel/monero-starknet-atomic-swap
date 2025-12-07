@@ -52,8 +52,11 @@ fn generate_cairo_test_vectors() {
 
     // Write to file
     let output_path = "test_vectors.json";
-    fs::write(output_path, serde_json::to_string_pretty(&test_vector).unwrap())
-        .expect("Failed to write test vectors");
+    fs::write(
+        output_path,
+        serde_json::to_string_pretty(&test_vector).unwrap(),
+    )
+    .expect("Failed to write test vectors");
 
     println!("✅ Test vectors written to {}", output_path);
     println!("📋 Use this file in Cairo integration tests");
@@ -101,4 +104,3 @@ fn generate_multiple_test_vectors() {
 
     println!("✅ Generated {} test vectors", test_vectors.len());
 }
-

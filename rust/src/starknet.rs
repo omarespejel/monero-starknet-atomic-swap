@@ -78,10 +78,7 @@ impl StarknetClient {
             .call("starknet_getEvents", json!({ "filter": filter }))
             .await?;
 
-        Ok(result
-            .as_array()
-            .cloned()
-            .unwrap_or_default())
+        Ok(result.as_array().cloned().unwrap_or_default())
     }
 
     /// Call contract function (simplified - requires account signing in production).
@@ -104,21 +101,24 @@ pub async fn watch_unlocked_events(
     contract_address: &str,
     poll_interval_secs: u64,
 ) -> Result<String> {
-    println!("👀 Watching for Unlocked events from contract: {}", contract_address);
-    
+    println!(
+        "👀 Watching for Unlocked events from contract: {}",
+        contract_address
+    );
+
     let mut last_block = client.get_block_number().await?;
-    
+
     loop {
         tokio::time::sleep(tokio::time::Duration::from_secs(poll_interval_secs)).await;
-        
+
         let current_block = client.get_block_number().await?;
-        
+
         // Check events from last_block to current_block
         let events = client
             .get_events(contract_address, Some(last_block))
             .await
             .context("Failed to fetch events")?;
-        
+
         for event in events {
             // Look for Unlocked event (event key = hash of "Unlocked")
             // In production, decode event using contract ABI
@@ -137,8 +137,7 @@ pub async fn watch_unlocked_events(
                 }
             }
         }
-        
+
         last_block = current_block;
     }
 }
-

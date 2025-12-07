@@ -9,4 +9,3 @@ pub mod transaction;
 
 // Re-export main types
 pub use key_splitting::SwapKeyPair;
-

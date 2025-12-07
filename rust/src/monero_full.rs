@@ -110,7 +110,7 @@ impl MoneroRpcClient {
         });
 
         let result = self.call("send_raw_transaction", params).await?;
-        
+
         if let Some(tx_hash) = result.get("tx_hash_list") {
             if let Some(tx_list) = tx_hash.as_array() {
                 if let Some(first_tx) = tx_list.first() {
@@ -175,9 +175,8 @@ impl MoneroTransactionBuilder {
         println!("✅ Signature finalized successfully (demo implementation)");
         println!("   Finalized signature: {:?}", finalized_sig);
         println!("   ⚠️  This is a demo - production requires full CLSAG integration");
-        
+
         // In production, serialize the full transaction
         Ok("finalized_tx_hex_placeholder".to_string())
     }
 }
-

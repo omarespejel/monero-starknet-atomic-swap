@@ -41,10 +41,10 @@ pub fn split_monero_key(full_key: Scalar) -> KeyPair {
     let mut raw_bytes = [0u8; 32];
     csprng.fill_bytes(&mut raw_bytes);
     let adaptor_scalar = Scalar::from_bytes_mod_order(raw_bytes);
-    
+
     // Base key = full_key - adaptor_scalar
     let base_key = full_key - adaptor_scalar;
-    
+
     KeyPair {
         base_key,
         adaptor_scalar,
@@ -54,29 +54,28 @@ pub fn split_monero_key(full_key: Scalar) -> KeyPair {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_key_splitting_reconstruction() {
         let full_key = Scalar::from_bytes_mod_order([1u8; 32]);
         let key_pair = split_monero_key(full_key);
-        
+
         // Verify: base_key + adaptor_scalar == full_key
         let reconstructed = key_pair.base_key + key_pair.adaptor_scalar;
         assert_eq!(reconstructed, full_key);
     }
-    
+
     #[test]
     fn test_key_splitting_different_adaptors() {
         let full_key = Scalar::from_bytes_mod_order([2u8; 32]);
         let pair1 = split_monero_key(full_key);
         let pair2 = split_monero_key(full_key);
-        
+
         // Adaptor scalars should be different (random)
         assert_ne!(pair1.adaptor_scalar, pair2.adaptor_scalar);
-        
+
         // But both should reconstruct to the same full key
         assert_eq!(pair1.base_key + pair1.adaptor_scalar, full_key);
         assert_eq!(pair2.base_key + pair2.adaptor_scalar, full_key);
     }
 }
-

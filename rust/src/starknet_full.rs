@@ -22,11 +22,7 @@ pub struct StarknetAccount {
 
 impl StarknetAccount {
     /// Create a new Starknet account client.
-    pub fn new(
-        rpc_url: String,
-        account_address: String,
-        private_key: String,
-    ) -> Self {
+    pub fn new(rpc_url: String, account_address: String, private_key: String) -> Self {
         Self {
             rpc_url,
             account_address,
@@ -74,10 +70,10 @@ impl StarknetAccount {
         // 1. Sign the deployment transaction
         // 2. Broadcast via addInvokeTransaction
         // 3. Wait for confirmation
-        
+
         println!("⚠️  Contract deployment requires account signing");
         println!("   Use Starknet CLI or implement full signing flow");
-        
+
         // Placeholder for now
         Ok("0x0".to_string())
     }
@@ -90,12 +86,12 @@ impl StarknetAccount {
     ) -> Result<String> {
         // Convert secret to ByteArray format
         let secret_hex = hex::encode(secret_bytes);
-        
+
         // Create calldata for verify_and_unlock(secret: ByteArray)
         // ByteArray format: [length, ...bytes as felts]
         let mut calldata = Vec::new();
         calldata.push(format!("0x{:x}", secret_bytes.len()));
-        
+
         // Add secret bytes (simplified - proper ByteArray serialization needed)
         for chunk in secret_bytes.chunks(31) {
             let chunk_hex = hex::encode(chunk);
@@ -107,13 +103,13 @@ impl StarknetAccount {
         // 2. Sign with account
         // 3. Broadcast via addInvokeTransaction
         // 4. Return transaction hash
-        
+
         println!("⚠️  Contract call requires account signing");
         println!("   Function: verify_and_unlock");
         println!("   Contract: {}", contract_address);
         println!("   Secret: {}...", &secret_hex[..16]);
         println!("   Calldata: {:?}", calldata);
-        
+
         // Placeholder
         Ok("0x0".to_string())
     }
@@ -125,18 +121,18 @@ impl StarknetAccount {
         poll_interval_secs: u64,
     ) -> Result<String> {
         println!("👀 Watching for Unlocked events from: {}", contract_address);
-        
+
         // Get Unlocked event key (hash of "Unlocked")
         // In production, compute: pedersen_hash("Unlocked")
         let unlocked_event_key = "0x0"; // Placeholder
-        
+
         let mut last_block = self.get_block_number().await?;
-        
+
         loop {
             sleep(Duration::from_secs(poll_interval_secs)).await;
-            
+
             let current_block = self.get_block_number().await?;
-            
+
             // Query events
             let filter = json!({
                 "address": contract_address,
@@ -144,11 +140,11 @@ impl StarknetAccount {
                 "from_block": format!("0x{:x}", last_block),
                 "to_block": format!("0x{:x}", current_block),
             });
-            
+
             let events_result = self
                 .call("starknet_getEvents", json!({ "filter": filter }))
                 .await;
-            
+
             if let Ok(events) = events_result {
                 if let Some(events_array) = events.get("events").and_then(|v| v.as_array()) {
                     for event in events_array {
@@ -165,7 +161,7 @@ impl StarknetAccount {
                     }
                 }
             }
-            
+
             last_block = current_block;
         }
     }
@@ -173,18 +169,16 @@ impl StarknetAccount {
     /// Get current block number.
     async fn get_block_number(&self) -> Result<u64> {
         let result = self.call("starknet_blockNumber", json!([])).await?;
-        let block_num_str = result
-            .as_str()
-            .context("Invalid block number format")?;
-        
+        let block_num_str = result.as_str().context("Invalid block number format")?;
+
         let block_num = if let Some(hex_str) = block_num_str.strip_prefix("0x") {
-            u64::from_str_radix(hex_str, 16)
-                .context("Failed to parse block number")?
+            u64::from_str_radix(hex_str, 16).context("Failed to parse block number")?
         } else {
-            block_num_str.parse()
+            block_num_str
+                .parse()
                 .context("Failed to parse block number")?
         };
-        
+
         Ok(block_num)
     }
 }
