@@ -63,7 +63,12 @@ def compute_dleq_challenge_python():
     print(f"R2: {R2_hex}")
     print()
     
-    # Hashlock (8 x u32, big-endian from SHA-256, then byte-swapped for BLAKE2s)
+    # Hashlock (8 x u32, big-endian from SHA-256)
+    # CRITICAL: Rust feeds hashlock directly as bytes [u8; 32]
+    # Cairo stores as BE u32 words, byte-swaps them, then extracts as u32 values
+    # When these u32 values are put into BLAKE2s blocks, BLAKE2s reads them as LE bytes
+    # So: BE word -> swap -> u32 value -> BLAKE2s reads as LE bytes
+    # This means: swap word -> bytes should match Rust's direct bytes
     hashlock_hex = vectors["hashlock"]
     hashlock_be = [
         int(hashlock_hex[i:i+8], 16) for i in range(0, len(hashlock_hex), 8)
@@ -73,28 +78,31 @@ def compute_dleq_challenge_python():
     print(f"Hashlock hex: {hashlock_hex}")
     print(f"Hashlock BE words: {[hex(w) for w in hashlock_be]}")
     
-    # Byte-swap each u32 (BE -> LE) for BLAKE2s
-    hashlock_le = [swap_u32(w) for w in hashlock_be]
-    hashlock_bytes = b''.join(w.to_bytes(4, 'little') for w in hashlock_le)
+    # Rust feeds hashlock directly as bytes (no byte-swap needed)
+    # Cairo byte-swaps each word, then extracts as u32, which BLAKE2s reads as LE bytes
+    # So we should use Rust's direct bytes (what Rust actually feeds to BLAKE2s)
+    hashlock_bytes = bytes.fromhex(hashlock_hex)
     
-    print(f"Hashlock LE words: {[hex(w) for w in hashlock_le]}")
-    print(f"Hashlock bytes: {hashlock_bytes.hex()}")
+    print(f"Hashlock bytes (Rust feeds directly): {hashlock_bytes.hex()}")
     print()
     
-    # DLEQ tag (little-endian: "DLEQ" = 0x51454c44)
-    # In Cairo: DLEQ_TAG = 0x51454c44 (little-endian u32)
-    tag = b'DLEQ'  # This is "DLEQ" in ASCII, which is 0x444c4551 in big-endian
-    # But Cairo uses 0x51454c44 (little-endian), so we need to reverse
-    tag_le = int.from_bytes(tag, 'little').to_bytes(4, 'little')
+    # DLEQ tag
+    # Rust: b"DLEQ" = [0x44, 0x4C, 0x45, 0x51] (ASCII bytes)
+    # Cairo: DLEQ_TAG = 0x51454c44 (little-endian u32)
+    # When Cairo puts 0x51454c44 as u32 into BLAKE2s, BLAKE2s reads it as LE bytes:
+    # [0x44, 0x4C, 0x45, 0x51] which is "DLEQ" ✓
+    tag = b'DLEQ'  # Rust uses this directly
+    tag_bytes = tag  # Rust feeds "DLEQ" as 4 bytes directly
     
     print("### DLEQ TAG ###")
-    print(f"Tag (ASCII): {tag}")
-    print(f"Tag (hex): {tag.hex()}")
-    print(f"Tag (u32 LE): 0x{int.from_bytes(tag_le, 'little'):08x}")
+    print(f"Tag (Rust): {tag_bytes}")
+    print(f"Tag (hex): {tag_bytes.hex()}")
+    print(f"Cairo uses: 0x51454c44 (u32 LE, reads as bytes: {bytes.fromhex('444c4551').hex()})")
     print()
     
     # Build input: tag || G || Y || T || U || R1 || R2 || hashlock
-    data = tag_le + G + Y + T + U + R1 + R2 + hashlock_bytes
+    # Match Rust exactly: Rust feeds everything as bytes directly
+    data = tag_bytes + G + Y + T + U + R1 + R2 + hashlock_bytes
     
     print("### BLAKE2s INPUT ###")
     print(f"Total input length: {len(data)} bytes")
