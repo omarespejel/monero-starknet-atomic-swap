@@ -55,13 +55,15 @@ fn test_full_atomic_swap_flow() {
     // === ALICE RECOVERS FULL KEY ===
     // Alice watches for Unlocked event, extracts revealed t
     // Alice recovers full Monero spend key: x = x_partial + t
+    // Wrap partial_key in Zeroizing for memory safety
+    let partial_key_zeroizing = Zeroizing::new(alice_keys.partial_key);
     let recovered_full_key = SwapKeyPair::recover(
-        alice_keys.partial_key,
+        partial_key_zeroizing,
         revealed_secret,
     );
-    
+
     // Verify recovery is correct
-    assert_eq!(recovered_full_key, alice_keys.full_spend_key,
+    assert_eq!(*recovered_full_key, alice_keys.full_spend_key,
         "Recovered key must match original full key");
     
     // === ALICE SPENDS MONERO ===
@@ -112,11 +114,13 @@ fn test_swap_fails_with_wrong_secret() {
         "Wrong secret must produce different hashlock");
     
     // Key recovery with wrong secret produces wrong key
+    // Wrap partial_key in Zeroizing for memory safety
+    let partial_key_zeroizing = Zeroizing::new(alice_keys.partial_key);
     let wrong_recovered = SwapKeyPair::recover(
-        alice_keys.partial_key,
+        partial_key_zeroizing,
         wrong_secret,
     );
-    assert_ne!(wrong_recovered, alice_keys.full_spend_key,
+    assert_ne!(*wrong_recovered, alice_keys.full_spend_key,
         "Wrong secret must produce wrong recovered key");
     
     println!("✅ Wrong secret rejection: PASSED");

@@ -39,10 +39,12 @@ fn test_key_recovery_after_reveal() {
     // Simulate: Bob reveals t on Starknet
     let revealed_t = keys.adaptor_scalar;
 
-    // Alice recovers full key
-    let recovered = SwapKeyPair::recover(keys.partial_key, revealed_t);
+    // Alice recovers full key (wrap partial_key in Zeroizing for memory safety)
+    use zeroize::Zeroizing;
+    let partial_key_zeroizing = Zeroizing::new(keys.partial_key);
+    let recovered = SwapKeyPair::recover(partial_key_zeroizing, revealed_t);
 
-    assert_eq!(recovered, keys.full_spend_key, "Key recovery failed");
+    assert_eq!(*recovered, keys.full_spend_key, "Key recovery failed");
     println!("✅ Key recovery: PASSED");
 }
 
