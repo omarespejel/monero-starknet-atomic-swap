@@ -40,7 +40,7 @@ pub enum DleqError {
 }
 
 /// DLEQ proof structure containing the second point, challenge, response, and commitments.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct DleqProof {
     /// Second point U = t·Y
     pub second_point: EdwardsPoint,
