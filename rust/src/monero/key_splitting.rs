@@ -85,30 +85,27 @@ mod tests {
 
     #[test]
     fn test_key_splitting_math() {
-        let keys = AtomicSwapKeys::generate();
-        assert!(keys.verify(), "Key splitting math must be correct");
+        let keys = SwapKeyPair::generate();
+        assert!(keys.verify(), "Key splitting: T + partial·G must equal X");
     }
 
     #[test]
     fn test_key_recovery() {
-        let keys = AtomicSwapKeys::generate();
-        
-        // Simulate: Alice has partial_key, Bob reveals t on Starknet
-        let recovered = SwapKeyPair::recover_full_key(
-            keys.partial_key,
-            keys.adaptor_scalar,
-        );
-        
+        let keys = SwapKeyPair::generate();
+        let recovered = SwapKeyPair::recover(keys.partial_key, keys.adaptor_scalar);
         assert_eq!(recovered, keys.full_spend_key);
     }
 
     #[test]
-    fn test_adaptor_point_correct() {
-        let keys = AtomicSwapKeys::generate();
-        let G = ED25519_BASEPOINT_POINT;
-        
-        // T should equal t·G
+    fn test_adaptor_point_derivation() {
+        let keys = SwapKeyPair::generate();
         assert_eq!(keys.adaptor_point, keys.adaptor_scalar * G);
+    }
+    
+    #[test]
+    fn test_public_key_derivation() {
+        let keys = SwapKeyPair::generate();
+        assert_eq!(keys.public_key, keys.full_spend_key * G);
     }
 }
 
