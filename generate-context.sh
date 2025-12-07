@@ -23,8 +23,9 @@ echo ""
   printf '%s\n' "to an Ed25519 adaptor point, enabling trustless cross-chain swaps."
   printf '%s\n' ""
   printf '%s\n' "## Current Status & Debugging Context"
-  printf '%s\n' "**Release**: v0.5.3-rc2 (2025-12-06) - DLEQ Rust-Cairo Compatibility Verified"
+  printf '%s\n' "**Release**: v0.6.0 (2025-12-06) - CLSAG Adaptor Signatures Implementation Started"
   printf '%s\n' "**MAJOR ACHIEVEMENT**: E2E DLEQ test PASSES - Rust↔Cairo compatibility verified!"
+  printf '%s\n' "**NEW FEATURE**: CLSAG adaptor signatures implementation in progress for Monero atomic swaps"
   printf '%s\n' "**Progress Made**:"
   printf '%s\n' "- ✅ Fixed sequential MSM call issue by replacing reduce_felt_to_scalar() with direct scalar construction"
   printf '%s\n' "- ✅ Fixed double consumption bug: removed redundant challenge recomputation from _verify_dleq_proof()"
@@ -69,7 +70,24 @@ echo ""
   printf '%s\n' "- ✅ Fixed refund tests: test_refund_returns_exact_amount and test_refund_fails_with_insufficient_balance now pass"
   printf '%s\n' "- ✅ Fixed unlock tests: test_unlock_fails_with_insufficient_balance expects correct ERC20 error message"
   printf '%s\n' "- ✅ Fixed reentrancy test: test_reentrancy_attack_blocked properly tests ReentrancyGuard protection"
-  printf '%s\n' "- 🔍 Current state: All token security tests passing (6/6), comprehensive test suite complete"
+  printf '%s\n' "- ✅ Version 0.6.0: CLSAG adaptor signatures implementation started"
+  printf '%s\n' "- ✅ CLSAG hash-to-point: Implemented Hp() function for Monero key images (hash_to_point.rs)"
+  printf '%s\n' "- ✅ CLSAG standard: Implemented standard CLSAG signing and verification (standard.rs)"
+  printf '%s\n' "- ✅ CLSAG adaptor: Implemented adaptor CLSAG for atomic swaps (adaptor.rs)"
+  printf '%s\n' "  * ClsagAdaptorSigner::sign_adaptor() - Creates partial signatures with embedded adaptor"
+  printf '%s\n' "  * ClsagAdaptorSignature::finalize() - Completes signature when adaptor scalar t is revealed"
+  printf '%s\n' "  * extract_adaptor_scalar() - Extracts adaptor scalar from partial + finalized signatures"
+  printf '%s\n' "- ✅ CLSAG dependencies: Added monero, sha3 (Keccak256), zeroize to Cargo.toml"
+  printf '%s\n' "- ✅ CLSAG documentation: Created CLSAG_MATH.md with mathematical foundations"
+  printf '%s\n' "- ✅ CLSAG layered test suite: Created comprehensive test suite per auditor recommendations"
+  printf '%s\n' "  * clsag_unit_tests.rs: 11 unit tests (8 passing, 3 failing - catching bugs early!)"
+  printf '%s\n' "  * clsag_dleq_integration.rs: 3 integration tests (2 passing, 1 failing)"
+  printf '%s\n' "  * atomic_swap_e2e.rs: 2 E2E tests (1 passing, 1 failing)"
+  printf '%s\n' "  * README_CLSAG_TESTS.md: Test documentation and strategy"
+  printf '%s\n' "- 🔍 Issues found by tests (early detection working!):"
+  printf '%s\n' "  * Standard CLSAG verification failing (ring closure computation bug in compute_c1())"
+  printf '%s\n' "  * Adaptor finalization producing invalid signatures (formula bug in finalize())"
+  printf '%s\n' "- 🔍 Current state: CLSAG core implementation complete, tests catching bugs at unit level"
   printf '%s\n' ""
   printf '%s\n' "## Architecture Components"
   printf '%s\n' ""
@@ -78,6 +96,10 @@ echo ""
   printf '%s\n' "- Generates DLEQ proofs using BLAKE2s for challenge computation"
   printf '%s\n' "- Produces Ed25519 adaptor points, fake-GLV hints, and DLEQ hints"
   printf '%s\n' "- Outputs test vectors in JSON format for Cairo consumption"
+  printf '%s\n' "- **NEW**: CLSAG adaptor signatures for Monero atomic swaps"
+  printf '%s\n' "  * Hash-to-point (Hp) function for key images"
+  printf '%s\n' "  * Standard CLSAG signing and verification"
+  printf '%s\n' "  * Adaptor CLSAG with partial signature creation and finalization"
   printf '%s\n' ""
   printf '%s\n' "### Cairo Side (Contract & Verification)"
   printf '%s\n' "- AtomicLock contract: Stores hashlock, verifies DLEQ proof in constructor"
@@ -352,6 +374,7 @@ ROOT_FILES=(
   "TECHNICAL.md"
   "VERSIONING.md"
   "FORMATTING.md"
+  "pyproject.toml"
 )
 
 # Current debugging and analysis documents
@@ -362,6 +385,7 @@ DEBUG_DOCS=(
   "RELEASE_NOTES_v0.4.0.md"
   "RELEASE_NOTES_v0.5.0.md"
   "RELEASE_NOTES_v0.5.2.md"
+  "AUDITOR_RECOMMENDATIONS.md"
 )
 
 # Cairo source files (all)
@@ -369,9 +393,16 @@ CAIRO_SOURCE=(
   "cairo/Scarb.toml"
   "cairo/Scarb.lock"
   "cairo/snfoundry.toml"
+  "cairo/coverage.toml"
   "cairo/src/lib.cairo"
   "cairo/src/blake2s_challenge.cairo"
   "cairo/src/edwards_serialization.cairo"
+)
+
+# Cairo documentation files
+CAIRO_DOCS=(
+  "cairo/INVARIANTS.md"
+  "cairo/README_TESTS.md"
 )
 
 # Cairo test files (organized by category with naming convention)
@@ -479,6 +510,22 @@ RUST_ADAPTOR=(
   "rust/src/adaptor/key_splitting.rs"
 )
 
+# Rust CLSAG module (NEW in v0.6.0)
+# NOTE: Migrated to audited monero-clsag-mirror library
+# Custom hash_to_point.rs and standard.rs removed - using audited library
+RUST_CLSAG=(
+  "rust/src/clsag/mod.rs"
+  "rust/src/clsag/adaptor.rs"
+  "rust/src/clsag/adaptor_audited.rs"
+)
+
+# Rust documentation
+RUST_DOCS=(
+  "rust/docs/CLSAG_MATH.md"
+  "rust/MIGRATION_TO_AUDITED_CLSAG.md"
+  "rust/AUDIT_DEPENDENCIES.md"
+)
+
 # Rust binary tools (all)
 RUST_BIN=(
   "rust/src/bin/maker.rs"
@@ -497,6 +544,20 @@ RUST_TESTS=(
   "rust/tests/integration_test.rs"
   "rust/tests/test_vectors.rs"
   "rust/test_vectors.json"
+)
+
+# Rust CLSAG test files (NEW in v0.6.0)
+RUST_CLSAG_TESTS=(
+  "rust/tests/clsag_hash_to_point.rs"
+  "rust/tests/clsag_standard.rs"
+  "rust/tests/clsag_adaptor.rs"
+  "rust/tests/clsag_integration.rs"
+  "rust/tests/clsag_unit_tests.rs"
+  "rust/tests/clsag_dleq_integration.rs"
+  "rust/tests/atomic_swap_e2e.rs"
+  "rust/tests/clsag_verify_audited.rs"
+  "rust/tests/clsag_mirror_smoke.rs"
+  "rust/tests/README_CLSAG_TESTS.md"
 )
 
 # Python tooling (all)
@@ -553,6 +614,10 @@ for path in "${CAIRO_SOURCE[@]}"; do
   add_file "$path"
 done
 
+for path in "${CAIRO_DOCS[@]}"; do
+  add_file "$path"
+done
+
 for path in "${CAIRO_TESTS[@]}"; do
   add_file "$path"
 done
@@ -573,11 +638,23 @@ for path in "${RUST_ADAPTOR[@]}"; do
   add_file "$path"
 done
 
+for path in "${RUST_CLSAG[@]}"; do
+  add_file "$path"
+done
+
+for path in "${RUST_DOCS[@]}"; do
+  add_file "$path"
+done
+
 for path in "${RUST_BIN[@]}"; do
   add_file "$path"
 done
 
 for path in "${RUST_TESTS[@]}"; do
+  add_file "$path"
+done
+
+for path in "${RUST_CLSAG_TESTS[@]}"; do
   add_file "$path"
 done
 
@@ -598,13 +675,17 @@ TOTAL_FILES=$((
   ${#ROOT_FILES[@]} +
   ${#DEBUG_DOCS[@]} +
   ${#CAIRO_SOURCE[@]} +
+  ${#CAIRO_DOCS[@]} +
   ${#CAIRO_TESTS[@]} +
   ${#CAIRO_DATA[@]} +
   ${#CAIRO_TEST_CONSTANTS[@]} +
   ${#RUST_SOURCE[@]} +
   ${#RUST_ADAPTOR[@]} +
+  ${#RUST_CLSAG[@]} +
+  ${#RUST_DOCS[@]} +
   ${#RUST_BIN[@]} +
   ${#RUST_TESTS[@]} +
+  ${#RUST_CLSAG_TESTS[@]} +
   ${#TOOLS_PYTHON[@]} +
   ${#ROOT_PYTHON[@]} +
   ${#TOOLS_DATA[@]}
@@ -615,13 +696,17 @@ echo "📊 Summary:"
 echo "  - Root files: ${#ROOT_FILES[@]}"
 echo "  - Debug documentation: ${#DEBUG_DOCS[@]}"
 echo "  - Cairo source files: ${#CAIRO_SOURCE[@]}"
+echo "  - Cairo documentation: ${#CAIRO_DOCS[@]}"
 echo "  - Cairo test files: ${#CAIRO_TESTS[@]}"
 echo "  - Cairo data files: ${#CAIRO_DATA[@]}"
 echo "  - Cairo test constants: ${#CAIRO_TEST_CONSTANTS[@]}"
 echo "  - Rust source files: ${#RUST_SOURCE[@]}"
 echo "  - Rust adaptor module: ${#RUST_ADAPTOR[@]}"
+echo "  - Rust CLSAG module: ${#RUST_CLSAG[@]}"
+echo "  - Rust documentation: ${#RUST_DOCS[@]}"
 echo "  - Rust binary tools: ${#RUST_BIN[@]}"
 echo "  - Rust test files: ${#RUST_TESTS[@]}"
+echo "  - Rust CLSAG test files: ${#RUST_CLSAG_TESTS[@]}"
 echo "  - Python tooling: ${#TOOLS_PYTHON[@]}"
 echo "  - Root Python scripts: ${#ROOT_PYTHON[@]}"
 echo "  - Tooling data files: ${#TOOLS_DATA[@]}"
@@ -631,14 +716,19 @@ echo "✅ Context written to $OUTPUT_FILE"
 echo ""
 echo "💡 This context bundle includes:"
 echo "   - All Cairo source and test files (including debugging tests)"
+echo "   - Cairo documentation (INVARIANTS.md, README_TESTS.md)"
 echo "   - All Rust source, adaptor, and binary files"
+echo "   - Rust CLSAG documentation (CLSAG_MATH.md)"
 echo "   - All Python tooling scripts (including fix_hints.py)"
 echo "   - Current debugging status and analysis documents"
+echo "   - Auditor recommendations and feedback (AUDITOR_RECOMMENDATIONS.md)"
 echo "   - Test data files (JSON vectors, hints)"
+echo "   - Configuration files (Scarb.toml, Cargo.toml, pyproject.toml, coverage.toml)"
 echo ""
 echo "🎯 Use this context to understand:"
 echo "   - The complete DLEQ proof protocol implementation"
-echo "   - Current state: v0.5.3-rc2 - E2E DLEQ test PASSES (Rust↔Cairo compatibility verified!)"
+echo "   - Current state: v0.6.0 - CLSAG adaptor signatures implementation in progress"
+echo "   - E2E DLEQ test PASSES (Rust↔Cairo compatibility verified!)"
 echo "   - Recent fixes: double consumption bug, endianness bug, double-swap bug, BLAKE2s IV, base point constants"
 echo "   - BLAKE2s initialization: RFC 7693 compliant IV implementation (critical cryptographic fix)"
 echo "   - Scalar truncation: MSM hints use 128-bit truncated scalars (matching Cairo's reduce_felt_to_scalar)"
@@ -654,3 +744,30 @@ echo "   - Comprehensive test suite: negative tests, edge cases, multiple vector
   echo "   - Security audit tests: double-unlock prevention, state transitions, point rejection (ALL FIXED)"
   echo "   - Point rejection tests: zero and low-order point rejection verified (CRITICAL security invariant)"
 echo "   - Cross-platform verification: tools/verify_full_compatibility.py"
+echo "   - CLSAG adaptor signatures: Monero atomic swap cryptographic core (v0.6.0)"
+echo "     * Hash-to-point (Hp) for key images using Keccak256"
+echo "     * Standard CLSAG ring signatures with aggregation coefficients"
+echo "     * Adaptor CLSAG with partial signature creation and finalization"
+echo "     * Integration with DLEQ proofs for Starknet atomic swaps"
+echo "   - CLSAG migration to audited library: ⚠️ IN PROGRESS - Using Verification Oracle"
+echo "     * Using monero-clsag-mirror (audited by Cypher Stack for Serai DEX)"
+echo "     * ✅ Deleted custom hash_to_point.rs and standard.rs (buggy code removed)"
+echo "     * ✅ Updated mod.rs to remove deleted module references"
+echo "     * ✅ Created verification test using Clsag::verify() as oracle"
+echo "     * ✅ Verification test confirms InvalidC1 bug (audited library catching bugs!)"
+echo "     * Strategy: Option B - Custom signing + Audited verification (80% benefit, 20% effort)"
+echo "     * 🔴 CRITICAL: Buggy compute_c1 logic confirmed by verification test"
+echo "     * ⏳ Next: Fix compute_c1 using verify() as oracle to validate fixes"
+echo "     * Migration plan: MIGRATION_TO_AUDITED_CLSAG.md (includes API analysis and strategy)"
+echo "     * Audit dependencies: AUDIT_DEPENDENCIES.md (complete audit status)"
+echo "     * Benefits: Audited verification catches bugs, reduces audit scope (~1,500→350 lines)"
+echo "     * Leverages \$100k+ of community-funded audits from Monero ecosystem"
+echo "     * Architecture separation: Only CLSAG tests need updating (~16 tests)"
+echo "     * Cairo/DLEQ tests remain unchanged (all 107 Cairo tests should pass)"
+echo "   - CLSAG layered test suite: Comprehensive testing strategy catching bugs early"
+echo "     * Unit tests (11 tests): Hash-to-point, standard CLSAG, adaptor CLSAG"
+echo "     * Integration tests (3 tests): DLEQ-CLSAG bridge verification"
+echo "     * E2E tests (2 tests): Full atomic swap flow simulation"
+echo "     * Current status: 11/16 tests passing, 5 bugs identified at unit level"
+echo "     * Issues found: Ring closure computation bug, adaptor finalization formula bug"
+echo "     * Note: Bugs will be eliminated by migration to audited library"
