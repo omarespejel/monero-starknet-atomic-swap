@@ -1,0 +1,35 @@
+{
+  "mcpServers": {
+    "sequential-thinking": {
+      "command": "npx",
+      "args": ["-y", "@anthropic/mcp-sequential-thinking"],
+      "description": "Structured reasoning for complex crypto problems"
+    },
+    "repomix": {
+      "command": "npx",
+      "args": ["-y", "repomix", "--mcp"],
+      "description": "Smart codebase context generation"
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@anthropic/mcp-filesystem", "--root", "."],
+      "description": "Read/write project files"
+    },
+    "rust-analyzer": {
+      "command": "npx",
+      "args": ["-y", "@anthropic/mcp-rust"],
+      "env": {
+        "CARGO_HOME": "${HOME}/.cargo"
+      },
+      "description": "Rust development tools - build, test, clippy"
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@anthropic/mcp-github"],
+      "env": {
+        "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+      },
+      "description": "GitHub PR, issues, actions management"
+    }
+  }
+}
