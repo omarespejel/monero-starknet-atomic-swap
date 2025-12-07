@@ -6,6 +6,7 @@
 //! Also includes adaptor signature support for Monero atomic swaps.
 
 pub mod adaptor;
+pub mod clsag;
 pub mod dleq;
 pub mod starknet;
 pub mod monero;
@@ -13,6 +14,11 @@ pub mod monero;
 // pub mod poseidon;
 
 pub use dleq::{generate_dleq_proof, DleqProof};
+pub use clsag::{
+    ClsagAdaptorSignature, ClsagAdaptorSigner, 
+    ClsagSignature, RingMember,
+    extract_adaptor_scalar,
+};
 #[cfg(feature = "full-integration")]
 pub mod starknet_full;
 #[cfg(feature = "full-integration")]
