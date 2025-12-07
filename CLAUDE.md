@@ -67,7 +67,15 @@ python tools/verify_full_compatibility.py       # Cross-platform
 
 ### Next Tasks (Priority Order)
 
-1. Fix CI workflows (dependency conflicts)
-2. Add Transcript abstraction (P1 - deferred)
+1. Implement race condition mitigations (P0 - grace period, two-phase unlock)
+2. Fix CI workflows (dependency conflicts)
 3. External security audit preparation
+4. Add Transcript abstraction (P1 - deferred)
+
+### Known Vulnerabilities
+
+- **Race Condition**: Protocol-level race between secret revelation and cross-chain confirmation
+  - Status: Documented in `RACE_CONDITION_MITIGATION.md`
+  - Mitigation: Planned for v0.8.0 (grace period, two-phase unlock)
+  - Current: Acceptable for testnet with warnings
 

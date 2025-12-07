@@ -42,6 +42,13 @@ Response: s = k + c·t mod n
 - `cairo/src/lib.cairo` - AtomicLock contract
 - `cairo/src/blake2s_challenge.cairo` - Challenge computation
 
+## Repository Structure
+
+- `docs/`: All documentation (architecture, protocol, decisions)
+- `rust/`: Rust library (key splitting, DLEQ proofs)
+- `cairo/`: Cairo contract (AtomicLock, DLEQ verification)
+- `tools/`: Python utilities (hints, verify, convert, archive)
+
 ## Code Standards
 
 ### Cryptography Rules (CRITICAL)
@@ -111,11 +118,19 @@ cd rust && cargo test
 # Cairo tests  
 cd cairo && scarb test
 
+# Security tests (CRITICAL)
+cd cairo && snforge test security -v
+
+# E2E tests
+cd cairo && snforge test e2e -v
+
 # Generate context for AI
-repomix --config repomix.monero.json
+make context-monero  # Monero-focused
+make context-cairo    # Cairo-focused
+make context          # Full project
 
 # Cross-platform verification
-python tools/verify_full_compatibility.py
+python tools/verify/rust_cairo_compatibility.py
 ```
 
 ## Don't Modify Without Understanding
