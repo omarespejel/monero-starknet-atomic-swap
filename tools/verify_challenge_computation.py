@@ -10,12 +10,7 @@ import json
 import sys
 from pathlib import Path
 
-try:
-    from blake2 import blake2s
-except ImportError:
-    print("ERROR: pyblake2 not installed")
-    print("Install with: pip install pyblake2")
-    sys.exit(1)
+import hashlib
 
 
 def swap_u32(x: int) -> int:
@@ -107,8 +102,8 @@ def compute_dleq_challenge_python():
     print(f"Input hex (last 64 bytes): {data[-64:].hex()}")
     print()
     
-    # BLAKE2s-256
-    h = blake2s(data, digest_size=32)
+    # BLAKE2s-256 (using Python's hashlib)
+    h = hashlib.blake2s(data, digest_size=32)
     digest = h.digest()
     
     print("### BLAKE2s OUTPUT ###")
