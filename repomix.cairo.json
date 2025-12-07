@@ -1,0 +1,35 @@
+{
+  "output": {
+    "filePath": "context-cairo.xml",
+    "style": "xml",
+    "showLineNumbers": true
+  },
+  "ignore": {
+    "customPatterns": [
+      "target/**",
+      ".git/**",
+      "context*.xml",
+      "monero-swap-context-*.txt",
+      "cairo/tests/test_debug_*",
+      "cairo/tests/test_unit_*"
+    ]
+  },
+  "include": [
+    "cairo/Scarb.toml",
+    "cairo/src/lib.cairo",
+    "cairo/src/blake2s_challenge.cairo",
+    "cairo/src/edwards_serialization.cairo",
+    "cairo/tests/test_e2e_dleq.cairo",
+    "cairo/tests/test_e2e_full_swap_flow.cairo",
+    "cairo/tests/test_security_audit.cairo",
+    "cairo/tests/test_security_tokens.cairo",
+    "cairo/tests/test_security_dleq_negative.cairo",
+    "cairo/tests/test_security_edge_cases.cairo",
+    "cairo/tests/test_integration_atomic_lock.cairo",
+    "cairo/tests/test_integration_constructor.cairo",
+    "cairo/tests/test_integration_garaga_msm.cairo",
+    "cairo/INVARIANTS.md",
+    "cairo/README_TESTS.md"
+  ]
+}
+

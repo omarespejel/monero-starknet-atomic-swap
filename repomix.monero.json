@@ -1,0 +1,30 @@
+{
+  "output": {
+    "filePath": "context-monero.xml",
+    "style": "xml",
+    "showLineNumbers": true
+  },
+  "ignore": {
+    "customPatterns": [
+      "target/**",
+      "*.lock",
+      ".git/**",
+      "context*.xml",
+      "monero-swap-context-*.txt"
+    ]
+  },
+  "include": [
+    "rust/Cargo.toml",
+    "rust/src/lib.rs",
+    "rust/src/dleq.rs",
+    "rust/src/monero/mod.rs",
+    "rust/src/monero/key_splitting.rs",
+    "rust/src/monero/transaction.rs",
+    "rust/tests/key_splitting_dleq_integration.rs",
+    "rust/tests/atomic_swap_e2e.rs",
+    "rust/tests/dleq_properties.rs",
+    "deny.toml",
+    "rust/AUDIT_DEPENDENCIES.md"
+  ]
+}
+
