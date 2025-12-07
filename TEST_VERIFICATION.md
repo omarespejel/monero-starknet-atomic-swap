@@ -10,12 +10,11 @@
 
 | Test Suite | Tests | Status |
 |------------|-------|--------|
-| Library tests (dleq.rs) | 20 | ✅ Passing |
+| Library tests (dleq.rs + key_splitting.rs) | 20 | ✅ Passing |
 | Property tests (dleq_properties.rs) | 5 | ✅ Passing |
 | Integration tests (key_splitting_dleq_integration.rs) | 4 | ✅ Passing |
 | E2E tests (atomic_swap_e2e.rs) | 3 | ✅ Passing |
-| Key splitting module tests | 4 | ✅ Passing |
-| **TOTAL** | **36** | ✅ **All Passing** |
+| **TOTAL** | **32** | ✅ **All Passing** |
 
 ### Edge Case Tests Added
 
@@ -54,5 +53,5 @@ cd rust
 cargo test --all
 ```
 
-**Result**: ✅ 36 tests passing, 0 failing
+**Result**: ✅ 32 tests passing, 0 failing
 
