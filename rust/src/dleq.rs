@@ -366,7 +366,9 @@ mod tests {
         // Generate a test secret
         let secret_bytes = [0x42u8; 32];
         let secret = Scalar::from_bytes_mod_order(secret_bytes);
-        let hashlock: [u8; 32] = Sha256::digest(&secret_bytes).into();
+        // Hashlock must be computed from secret.to_bytes() (not raw secret_bytes)
+        // This matches the validation in generate_dleq_proof
+        let hashlock: [u8; 32] = Sha256::digest(secret.to_bytes()).into();
 
         // Compute adaptor point
         let adaptor_point = ED25519_BASEPOINT_POINT * secret;
