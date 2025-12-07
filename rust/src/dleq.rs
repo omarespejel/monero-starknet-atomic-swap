@@ -243,7 +243,7 @@ impl DleqProof {
 /// update both Rust and Cairo to use the same hash-to-curve point.
 ///
 /// Production path: Use hash-to-curve("DLEQ_SECOND_BASE_V1") → Edwards → Weierstrass → u384 limbs
-fn get_second_generator() -> EdwardsPoint {
+pub(crate) fn get_second_generator() -> EdwardsPoint {
     // Current implementation: Y = 2·G (matches Cairo placeholder)
     // This ensures compatibility between Rust proof generation and Cairo verification
     ED25519_BASEPOINT_POINT * Scalar::from(2u64)

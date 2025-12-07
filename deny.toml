@@ -1,0 +1,57 @@
+# Cargo Deny configuration for supply chain security
+# See: https://github.com/EmbarkStudios/cargo-deny
+
+[advisories]
+# Use the RustSec advisory database
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+
+# Vulnerability handling
+vulnerability = "deny"      # Deny any known vulnerabilities
+unmaintained = "warn"       # Warn about unmaintained crates
+yanked = "deny"            # Deny yanked crates
+notice = "warn"            # Warn about security notices
+
+# Ignore specific advisories (if needed)
+# ignore = [
+#     { id = "RUSTSEC-YYYY-XXXX", reason = "..." },
+# ]
+
+[licenses]
+# License policy
+unlicensed = "deny"         # Deny unlicensed crates
+
+# Allowed licenses
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-3-Clause",
+    "ISC",
+    "0BSD",                 # Zero-clause BSD (public domain)
+]
+
+# Denied licenses (copyleft - may conflict with MIT)
+deny = [
+    "GPL-3.0",
+    "GPL-2.0",
+    "AGPL-3.0",
+]
+
+# License exceptions (if needed)
+# exceptions = [
+#     { allow = ["GPL-3.0"], name = "some-crate", version = "1.0.0" },
+# ]
+
+[bans]
+# Dependency ban policy
+multiple-versions = "warn"  # Warn about multiple versions of same crate
+wildcards = "deny"          # Force explicit versions (no wildcards)
+
+# Skip specific crates from ban checks (if needed)
+# skip = ["some-crate"]
+
+[metadata]
+# Metadata for cargo-deny
+authors = ["Omar Espejel <omarespejel@example.com>"]
+maintainers = ["Omar Espejel <omarespejel@example.com>"]
+
