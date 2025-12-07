@@ -23,10 +23,13 @@ fn generate_cairo_test_vectors() {
 
     // Generate hashlock H = SHA-256(secret) (must match secret)
     use sha2::{Digest, Sha256};
-    let hashlock: [u8; 32] = Sha256::digest(&secret_bytes).into();
+    // Hashlock must be computed from secret.to_bytes() (not raw secret_bytes)
+    // This matches the validation in generate_dleq_proof
+    let hashlock: [u8; 32] = Sha256::digest(secret.to_bytes()).into();
 
     // Generate DLEQ proof
-    let proof = generate_dleq_proof(&secret, &adaptor_point, &hashlock);
+    let proof = generate_dleq_proof(&secret, &adaptor_point, &hashlock)
+        .expect("Proof generation should succeed for valid inputs");
 
     // Convert to Cairo format
     let cairo_format = proof.to_cairo_format(&adaptor_point);
@@ -74,9 +77,8 @@ fn generate_multiple_test_vectors() {
         let secret = Scalar::from_bytes_mod_order(secret_bytes);
         let adaptor_point = ED25519_BASEPOINT_POINT * secret;
 
-        // Use different hashlock for each test
-        let mut hashlock = [0u8; 32];
-        hashlock[0] = i as u8;
+        // Generate hashlock from secret (must match for validation)
+        let hashlock: [u8; 32] = Sha256::digest(secret.to_bytes()).into();
 
         let proof = generate_dleq_proof(&secret, &adaptor_point, &hashlock)
             .expect("Proof generation should succeed for valid inputs");
