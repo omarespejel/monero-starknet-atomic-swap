@@ -2,6 +2,7 @@
 name = "atomic_lock"
 version = "0.1.0"
 edition = "2024_07"
+cairo-version = "2.10.0"
 
 [dependencies]
 # PRODUCTION: Official Starknet SDK (v2.10.0 stable)
@@ -22,9 +23,18 @@ openzeppelin = { git = "https://github.com/OpenZeppelin/cairo-contracts.git", ta
 
 [dev-dependencies]
 # Testing framework (Starknet Foundry)
-cairo_test = "2.14.0"
-snforge_std = "0.53.0"
+# CRITICAL: Must match snforge version in CI workflow
+snforge_std = { git = "https://github.com/foundry-rs/starknet-foundry", tag = "v0.37.0" }
+assert_macros = "2.10.0"
+
+[tool.scarb]
+# Allow prebuilt plugins (faster CI, no Rust needed)
+allow-prebuilt-plugins = ["snforge_std"]
 
 [[target.starknet-contract]]
 sierra = true
+casm = true
 allowed-libfuncs-list.name = "experimental"
+
+[scripts]
+test = "snforge test"

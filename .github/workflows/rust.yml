@@ -1,0 +1,40 @@
+name: Rust Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'rust/**'
+      - '.github/workflows/rust.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'rust/**'
+      - '.github/workflows/rust.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+
+      - name: Test
+        working-directory: rust
+        run: cargo test --all-features
+
+      - name: Clippy
+        working-directory: rust
+        run: cargo clippy -- -D warnings
+
+      - name: Check format
+        working-directory: rust
+        run: cargo fmt --all -- --check
+

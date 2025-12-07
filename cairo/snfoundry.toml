@@ -3,4 +3,6 @@ project = "."
 
 [snforge]
 exit_first = false
+# Uncomment for verbose output
+# output = "detailed"
 
