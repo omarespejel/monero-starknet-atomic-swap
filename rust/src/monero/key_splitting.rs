@@ -11,7 +11,7 @@
 //! This is the approach used by Serai DEX (audited by Cypher Stack).
 
 use curve25519_dalek::{
-    constants::ED25519_BASEPOINT_POINT,
+    constants::ED25519_BASEPOINT_POINT as G,
     edwards::EdwardsPoint,
     scalar::Scalar,
 };
@@ -49,7 +49,6 @@ impl SwapKeyPair {
         let adaptor_scalar = Scalar::random(&mut rng);
         let full_spend_key = partial_key + adaptor_scalar;
         
-        let G = ED25519_BASEPOINT_POINT;
         let adaptor_point = adaptor_scalar * G;
         let public_key = full_spend_key * G;
         
@@ -63,21 +62,20 @@ impl SwapKeyPair {
     }
     
     /// Recover full spend key when t is revealed from Starknet.
-    /// 
-    /// Called by Alice after watching for the Unlocked event.
-    pub fn recover_full_key(partial_key: Scalar, revealed_t: Scalar) -> Scalar {
+    pub fn recover(partial_key: Scalar, revealed_t: Scalar) -> Scalar {
         partial_key + revealed_t
     }
     
-    /// Verify key splitting math is correct.
+    /// Verify the key splitting math is correct.
     pub fn verify(&self) -> bool {
-        let G = ED25519_BASEPOINT_POINT;
-        
         // T + P_partial = P_full
         let partial_public = self.partial_key * G;
-        let reconstructed = self.adaptor_point + partial_public;
-        
-        reconstructed == self.public_key
+        self.adaptor_point + partial_public == self.public_key
+    }
+    
+    /// Get adaptor scalar bytes (for hashlock computation).
+    pub fn adaptor_scalar_bytes(&self) -> [u8; 32] {
+        self.adaptor_scalar.to_bytes()
     }
 }
 
