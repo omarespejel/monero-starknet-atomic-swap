@@ -7,6 +7,7 @@
 //! 4. Alice recovers full Monero key and can spend XMR
 
 use sha2::{Sha256, Digest};
+use zeroize::Zeroizing;
 use xmr_secret_gen::monero::SwapKeyPair;
 use xmr_secret_gen::dleq::generate_dleq_proof;
 
@@ -24,8 +25,10 @@ fn test_full_atomic_swap_flow() {
     ).into();
     
     // 3. Alice generates DLEQ proof binding hashlock to adaptor point
+    // Wrap adaptor_scalar in Zeroizing for memory safety
+    let adaptor_scalar_zeroizing = Zeroizing::new(alice_keys.adaptor_scalar);
     let dleq_proof = generate_dleq_proof(
-        &alice_keys.adaptor_scalar,
+        &adaptor_scalar_zeroizing,
         &alice_keys.adaptor_point,
         &hashlock,
     ).expect("DLEQ proof generation should succeed with valid inputs");
@@ -90,8 +93,10 @@ fn test_swap_fails_with_wrong_secret() {
     ).into();
     
     // Generate DLEQ proof
+    // Wrap adaptor_scalar in Zeroizing for memory safety
+    let adaptor_scalar_zeroizing = Zeroizing::new(alice_keys.adaptor_scalar);
     let _dleq_proof = generate_dleq_proof(
-        &alice_keys.adaptor_scalar,
+        &adaptor_scalar_zeroizing,
         &alice_keys.adaptor_point,
         &hashlock,
     ).expect("DLEQ proof generation should succeed with valid inputs");

@@ -17,10 +17,12 @@
 
 use blake2::{Blake2s256, Digest as Blake2Digest};
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
-use curve25519_dalek::edwards::EdwardsPoint;
+use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
 use curve25519_dalek::scalar::Scalar;
 use sha2::{Digest, Sha256};
+use std::ops::Deref;
 use thiserror::Error;
+use zeroize::{Zeroize, Zeroizing};
 
 // TODO: Uncomment when Poseidon is fully implemented
 // mod poseidon;
@@ -37,20 +39,31 @@ pub enum DleqError {
     HashlockMismatch,
     #[error("Failed to generate valid nonce after maximum attempts")]
     NonceGenerationFailed,
+    #[error("Invalid proof data (decompression or deserialization failed)")]
+    InvalidProof,
 }
 
 /// DLEQ proof structure containing the second point, challenge, response, and commitments.
-#[derive(Debug, Clone, PartialEq)]
+///
+/// **Security**: This struct derives `Zeroize` to ensure sensitive data is cleared from memory.
+/// Public values (points, challenge, response) don't need zeroization, but the struct itself
+/// can be zeroized if needed for cleanup.
+#[derive(Debug, Clone, PartialEq, Zeroize)]
 pub struct DleqProof {
     /// Second point U = t·Y
+    #[zeroize(skip)] // Public value, no need to zeroize
     pub second_point: EdwardsPoint,
     /// Challenge scalar c
+    #[zeroize(skip)] // Public value, no need to zeroize
     pub challenge: Scalar,
     /// Response scalar s = k + c·t mod n
+    #[zeroize(skip)] // Public value, no need to zeroize
     pub response: Scalar,
     /// First commitment R1 = k·G (needed for Cairo challenge computation)
+    #[zeroize(skip)] // Public value, no need to zeroize
     pub r1: EdwardsPoint,
     /// Second commitment R2 = k·Y (needed for Cairo challenge computation)
+    #[zeroize(skip)] // Public value, no need to zeroize
     pub r2: EdwardsPoint,
 }
 
@@ -90,7 +103,7 @@ pub struct DleqProofForCairo {
 ///
 /// # Arguments
 ///
-/// * `secret` - The secret scalar t
+/// * `secret` - The secret scalar t (wrapped in Zeroizing for automatic memory clearing)
 /// * `adaptor_point` - The adaptor point T = t·G
 /// * `hashlock` - The hashlock (32-byte SHA-256 hash of the secret)
 ///
@@ -105,27 +118,32 @@ pub struct DleqProofForCairo {
 /// Returns `DleqError::ZeroScalar` if secret is zero.
 /// Returns `DleqError::PointMismatch` if adaptor_point ≠ secret * G.
 /// Returns `DleqError::HashlockMismatch` if hashlock ≠ SHA256(secret).
+///
+/// # Security
+///
+/// The secret is wrapped in `Zeroizing<Scalar>` to ensure it's automatically zeroed
+/// when dropped. The nonce `k` is also wrapped in `Zeroizing` and automatically cleared.
 pub fn generate_dleq_proof(
-    secret: &Scalar,
+    secret: &Zeroizing<Scalar>,
     adaptor_point: &EdwardsPoint,
     hashlock: &[u8; 32],
 ) -> Result<DleqProof, DleqError> {
     // SECURITY: Validate inputs before generating proof
     
-    // 1. Check secret is non-zero
-    if *secret == Scalar::ZERO {
+    // 1. Check secret is non-zero (use double deref for Zeroizing)
+    if **secret == Scalar::ZERO {
         return Err(DleqError::ZeroScalar);
     }
     
-    // 2. Verify adaptor_point = secret * G
+    // 2. Verify adaptor_point = secret * G (use deref() for Zeroizing)
     let G = ED25519_BASEPOINT_POINT;
-    let computed_point = G * secret;
+    let computed_point = G * secret.deref();
     if computed_point != *adaptor_point {
         return Err(DleqError::PointMismatch);
     }
     
-    // 3. Verify hashlock = SHA256(secret)
-    let computed_hash: [u8; 32] = Sha256::digest(secret.to_bytes()).into();
+    // 3. Verify hashlock = SHA256(secret) (use deref() for Zeroizing)
+    let computed_hash: [u8; 32] = Sha256::digest(secret.deref().to_bytes()).into();
     if computed_hash != *hashlock {
         return Err(DleqError::HashlockMismatch);
     }
@@ -133,16 +151,17 @@ pub fn generate_dleq_proof(
     // 4. Get generators
     let Y = get_second_generator(); // Derived second base
 
-    // 5. Compute U = t·Y
-    let U = Y * secret;
+    // 5. Compute U = t·Y (use deref() for Zeroizing)
+    let U = Y * secret.deref();
 
     // 6. Generate nonce k (deterministic for reproducibility in tests)
     // Using RFC6979-style deterministic nonce generation with domain separation
+    // k is wrapped in Zeroizing and will be automatically zeroed when dropped
     let k = generate_deterministic_nonce(secret, hashlock)?;
 
-    // 7. Compute commitments
-    let R1 = G * k; // k·G
-    let R2 = Y * k; // k·Y
+    // 7. Compute commitments (use deref() for Zeroizing)
+    let R1 = G * k.deref(); // k·G
+    let R2 = Y * k.deref(); // k·Y
 
     // 8. Compute Fiat-Shamir challenge
     let c = compute_challenge(&G, &Y, adaptor_point, &U, &R1, &R2, hashlock);
@@ -150,7 +169,9 @@ pub fn generate_dleq_proof(
     // 9. Compute response s = k + c·t mod n
     // SECURITY: Uses curve25519-dalek's constant-time scalar arithmetic
     // to prevent timing attacks. DO NOT replace with standard operators.
-    let s = k + (c * secret);
+    // k is Zeroizing<Scalar> and will be automatically zeroed when dropped
+    let s = k.deref() + (c * secret.deref());
+    // k is automatically zeroed here when it goes out of scope
 
     Ok(DleqProof {
         second_point: U,
@@ -192,7 +213,106 @@ fn edwards_point_to_cairo_format(point: &EdwardsPoint) -> ([u8; 32], [u8; 32]) {
     (compressed, sqrt_hint)
 }
 
+/// Serializable version of DLEQ proof for JSON/network transport.
+///
+/// This struct contains all proof data in serializable format (compressed points as bytes).
+/// Use `DleqProof::to_serializable()` and `DleqProof::from_serializable()` for conversion.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct DleqProofSerialized {
+    /// Second point U = t·Y (compressed Edwards, 32 bytes)
+    pub second_point: [u8; 32],
+    /// Challenge scalar c (32 bytes)
+    pub challenge: [u8; 32],
+    /// Response scalar s (32 bytes)
+    pub response: [u8; 32],
+    /// First commitment R1 = k·G (compressed Edwards, 32 bytes)
+    pub r1: [u8; 32],
+    /// Second commitment R2 = k·Y (compressed Edwards, 32 bytes)
+    pub r2: [u8; 32],
+}
+
 impl DleqProof {
+    /// Convert DLEQ proof to serializable format for JSON/network transport.
+    ///
+    /// # Returns
+    ///
+    /// A `DleqProofSerialized` containing all proof data as bytes.
+    pub fn to_serializable(&self) -> DleqProofSerialized {
+        DleqProofSerialized {
+            second_point: self.second_point.compress().to_bytes(),
+            challenge: self.challenge.to_bytes(),
+            response: self.response.to_bytes(),
+            r1: self.r1.compress().to_bytes(),
+            r2: self.r2.compress().to_bytes(),
+        }
+    }
+
+    /// Reconstruct DLEQ proof from serializable format.
+    ///
+    /// # Arguments
+    ///
+    /// * `ser` - The serialized proof data
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing either:
+    /// - `Ok(DleqProof)` - Valid reconstructed proof
+    /// - `Err(DleqError)` - Invalid proof data (decompression failed)
+    pub fn from_serializable(ser: DleqProofSerialized) -> Result<Self, DleqError> {
+        let second_point = CompressedEdwardsY(ser.second_point)
+            .decompress()
+            .ok_or(DleqError::PointMismatch)?;
+        
+        let r1 = CompressedEdwardsY(ser.r1)
+            .decompress()
+            .ok_or(DleqError::PointMismatch)?;
+        
+        let r2 = CompressedEdwardsY(ser.r2)
+            .decompress()
+            .ok_or(DleqError::PointMismatch)?;
+        
+        let challenge: Option<Scalar> = Scalar::from_canonical_bytes(ser.challenge).into();
+        let challenge = challenge.ok_or(DleqError::InvalidProof)?;
+        
+        let response: Option<Scalar> = Scalar::from_canonical_bytes(ser.response).into();
+        let response = response.ok_or(DleqError::InvalidProof)?;
+        
+        Ok(DleqProof {
+            second_point,
+            challenge,
+            response,
+            r1,
+            r2,
+        })
+    }
+
+    /// Convert DLEQ proof to JSON string.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing either:
+    /// - `Ok(String)` - JSON representation of the proof
+    /// - `Err(serde_json::Error)` - Serialization error
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(&self.to_serializable())
+    }
+
+    /// Reconstruct DLEQ proof from JSON string.
+    ///
+    /// # Arguments
+    ///
+    /// * `json` - JSON string representation of the proof
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing either:
+    /// - `Ok(DleqProof)` - Valid reconstructed proof
+    /// - `Err` - JSON parsing or proof reconstruction error
+    pub fn from_json(json: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        let ser: DleqProofSerialized = serde_json::from_str(json)?;
+        Ok(Self::from_serializable(ser)?)
+    }
+
     /// Convert DLEQ proof to Cairo-compatible format.
     ///
     /// This method generates all compressed Edwards points and sqrt hints needed
@@ -271,17 +391,32 @@ pub(crate) fn get_second_generator() -> EdwardsPoint {
 /// A `Result` containing either:
 /// - `Ok(Scalar)` - Valid non-zero nonce
 /// - `Err(DleqError::NonceGenerationFailed)` - Failed to generate valid nonce
+/// Generate a deterministic nonce for DLEQ proof generation.
+///
+/// **Security**: Returns `Zeroizing<Scalar>` to ensure the nonce is automatically
+/// zeroed from memory when dropped. This prevents nonce extraction attacks.
+///
+/// # Arguments
+///
+/// * `secret` - The secret scalar (wrapped in Zeroizing for memory safety)
+/// * `hashlock` - The hashlock (32-byte SHA-256 hash)
+///
+/// # Returns
+///
+/// A `Result` containing either:
+/// - `Ok(Zeroizing<Scalar>)` - Valid nonce (automatically zeroed when dropped)
+/// - `Err(DleqError::NonceGenerationFailed)` - Failed after 100 attempts
 fn generate_deterministic_nonce(
-    secret: &Scalar,
+    secret: &Zeroizing<Scalar>,
     hashlock: &[u8; 32],
-) -> Result<Scalar, DleqError> {
+) -> Result<Zeroizing<Scalar>, DleqError> {
     let mut counter = 0u32;
     
     loop {
         let mut hasher = Sha256::new();
         // Domain separation: prevents hash collisions with other protocol hashes
         hasher.update(b"DLEQ_NONCE_V1");
-        hasher.update(secret.to_bytes());
+        hasher.update(secret.deref().to_bytes()); // Use deref() for Zeroizing
         hasher.update(hashlock);
         hasher.update(&counter.to_le_bytes()); // Counter for retry if k is invalid
 
@@ -292,7 +427,8 @@ fn generate_deterministic_nonce(
 
         // Validate nonce is non-zero
         if k != Scalar::ZERO {
-            return Ok(k);
+            // Wrap in Zeroizing to ensure automatic memory clearing
+            return Ok(Zeroizing::new(k));
         }
 
         counter += 1;
@@ -361,26 +497,30 @@ fn compute_challenge(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use zeroize::Zeroizing;
+    use std::ops::Deref;
 
     #[test]
     fn test_dleq_proof_generation() {
+        use zeroize::Zeroizing;
         // Generate a test secret
         let secret_bytes = [0x42u8; 32];
         let secret = Scalar::from_bytes_mod_order(secret_bytes);
+        let secret_zeroizing = Zeroizing::new(secret);
         // Hashlock must be computed from secret.to_bytes() (not raw secret_bytes)
         // This matches the validation in generate_dleq_proof
-        let hashlock: [u8; 32] = Sha256::digest(secret.to_bytes()).into();
+        let hashlock: [u8; 32] = Sha256::digest(secret_zeroizing.deref().to_bytes()).into();
 
         // Compute adaptor point
-        let adaptor_point = ED25519_BASEPOINT_POINT * secret;
+        let adaptor_point = ED25519_BASEPOINT_POINT * *secret_zeroizing;
 
         // Generate DLEQ proof
-        let proof = generate_dleq_proof(&secret, &adaptor_point, &hashlock)
+        let proof = generate_dleq_proof(&secret_zeroizing, &adaptor_point, &hashlock)
             .expect("Proof generation should succeed for valid inputs");
 
         // Verify proof structure: U should equal t·Y
         let Y = get_second_generator();
-        let expected_U = Y * secret;
+        let expected_U = Y * *secret_zeroizing;
         assert_eq!(proof.second_point, expected_U, "U should equal t·Y");
     }
 
@@ -394,7 +534,8 @@ mod tests {
 
     #[test]
     fn test_dleq_validation_zero_scalar() {
-        let secret = Scalar::ZERO;
+        use zeroize::Zeroizing;
+        let secret = Zeroizing::new(Scalar::ZERO);
         let adaptor_point = ED25519_BASEPOINT_POINT; // arbitrary
         let hashlock = [0u8; 32]; // arbitrary
 
@@ -404,9 +545,11 @@ mod tests {
 
     #[test]
     fn test_dleq_validation_point_mismatch() {
-        let secret = Scalar::from(42u64);
+        use zeroize::Zeroizing;
+        use std::ops::Deref;
+        let secret = Zeroizing::new(Scalar::from(42u64));
         let wrong_point = ED25519_BASEPOINT_POINT * Scalar::from(99u64); // wrong!
-        let hashlock: [u8; 32] = Sha256::digest(secret.to_bytes()).into();
+        let hashlock: [u8; 32] = Sha256::digest(secret.deref().to_bytes()).into();
 
         let result = generate_dleq_proof(&secret, &wrong_point, &hashlock);
         assert_eq!(
@@ -418,8 +561,10 @@ mod tests {
 
     #[test]
     fn test_dleq_validation_hashlock_mismatch() {
-        let secret = Scalar::from(42u64);
-        let adaptor_point = ED25519_BASEPOINT_POINT * secret;
+        use zeroize::Zeroizing;
+        use std::ops::Deref;
+        let secret = Zeroizing::new(Scalar::from(42u64));
+        let adaptor_point = ED25519_BASEPOINT_POINT * *secret;
         let wrong_hashlock = [0xFF; 32]; // wrong!
 
         let result = generate_dleq_proof(&secret, &adaptor_point, &wrong_hashlock);
@@ -432,24 +577,28 @@ mod tests {
 
     #[test]
     fn test_nonce_generation_deterministic() {
-        let secret = Scalar::from(42u64);
-        let hashlock: [u8; 32] = Sha256::digest(secret.to_bytes()).into();
+        use zeroize::Zeroizing;
+        use std::ops::Deref;
+        let secret = Zeroizing::new(Scalar::from(42u64));
+        let hashlock: [u8; 32] = Sha256::digest(secret.deref().to_bytes()).into();
 
         let nonce1 = generate_deterministic_nonce(&secret, &hashlock)
             .expect("Nonce generation should succeed");
         let nonce2 = generate_deterministic_nonce(&secret, &hashlock)
             .expect("Nonce generation should succeed");
 
-        assert_eq!(nonce1, nonce2, "Nonce generation must be deterministic");
-        assert_ne!(nonce1, Scalar::ZERO, "Nonce must not be zero");
+        assert_eq!(*nonce1, *nonce2, "Nonce generation must be deterministic");
+        assert_ne!(*nonce1, Scalar::ZERO, "Nonce must not be zero");
     }
 
     #[test]
     fn test_nonce_generation_different_inputs_produce_different_nonces() {
-        let secret1 = Scalar::from(42u64);
-        let secret2 = Scalar::from(99u64);
-        let hashlock1: [u8; 32] = Sha256::digest(secret1.to_bytes()).into();
-        let hashlock2: [u8; 32] = Sha256::digest(secret2.to_bytes()).into();
+        use zeroize::Zeroizing;
+        use std::ops::Deref;
+        let secret1 = Zeroizing::new(Scalar::from(42u64));
+        let secret2 = Zeroizing::new(Scalar::from(99u64));
+        let hashlock1: [u8; 32] = Sha256::digest(secret1.deref().to_bytes()).into();
+        let hashlock2: [u8; 32] = Sha256::digest(secret2.deref().to_bytes()).into();
 
         let nonce1 = generate_deterministic_nonce(&secret1, &hashlock1)
             .expect("Nonce generation should succeed");
@@ -457,15 +606,17 @@ mod tests {
             .expect("Nonce generation should succeed");
 
         // Different inputs should produce different nonces (with high probability)
-        assert_ne!(nonce1, nonce2, "Different inputs should produce different nonces");
+        assert_ne!(*nonce1, *nonce2, "Different inputs should produce different nonces");
     }
 
     #[test]
     fn test_dleq_validation_scalar_one() {
+        use zeroize::Zeroizing;
+        use std::ops::Deref;
         // Test edge case: Scalar::ONE (smallest non-zero scalar)
-        let secret = Scalar::ONE;
-        let adaptor_point = ED25519_BASEPOINT_POINT * secret;
-        let hashlock: [u8; 32] = Sha256::digest(secret.to_bytes()).into();
+        let secret = Zeroizing::new(Scalar::ONE);
+        let adaptor_point = ED25519_BASEPOINT_POINT * *secret;
+        let hashlock: [u8; 32] = Sha256::digest(secret.deref().to_bytes()).into();
 
         // Should succeed (ONE is valid, only ZERO is rejected)
         let result = generate_dleq_proof(&secret, &adaptor_point, &hashlock);
@@ -474,6 +625,8 @@ mod tests {
 
     #[test]
     fn test_dleq_validation_max_scalar() {
+        use zeroize::Zeroizing;
+        use std::ops::Deref;
         // Test edge case: Maximum scalar value (order - 1)
         // Ed25519 order is 2^252 + 27742317777372353535851937790883648493
         // Maximum scalar is order - 1
@@ -482,9 +635,9 @@ mod tests {
             0xde, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x10,
         ];
-        let max_scalar = Scalar::from_bytes_mod_order(max_scalar_bytes);
-        let adaptor_point = ED25519_BASEPOINT_POINT * max_scalar;
-        let hashlock: [u8; 32] = Sha256::digest(max_scalar.to_bytes()).into();
+        let max_scalar = Zeroizing::new(Scalar::from_bytes_mod_order(max_scalar_bytes));
+        let adaptor_point = ED25519_BASEPOINT_POINT * *max_scalar;
+        let hashlock: [u8; 32] = Sha256::digest(max_scalar.deref().to_bytes()).into();
 
         // Should succeed (max scalar is valid)
         let result = generate_dleq_proof(&max_scalar, &adaptor_point, &hashlock);
@@ -493,28 +646,32 @@ mod tests {
 
     #[test]
     fn test_nonce_generation_counter_boundary() {
+        use zeroize::Zeroizing;
+        use std::ops::Deref;
         // Test that nonce generation handles counter retries correctly
         // This tests the boundary condition where k might be zero multiple times
         // (though statistically unlikely, we should handle it)
-        let secret = Scalar::from(42u64);
-        let hashlock: [u8; 32] = Sha256::digest(secret.to_bytes()).into();
+        let secret = Zeroizing::new(Scalar::from(42u64));
+        let hashlock: [u8; 32] = Sha256::digest(secret.deref().to_bytes()).into();
 
         // Generate nonce multiple times - should always succeed
         for _ in 0..10 {
             let nonce = generate_deterministic_nonce(&secret, &hashlock)
                 .expect("Nonce generation should always succeed");
-            assert_ne!(nonce, Scalar::ZERO, "Nonce must never be zero");
+            assert_ne!(*nonce, Scalar::ZERO, "Nonce must never be zero");
         }
     }
 
     #[test]
     fn test_nonce_generation_max_attempts() {
+        use zeroize::Zeroizing;
+        use std::ops::Deref;
         // Test that nonce generation doesn't loop infinitely
         // Even if we hit zero nonces, we should fail gracefully after max attempts
         // Note: This is a theoretical test - hitting zero 100 times is cryptographically impossible
         // But we test the error handling path
-        let secret = Scalar::from(42u64);
-        let hashlock: [u8; 32] = Sha256::digest(secret.to_bytes()).into();
+        let secret = Zeroizing::new(Scalar::from(42u64));
+        let hashlock: [u8; 32] = Sha256::digest(secret.deref().to_bytes()).into();
 
         // This should succeed (hitting zero 100 times is impossible)
         let result = generate_deterministic_nonce(&secret, &hashlock);

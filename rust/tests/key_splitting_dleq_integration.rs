@@ -6,6 +6,7 @@
 //! 2. Starknet DLEQ proof: T = t·G, U = t·Y
 
 use sha2::{Digest, Sha256};
+use zeroize::Zeroizing;
 use xmr_secret_gen::dleq::generate_dleq_proof;
 use xmr_secret_gen::monero::SwapKeyPair;
 
@@ -19,7 +20,9 @@ fn test_swap_keypair_with_dleq_proof() {
     let hashlock: [u8; 32] = Sha256::digest(keys.adaptor_scalar_bytes()).into();
 
     // 3. Generate DLEQ proof - THIS IS THE CONFIRMED API
-    let proof = generate_dleq_proof(&keys.adaptor_scalar, &keys.adaptor_point, &hashlock)
+    // Wrap adaptor_scalar in Zeroizing for memory safety
+    let adaptor_scalar_zeroizing = Zeroizing::new(keys.adaptor_scalar);
+    let proof = generate_dleq_proof(&adaptor_scalar_zeroizing, &keys.adaptor_point, &hashlock)
         .expect("DLEQ proof generation should succeed with valid inputs");
 
     // 4. Basic proof validity checks

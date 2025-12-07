@@ -10,6 +10,8 @@ use curve25519_dalek::{
     constants::ED25519_BASEPOINT_POINT,
     scalar::Scalar,
 };
+use zeroize::Zeroizing;
+use std::ops::Deref;
 
 proptest! {
     /// Property: Valid proof should always verify (soundness).
@@ -27,10 +29,11 @@ proptest! {
             return Ok(());
         }
         
-        let adaptor_point = ED25519_BASEPOINT_POINT * secret;
-        let hashlock: [u8; 32] = Sha256::digest(secret.to_bytes()).into();
+        let secret_zeroizing = Zeroizing::new(secret);
+        let adaptor_point = ED25519_BASEPOINT_POINT * *secret_zeroizing;
+        let hashlock: [u8; 32] = Sha256::digest(secret_zeroizing.deref().to_bytes()).into();
         
-        let proof = generate_dleq_proof(&secret, &adaptor_point, &hashlock)?;
+        let proof = generate_dleq_proof(&secret_zeroizing, &adaptor_point, &hashlock)?;
         
         // Challenge and response must be non-zero
         prop_assert_ne!(proof.challenge.to_bytes(), [0u8; 32], "Challenge must be non-zero");
@@ -60,16 +63,17 @@ proptest! {
             return Ok(());
         }
         
-        let adaptor_point = ED25519_BASEPOINT_POINT * secret;
-        let hashlock: [u8; 32] = Sha256::digest(secret.to_bytes()).into();
+        let secret_zeroizing = Zeroizing::new(secret);
+        let adaptor_point = ED25519_BASEPOINT_POINT * *secret_zeroizing;
+        let hashlock: [u8; 32] = Sha256::digest(secret_zeroizing.deref().to_bytes()).into();
         let wrong_hashlock: [u8; 32] = Sha256::digest(wrong_secret.to_bytes()).into();
         
         // Proof with correct hashlock should succeed
-        let proof_result = generate_dleq_proof(&secret, &adaptor_point, &hashlock);
+        let proof_result = generate_dleq_proof(&secret_zeroizing, &adaptor_point, &hashlock);
         prop_assert!(proof_result.is_ok(), "Valid proof should generate successfully");
         
         // Proof with wrong hashlock should fail
-        let wrong_proof_result = generate_dleq_proof(&secret, &adaptor_point, &wrong_hashlock);
+        let wrong_proof_result = generate_dleq_proof(&secret_zeroizing, &adaptor_point, &wrong_hashlock);
         prop_assert_eq!(
             wrong_proof_result,
             Err(DleqError::HashlockMismatch),
@@ -78,7 +82,7 @@ proptest! {
         
         // Proof with wrong adaptor point should fail
         let wrong_adaptor_point = ED25519_BASEPOINT_POINT * wrong_secret;
-        let wrong_point_result = generate_dleq_proof(&secret, &wrong_adaptor_point, &hashlock);
+        let wrong_point_result = generate_dleq_proof(&secret_zeroizing, &wrong_adaptor_point, &hashlock);
         prop_assert_eq!(
             wrong_point_result,
             Err(DleqError::PointMismatch),
@@ -97,10 +101,11 @@ proptest! {
             return Ok(());
         }
         
-        let adaptor_point = ED25519_BASEPOINT_POINT * secret;
-        let hashlock: [u8; 32] = Sha256::digest(secret.to_bytes()).into();
+        let secret_zeroizing = Zeroizing::new(secret);
+        let adaptor_point = ED25519_BASEPOINT_POINT * *secret_zeroizing;
+        let hashlock: [u8; 32] = Sha256::digest(secret_zeroizing.deref().to_bytes()).into();
         
-        let result = generate_dleq_proof(&secret, &adaptor_point, &hashlock);
+        let result = generate_dleq_proof(&secret_zeroizing, &adaptor_point, &hashlock);
         prop_assert_eq!(
             result,
             Err(DleqError::ZeroScalar),
@@ -120,15 +125,16 @@ proptest! {
             return Ok(());
         }
         
-        let adaptor_point = ED25519_BASEPOINT_POINT * secret;
-        let correct_hashlock: [u8; 32] = Sha256::digest(secret.to_bytes()).into();
+        let secret_zeroizing = Zeroizing::new(secret);
+        let adaptor_point = ED25519_BASEPOINT_POINT * *secret_zeroizing;
+        let correct_hashlock: [u8; 32] = Sha256::digest(secret_zeroizing.deref().to_bytes()).into();
         
         // Skip if wrong hashlock happens to match (rare but possible)
         if wrong_hashlock_bytes == correct_hashlock {
             return Ok(());
         }
         
-        let result = generate_dleq_proof(&secret, &adaptor_point, &wrong_hashlock_bytes);
+        let result = generate_dleq_proof(&secret_zeroizing, &adaptor_point, &wrong_hashlock_bytes);
         prop_assert_eq!(
             result,
             Err(DleqError::HashlockMismatch),
@@ -149,11 +155,12 @@ proptest! {
             return Ok(());
         }
         
-        let correct_adaptor_point = ED25519_BASEPOINT_POINT * secret;
+        let secret_zeroizing = Zeroizing::new(secret);
+        let correct_adaptor_point = ED25519_BASEPOINT_POINT * *secret_zeroizing;
         let wrong_adaptor_point = ED25519_BASEPOINT_POINT * wrong_secret;
-        let hashlock: [u8; 32] = Sha256::digest(secret.to_bytes()).into();
+        let hashlock: [u8; 32] = Sha256::digest(secret_zeroizing.deref().to_bytes()).into();
         
-        let result = generate_dleq_proof(&secret, &wrong_adaptor_point, &hashlock);
+        let result = generate_dleq_proof(&secret_zeroizing, &wrong_adaptor_point, &hashlock);
         prop_assert_eq!(
             result,
             Err(DleqError::PointMismatch),

@@ -30,6 +30,7 @@ use rand::rngs::OsRng;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use zeroize::Zeroizing;
 
 /// Output structure for JSON serialization.
 #[derive(Serialize)]
@@ -259,9 +260,10 @@ pub fn generate_swap_secret() -> SwapSecret {
         u32::from_be_bytes(hash_bytes[start..start + 4].try_into().unwrap())
     });
 
-    // Generate DLEQ proof
-    let adaptor_point_edwards = ED25519_BASEPOINT_POINT * scalar;
-    let dleq_proof = generate_dleq_proof(&scalar, &adaptor_point_edwards, &hashlock)
+    // Generate DLEQ proof (wrap scalar in Zeroizing for memory safety)
+    let secret_zeroizing = Zeroizing::new(scalar);
+    let adaptor_point_edwards = ED25519_BASEPOINT_POINT * *secret_zeroizing;
+    let dleq_proof = generate_dleq_proof(&secret_zeroizing, &adaptor_point_edwards, &hashlock)
         .expect("DLEQ proof generation should succeed for valid test inputs");
 
     // Convert DLEQ second point to Weierstrass and get limbs

@@ -8,6 +8,8 @@ use curve25519_dalek::scalar::Scalar;
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use std::fs;
+use zeroize::Zeroizing;
+use std::ops::Deref;
 use xmr_secret_gen::dleq::generate_dleq_proof;
 
 /// Generate test vectors for Cairo integration tests
@@ -17,18 +19,19 @@ fn generate_cairo_test_vectors() {
     // Generate a deterministic secret for reproducible test vectors
     let secret_bytes = [0x12; 32];
     let secret = Scalar::from_bytes_mod_order(secret_bytes);
+    let secret_zeroizing = Zeroizing::new(secret);
 
     // Generate adaptor point T = secret·G (correct protocol)
-    let adaptor_point = ED25519_BASEPOINT_POINT * secret;
+    let adaptor_point = ED25519_BASEPOINT_POINT * *secret_zeroizing;
 
     // Generate hashlock H = SHA-256(secret) (must match secret)
     use sha2::{Digest, Sha256};
     // Hashlock must be computed from secret.to_bytes() (not raw secret_bytes)
     // This matches the validation in generate_dleq_proof
-    let hashlock: [u8; 32] = Sha256::digest(secret.to_bytes()).into();
+    let hashlock: [u8; 32] = Sha256::digest(secret_zeroizing.deref().to_bytes()).into();
 
     // Generate DLEQ proof
-    let proof = generate_dleq_proof(&secret, &adaptor_point, &hashlock)
+    let proof = generate_dleq_proof(&secret_zeroizing, &adaptor_point, &hashlock)
         .expect("Proof generation should succeed for valid inputs");
 
     // Convert to Cairo format
@@ -75,12 +78,13 @@ fn generate_multiple_test_vectors() {
     for i in 0..5 {
         let secret_bytes = [i as u8; 32];
         let secret = Scalar::from_bytes_mod_order(secret_bytes);
-        let adaptor_point = ED25519_BASEPOINT_POINT * secret;
+        let secret_zeroizing = Zeroizing::new(secret);
+        let adaptor_point = ED25519_BASEPOINT_POINT * *secret_zeroizing;
 
         // Generate hashlock from secret (must match for validation)
-        let hashlock: [u8; 32] = Sha256::digest(secret.to_bytes()).into();
+        let hashlock: [u8; 32] = Sha256::digest(secret_zeroizing.deref().to_bytes()).into();
 
-        let proof = generate_dleq_proof(&secret, &adaptor_point, &hashlock)
+        let proof = generate_dleq_proof(&secret_zeroizing, &adaptor_point, &hashlock)
             .expect("Proof generation should succeed for valid inputs");
         let cairo_format = proof.to_cairo_format(&adaptor_point);
 
