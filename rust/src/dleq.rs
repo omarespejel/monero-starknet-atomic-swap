@@ -391,4 +391,72 @@ mod tests {
         let Y2 = get_second_generator();
         assert_eq!(Y1, Y2, "Second generator should be deterministic");
     }
+
+    #[test]
+    fn test_dleq_validation_zero_scalar() {
+        let secret = Scalar::ZERO;
+        let adaptor_point = ED25519_BASEPOINT_POINT; // arbitrary
+        let hashlock = [0u8; 32]; // arbitrary
+
+        let result = generate_dleq_proof(&secret, &adaptor_point, &hashlock);
+        assert_eq!(result, Err(DleqError::ZeroScalar), "Zero scalar must be rejected");
+    }
+
+    #[test]
+    fn test_dleq_validation_point_mismatch() {
+        let secret = Scalar::from(42u64);
+        let wrong_point = ED25519_BASEPOINT_POINT * Scalar::from(99u64); // wrong!
+        let hashlock: [u8; 32] = Sha256::digest(secret.to_bytes()).into();
+
+        let result = generate_dleq_proof(&secret, &wrong_point, &hashlock);
+        assert_eq!(
+            result,
+            Err(DleqError::PointMismatch),
+            "Wrong adaptor point must be rejected"
+        );
+    }
+
+    #[test]
+    fn test_dleq_validation_hashlock_mismatch() {
+        let secret = Scalar::from(42u64);
+        let adaptor_point = ED25519_BASEPOINT_POINT * secret;
+        let wrong_hashlock = [0xFF; 32]; // wrong!
+
+        let result = generate_dleq_proof(&secret, &adaptor_point, &wrong_hashlock);
+        assert_eq!(
+            result,
+            Err(DleqError::HashlockMismatch),
+            "Wrong hashlock must be rejected"
+        );
+    }
+
+    #[test]
+    fn test_nonce_generation_deterministic() {
+        let secret = Scalar::from(42u64);
+        let hashlock: [u8; 32] = Sha256::digest(secret.to_bytes()).into();
+
+        let nonce1 = generate_deterministic_nonce(&secret, &hashlock)
+            .expect("Nonce generation should succeed");
+        let nonce2 = generate_deterministic_nonce(&secret, &hashlock)
+            .expect("Nonce generation should succeed");
+
+        assert_eq!(nonce1, nonce2, "Nonce generation must be deterministic");
+        assert_ne!(nonce1, Scalar::ZERO, "Nonce must not be zero");
+    }
+
+    #[test]
+    fn test_nonce_generation_different_inputs_produce_different_nonces() {
+        let secret1 = Scalar::from(42u64);
+        let secret2 = Scalar::from(99u64);
+        let hashlock1: [u8; 32] = Sha256::digest(secret1.to_bytes()).into();
+        let hashlock2: [u8; 32] = Sha256::digest(secret2.to_bytes()).into();
+
+        let nonce1 = generate_deterministic_nonce(&secret1, &hashlock1)
+            .expect("Nonce generation should succeed");
+        let nonce2 = generate_deterministic_nonce(&secret2, &hashlock2)
+            .expect("Nonce generation should succeed");
+
+        // Different inputs should produce different nonces (with high probability)
+        assert_ne!(nonce1, nonce2, "Different inputs should produce different nonces");
+    }
 }
