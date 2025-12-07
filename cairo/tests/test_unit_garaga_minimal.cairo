@@ -5,7 +5,7 @@
 mod garaga_minimal_tests {
     use core::array::ArrayTrait;
     use garaga::definitions::get_G;
-    use garaga::ec_ops::{msm_g1, G1PointTrait};
+    // Note: msm_g1 and G1PointTrait imports removed - not used in this test
 
     const ED25519_CURVE_INDEX: u32 = 4;
 

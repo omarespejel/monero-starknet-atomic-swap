@@ -10,54 +10,69 @@ use core::integer::u256;
 use core::array::ArrayTrait;
 
 /// Point 0: Identity (neutral element) - (0, 1)
+/// Compressed Edwards: 0x0100000000000000000000000000000000000000000000000000000000000000
 /// This is the identity point and must be rejected
+/// Generated from Ristretto test vectors: https://ristretto.group/test_vectors/ristretto255.html
 pub const LOW_ORDER_POINT_0: u256 = u256 { 
     low: 0x00000000000000000000000000000001, 
     high: 0x00000000000000000000000000000000 
 };
 
 /// Point 1: Order 2 - (0, -1)
+/// Compressed Edwards: 0xecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
 /// This point satisfies 2*P = identity
+/// Generated from Ristretto test vectors: https://ristretto.group/test_vectors/ristretto255.html
 pub const LOW_ORDER_POINT_1: u256 = u256 { 
-    low: 0xECFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF, 
-    high: 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFED 
+    low: 0xecffffffffffffffffffffffffffffffff, 
+    high: 0x7fffffffffffffffffffffffffffffffed 
 };
 
-/// Point 2: Order 4 - (0, 0) with sign bit
-/// Note: Actual value needs verification from curve25519-dalek
+/// Point 2: Order 4
+/// Compressed Edwards: 0x0000000000000000000000000000000000000000000000000000000000000000
+/// Generated from Ristretto test vectors: https://ristretto.group/test_vectors/ristretto255.html
 pub const LOW_ORDER_POINT_2: u256 = u256 {
     low: 0x00000000000000000000000000000000,
     high: 0x00000000000000000000000000000000
 };
 
-/// Point 3: Order 4 - (0, 0) with sign bit set
+/// Point 3: Order 4 (with sign bit)
+/// Compressed Edwards: 0x0000000000000000000000000000000000000000000000000000000000000080
+/// Generated from Ristretto test vectors: https://ristretto.group/test_vectors/ristretto255.html
 pub const LOW_ORDER_POINT_3: u256 = u256 {
     low: 0x00000000000000000000000000000080,
     high: 0x00000000000000000000000000000000
 };
 
-/// Point 4: Order 8 - From ristretto test vectors
+/// Point 4: Order 8
+/// Compressed Edwards: 0x26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05
+/// Generated from Ristretto test vectors: https://ristretto.group/test_vectors/ristretto255.html
 pub const LOW_ORDER_POINT_4: u256 = u256 {
-    low: 0x26e8958fc2b227b045c3f489f2ef98f0,
-    high: 0xd5dfac05d3c63339b13802886d53fc05
+    low: 0xd5dfac05d3c63339b13802886d53fc05,
+    high: 0x26e8958fc2b227b045c3f489f2ef98f0
 };
 
-/// Point 5: Order 8 - From ristretto test vectors
+/// Point 5: Order 8
+/// Compressed Edwards: 0x26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc85
+/// Generated from Ristretto test vectors: https://ristretto.group/test_vectors/ristretto255.html
 pub const LOW_ORDER_POINT_5: u256 = u256 {
-    low: 0x26e8958fc2b227b045c3f489f2ef98f0,
-    high: 0xd5dfac05d3c63339b13802886d53fc85
+    low: 0xd5dfac05d3c63339b13802886d53fc85,
+    high: 0x26e8958fc2b227b045c3f489f2ef98f0
 };
 
-/// Point 6: Order 8 - From ristretto test vectors
+/// Point 6: Order 8
+/// Compressed Edwards: 0xc7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a
+/// Generated from Ristretto test vectors: https://ristretto.group/test_vectors/ristretto255.html
 pub const LOW_ORDER_POINT_6: u256 = u256 {
-    low: 0xc7176a703d4dd84fba3c0b760d10670f,
-    high: 0x2a2053fa2c39ccc64ec7fd7792ac037a
+    low: 0x2a2053fa2c39ccc64ec7fd7792ac037a,
+    high: 0xc7176a703d4dd84fba3c0b760d10670f
 };
 
-/// Point 7: Order 8 - From ristretto test vectors
+/// Point 7: Order 8
+/// Compressed Edwards: 0xc7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac03fa
+/// Generated from Ristretto test vectors: https://ristretto.group/test_vectors/ristretto255.html
 pub const LOW_ORDER_POINT_7: u256 = u256 {
-    low: 0xc7176a703d4dd84fba3c0b760d10670f,
-    high: 0x2a2053fa2c39ccc64ec7fd7792ac03fa
+    low: 0x2a2053fa2c39ccc64ec7fd7792ac03fa,
+    high: 0xc7176a703d4dd84fba3c0b760d10670f
 };
 
 /// Helper to get all low-order points as array

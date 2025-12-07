@@ -317,51 +317,6 @@ pub mod AtomicLock {
         // INVARIANT: Hashlock must be exactly 8 u32 words (SHA-256 = 32 bytes = 8×u32)
         assert(hash_words.len() == 8, Errors::INVALID_HASH_LENGTH);
         
-        // DEBUG: Verify hashlock values match expected (for test vectors)
-        // This helps diagnose serialization/deserialization issues
-        // Expected values from test_vectors.json (Big-Endian u32 words from SHA-256):
-        // SHA-256(secret) = 0xb6acca81a0939a856c35e4c4188e95b91731aab1d4629a4cee79dd09ded4fc94
-        // Split into 8 u32 words: [0xb6acca81, 0xa0939a85, 0x6c35e4c4, 0x188e95b9, ...]
-        // These assertions will fail with descriptive error if hashlock serialization is corrupted
-        let h0 = *hash_words.at(0);
-        let h1 = *hash_words.at(1);
-        let h2 = *hash_words.at(2);
-        let h3 = *hash_words.at(3);
-        let h4 = *hash_words.at(4);
-        let h5 = *hash_words.at(5);
-        let h6 = *hash_words.at(6);
-        let h7 = *hash_words.at(7);
-        
-        // Debug assertions (will fail with descriptive error if mismatch)
-        // This helps identify if serialization is corrupting the hashlock
-        // CRITICAL: These are ORIGINAL SHA-256 big-endian words (not pre-swapped)
-        // hashlock_to_u256() will byte-swap them - test constants should NOT be pre-swapped
-        // Updated to match regenerated test_vectors.json
-        if h0 != 0xb6acca81_u32 {
-            assert(false, Errors::INVALID_HASH_LENGTH); // H0 mismatch (expected original BE)
-        }
-        if h1 != 0xa0939a85_u32 {
-            assert(false, Errors::INVALID_HASH_LENGTH); // H1 mismatch (expected original BE)
-        }
-        if h2 != 0x6c35e4c4_u32 {
-            assert(false, Errors::INVALID_HASH_LENGTH); // H2 mismatch (expected original BE)
-        }
-        if h3 != 0x188e95b9_u32 {
-            assert(false, Errors::INVALID_HASH_LENGTH); // H3 mismatch (expected original BE)
-        }
-        if h4 != 0x1731aab1_u32 {
-            assert(false, Errors::INVALID_HASH_LENGTH); // H4 mismatch (expected original BE)
-        }
-        if h5 != 0xd4629a4c_u32 {
-            assert(false, Errors::INVALID_HASH_LENGTH); // H5 mismatch (expected original BE)
-        }
-        if h6 != 0xee79dd09_u32 {
-            assert(false, Errors::INVALID_HASH_LENGTH); // H6 mismatch (expected original BE)
-        }
-        if h7 != 0xded4fc94_u32 {
-            assert(false, Errors::INVALID_HASH_LENGTH); // H7 mismatch (expected original BE)
-        }
-        
         // INVARIANT: Fake-GLV hint must be exactly 10 felts (Q.x[4], Q.y[4], s1, s2)
         assert(fake_glv_hint.len() == 10, Errors::INVALID_HINT_LENGTH);
         
@@ -538,46 +493,9 @@ pub mod AtomicLock {
         // Architecture: Constructor is the gatekeeper - it validates the challenge,
         // then _verify_dleq_proof trusts the validated challenge and only does MSM math
         
-        // DEBUG: Verify points match expected values (for test vectors)
-        // This helps diagnose if points are corrupted during calldata transmission
-        // Expected values from test_vectors.json (compressed Edwards points as u256)
-        // NOTE: G and Y are hardcoded constants, T/U/R1/R2 come from calldata
+        // ========== DLEQ CHALLENGE COMPUTATION ==========
         let G_compressed = ED25519_BASE_POINT_COMPRESSED;
         let Y_compressed = ED25519_SECOND_GENERATOR_COMPRESSED;
-        
-        // Verify base point constant is correct (RFC 8032)
-        assert(G_compressed.low == 0x66666666666666666666666666666658, 'G.low wrong');
-        assert(G_compressed.high == 0x66666666666666666666666666666666, 'G.high wrong');
-        
-        // Debug assertions for points from calldata (T, U, R1, R2)
-        // These will fail if points don't match expected test vector values
-        // Expected adaptor point T: 0x54e86953e7cc99b545cfef03f63cce85 (low), 0x427dde0adb325f957d29ad71e4643882 (high)
-        let expected_T_low = 0x54e86953e7cc99b545cfef03f63cce85;
-        let expected_T_high = 0x427dde0adb325f957d29ad71e4643882;
-        if adaptor_point_edwards_compressed.low != expected_T_low || adaptor_point_edwards_compressed.high != expected_T_high {
-            assert(false, Errors::DLEQ_CHALLENGE_MISMATCH); // T point mismatch
-        }
-        
-        // Expected second point U: 0xd893b3476bdf09770b7616f84c5c7bbe (low), 0x5c79d0fa84d6440908e2e2065e60d1cd (high)
-        let expected_U_low = 0xd893b3476bdf09770b7616f84c5c7bbe;
-        let expected_U_high = 0x5c79d0fa84d6440908e2e2065e60d1cd;
-        if dleq_second_point_edwards_compressed.low != expected_U_low || dleq_second_point_edwards_compressed.high != expected_U_high {
-            assert(false, Errors::DLEQ_CHALLENGE_MISMATCH); // U point mismatch
-        }
-        
-        // Expected R1: 0x90b1ab352981d43ec51fba0af7ab51c7 (low), 0xc21ebc88e5e59867b280909168338026 (high)
-        let expected_R1_low = 0x90b1ab352981d43ec51fba0af7ab51c7;
-        let expected_R1_high = 0xc21ebc88e5e59867b280909168338026;
-        if dleq_r1_compressed.low != expected_R1_low || dleq_r1_compressed.high != expected_R1_high {
-            assert(false, Errors::DLEQ_CHALLENGE_MISMATCH); // R1 point mismatch
-        }
-        
-        // Expected R2: 0x02d386e8fd6bd85a339171211735bcba (low), 0x10defc0130a9f3055798b1f5a99aeb67 (high)
-        let expected_R2_low = 0x02d386e8fd6bd85a339171211735bcba;
-        let expected_R2_high = 0x10defc0130a9f3055798b1f5a99aeb67;
-        if dleq_r2_compressed.low != expected_R2_low || dleq_r2_compressed.high != expected_R2_high {
-            assert(false, Errors::DLEQ_CHALLENGE_MISMATCH); // R2 point mismatch
-        }
         
         let c_prime = compute_dleq_challenge_blake2s(
             G_compressed,
