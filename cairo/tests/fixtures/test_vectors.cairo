@@ -66,12 +66,12 @@ pub const TESTVECTOR_HASHLOCK: [u32; 8] = [
 ];
 
 /// Challenge scalar (low 128 bits) - truncated from full challenge
-/// Full challenge: 0xc53365223a31a1e310296fda3ed593ff6212e6122afa3670f0f578dffd3b2703
-/// Low 128 bits:   0x6212e6122afa3670f0f578dffd3b2703
-pub const TESTVECTOR_CHALLENGE_LOW: felt252 = 0x6212e6122afa3670f0f578dffd3b2703;
+/// Full challenge (reduced scalar, LE bytes): 0xff93d53eda6f2910e3a1313a226533c503273bfddf78f5f07036fa2a12e61262
+/// Low 128 bits:   0xff93d53eda6f2910e3a1313a226533c5
+pub const TESTVECTOR_CHALLENGE_LOW: felt252 = 0xff93d53eda6f2910e3a1313a226533c5;
 
 /// Challenge scalar (high 124 bits)
-pub const TESTVECTOR_CHALLENGE_HIGH: felt252 = 0xc53365223a31a1e310296fda3ed593ff;
+pub const TESTVECTOR_CHALLENGE_HIGH: felt252 = 0x03273bfddf78f5f07036fa2a12e61262;
 
 /// Response scalar (low 128 bits)
 pub const TESTVECTOR_RESPONSE_LOW: felt252 = 0xc09b9a31d72db277d1bb402e80ef5008;

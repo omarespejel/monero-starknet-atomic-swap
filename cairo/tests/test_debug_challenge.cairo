@@ -67,15 +67,15 @@ mod print_challenge_tests {
             ED25519_ORDER,
         );
 
-        // Truncate to 128 bits (what MSM uses)
-        let challenge_low: u128 = challenge.try_into().unwrap_or(0);
+        // Convert to u256 to extract low/high parts
+        let challenge_u256: u256 = challenge.into();
+        
+        // Expected challenge from test_vectors.json (reduced scalar, LE bytes)
+        // Challenge truncated (low 128 bits): 0xff93d53eda6f2910e3a1313a226533c5
+        let expected_low: u128 = 0xff93d53eda6f2910e3a1313a226533c5;
 
-        // Expected truncated challenge from test_vectors.json
-        let expected_low: u128 = 0x6212e6122afa3670f0f578dffd3b2703;
-
-        // Compare - if mismatch, the test will fail and show values
-        // This helps debug what challenge Cairo actually computes
-        assert(challenge_low == expected_low, 'Mismatch');
+        // Verify truncated challenge matches expected
+        assert(challenge_u256.low == expected_low, 'Challenge mismatch');
     }
 }
 

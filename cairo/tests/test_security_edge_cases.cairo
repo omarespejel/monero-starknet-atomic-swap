@@ -19,7 +19,9 @@ mod dleq_edge_cases_tests {
         let scalar_u256 = reduce_felt_to_scalar(max_scalar);
         
         // Should truncate correctly
-        assert(scalar_u256.low == max_scalar.into(), 'Max scalar low');
+        // Convert felt252 to u256 first, then extract low
+        let max_scalar_u256: u256 = max_scalar.into();
+        assert(scalar_u256.low == max_scalar_u256.low, 'Max scalar low');
         assert(scalar_u256.high == 0, 'Max scalar high must be 0');
     }
     
@@ -30,7 +32,9 @@ mod dleq_edge_cases_tests {
         let near_order: felt252 = 0xffffffffffffffffffffffffffffffff; // Max 128-bit value
         let scalar_u256 = reduce_felt_to_scalar(near_order);
         
-        assert(scalar_u256.low == near_order.into(), 'Near order scalar');
+        // Convert felt252 to u256 first, then extract low
+        let near_order_u256: u256 = near_order.into();
+        assert(scalar_u256.low == near_order_u256.low, 'Near order scalar');
         assert(scalar_u256.high == 0, 'High must be 0');
     }
     

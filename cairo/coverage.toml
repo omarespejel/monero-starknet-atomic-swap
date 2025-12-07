@@ -1,0 +1,22 @@
+# Test Coverage Configuration for Cairo AtomicLock Contract
+# 
+# This file configures test coverage thresholds and exclusions
+# for the atomic swap contract test suite.
+
+[coverage]
+# Exclude debug and fixture files from coverage requirements
+exclude = [
+    "tests/debug/*",
+    "tests/fixtures/*",
+    "tests/mocks/*"
+]
+
+[coverage.thresholds]
+# Coverage thresholds (as percentages)
+line = 90      # 90% of lines must be covered
+branch = 85    # 85% of branches must be covered
+function = 95  # 95% of functions must be covered
+
+# Note: These thresholds are aspirational. Current coverage may be lower.
+# Run `snforge coverage` to see current coverage statistics.
+

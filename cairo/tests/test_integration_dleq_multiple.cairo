@@ -5,13 +5,7 @@
 
 #[cfg(test)]
 mod dleq_multiple_vectors_tests {
-    use atomic_lock::IAtomicLockDispatcher;
     use core::array::ArrayTrait;
-    use core::serde::Serde;
-    use core::traits::TryInto;
-    use starknet::ContractAddress;
-    use snforge_std::{declare, ContractClassTrait, DeclareResultTrait};
-    use core::integer::u256;
     
     const FUTURE_TIMESTAMP: u64 = 9999999999_u64;
     

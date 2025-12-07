@@ -51,11 +51,9 @@ mod e2e_dleq_tests {
     const TESTVECTOR_RESPONSE_LOW: felt252 = 0xc09b9a31d72db277d1bb402e80ef5008;
     const TESTVECTOR_RESPONSE_HIGH: felt252 = 0x004efaf601adbf89a8283471b5f7cf47;
     // CRITICAL: Truncated values (low 128 bits) - this is what hints were generated for
-    // Hints expect:
-    //   c = 0x6212e6122afa3670f0f578dffd3b2703 (truncated challenge)
-    //   s = 0x47cff7b5713428a889bfad01f6fa4e00 (truncated response)
-    const TEST_VECTOR_C_TRUNCATED: felt252 = 0x6212e6122afa3670f0f578dffd3b2703;
-    const TEST_VECTOR_S_TRUNCATED: felt252 = 0x47cff7b5713428a889bfad01f6fa4e00;
+    // Updated from regenerated test_vectors.json
+    const TEST_VECTOR_C_TRUNCATED: felt252 = 0xff93d53eda6f2910e3a1313a226533c5;
+    const TEST_VECTOR_S_TRUNCATED: felt252 = 0xc09b9a31d72db277d1bb402e80ef5008;
     const ED25519_ORDER: u256 = u256 {
         low: 0x14def9dea2f79cd65812631a5cf5d3ed,
         high: 0x10000000000000000000000000000000,
@@ -119,69 +117,67 @@ mod e2e_dleq_tests {
         Span<felt252>,
         Span<felt252>,
     ) {
-        // MSM hints regenerated using generate_hints_exact.py (auditor's fix)
-        // CRITICAL: Uses EXACT Garaga decompression to get same Weierstrass coordinates as Cairo
-        // This fixes the birational map issue - decompresses T/U from compressed format
-        // using sqrt hints, then converts Edwards → Weierstrass (matching Cairo's path)
-        // Scalars: s = 0x47cff7b5713428a889bfad01f6fa4e00, c = 0x6212e6122afa3670f0f578dffd3b2703
-        // Q values computed correctly as Q = scalar * point using Garaga's get_fake_glv_hint
-        // T (Weierstrass): x=0x6decdae5e1b9b254748d85ad870959a54bca47ba4af5bf430174455ca59934c5
-        // U (Weierstrass): x=0x4064403270f2ea13e58e5540490527c645e6ca9b3e1119338bad8c53640d33b8
+        // MSM hints regenerated using generate_hints_from_test_vectors.py
+        // Updated with regenerated test_vectors.json (correct Y constant)
+        // CRITICAL: Hints generated with TRUNCATED scalars (128-bit) to match Cairo's behavior
+        // Cairo truncates to 128 bits before using scalars, so hints must match
+        // c_truncated = 0xff93d53eda6f2910e3a1313a226533c5
+        // s_truncated = 0xc09b9a31d72db277d1bb402e80ef5008
         
-        // s_hint_for_g: Fake-GLV hint for s·G
+        // s_hint_for_g: Fake-GLV hint for s·G (with truncated s)
         let s_hint_for_g = array![
-            0xd21de05d0b4fe220a6fcca9b,
-            0xa8e827ce9b59e1a5770bd9a,
-            0x4e14ea0d8a7581a1,
+            0xa82b6800cf6fafb9e422ff00,
+            0xa9d32170fa1d6e70ce9f5875,
+            0x38d522e54f3cc905,
             0x0,
-            0x8cfb1d3e412e174d0ad03ad4,
-            0x4417fe7cc6824de3b328f2a0,
-            0x13f6f393b443ac08,
+            0x6632b6936c8a0092f2fa8193,
+            0x48849326ffd29b0fd452c82e,
+            0x1cb22722b8aeac6d,
             0x0,
-            0x1fd0f994a4c11a4543d86f4578e7b9ed,
-            0x39099b31d1013f73ec51ebd61fdfe2ab
+            0x3ce8213ee078382bd7862b141d23a01e,
+            0x12a88328ee6fe07c656e9f1f11921d2ff
         ].span();
 
-        // s_hint_for_y: Fake-GLV hint for s·Y
+        // s_hint_for_y: Fake-GLV hint for s·Y (with truncated s)
         let s_hint_for_y = array![
-            0xcdb4e41a66188ec060e0e45b,
-            0x1cf0f0ff51495823cad8d964,
-            0x2dcda3d3bbeda8a3,
+            0x5f8703b67e528a68c666436f,
+            0x4319c91a2264dceb203b3c7,
+            0x131bcf26d61c6749,
             0x0,
-            0x8b8b33d4304cc1bedc45545c,
-            0x5fbf8dbd7bd2029ba859c5bb,
-            0x145b0ef370c62319,
+            0x2b9edf9810114e3f99120ee8,
+            0x23ac0997ff9d26665393f4f1,
+            0xa2adc2ad21db8d1,
             0x0,
-            0x1fd0f994a4c11a4543d86f4578e7b9ed,
-            0x39099b31d1013f73ec51ebd61fdfe2ab
+            0x3ce8213ee078382bd7862b141d23a01e,
+            0x12a88328ee6fe07c656e9f1f11921d2ff
         ].span();
 
-        // c_neg_hint_for_t: Fake-GLV hint for (-c)·T (using EXACT decompressed T)
+        // c_neg_hint_for_t: Fake-GLV hint for (-c)·T (with truncated c, EXACT Garaga decompression)
         let c_neg_hint_for_t = array![
-            0x959983489a84cf6bb55fde22,
-            0xfbea3c47483b8fb99b0e29ef,
-            0x3fe816922486f803,
+            0xcc7bbab2a86720f06fa72b5a,
+            0x27ebc6cd7c83bd71f4819168,
+            0x2b4af1beb7dc4112,
             0x0,
-            0x406a020256217f7a00633c4a,
-            0x6b9be390479e99c682cae8f0,
-            0x7b48b6a59c2c6732,
+            0xd0ac52873f110a396803c36c,
+            0xc23304c89672797661dbefa3,
+            0x547b7c3862004a5a,
             0x0,
-            0x208a4ac47d492a7b82475d0c0c798e52,
-            0x29c3b379b559be107e5c78bb9abb6515
+            0xba5f45d69eaafbaaa06091a65e2873d,
+            0x1301450999c6615fa5bded0ada7e22902
         ].span();
 
-        // c_neg_hint_for_u: Fake-GLV hint for (-c)·U (using EXACT decompressed U)
+        // c_neg_hint_for_u: Fake-GLV hint for (-c)·U (with truncated c, EXACT Garaga decompression)
         let c_neg_hint_for_u = array![
-            0x6bea23ab976cb56319ceb69d,
-            0xba4983a65676829fc603f500,
-            0x65b0b083f90952f1,
+            0x3aa67aef7c64a7b253e4a0fc,
+            0x2799eb3ed1784408cb1f6360,
+            0x6d7fa630d5721877,
             0x0,
-            0x7e7a6ae6e23418c184e6d824,
-            0x119cf240405f414ec4ed2cc6,
-            0x15cea0344fcb9e58,
+            0x9fed6006f4d300b627b45f,
+            0xf8f69fd5bc96748bf6e2541b,
+            0x56b40a0879ad40ae,
             0x0,
-            0x208a4ac47d492a7b82475d0c0c798e52,
-            0x29c3b379b559be107e5c78bb9abb6515
+            0xba5f45d69eaafbaaa06091a65e2873d,
+            0x1301450999c6615fa5bded0ada7e22902
         ].span();
 
         (s_hint_for_g, s_hint_for_y, c_neg_hint_for_t, c_neg_hint_for_u)

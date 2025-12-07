@@ -10,7 +10,9 @@
 #[cfg(test)]
 mod full_swap_flow_tests {
     use atomic_lock::IAtomicLockDispatcher;
+    use atomic_lock::IAtomicLockDispatcherTrait;
     use core::array::ArrayTrait;
+    use core::byte_array::{ByteArray, ByteArrayTrait};
     use core::serde::Serde;
     use core::traits::TryInto;
     use starknet::ContractAddress;
@@ -130,6 +132,20 @@ mod full_swap_flow_tests {
         let hashlock = TESTVECTOR_HASHLOCK.span();
         let (s_hint_for_g, s_hint_for_y, c_neg_hint_for_t, c_neg_hint_for_u) = get_real_msm_hints();
         
+        // Fake-GLV hint for adaptor point MSM (from test_e2e_dleq.cairo)
+        let fake_glv_hint = array![
+            0x4af5bf430174455ca59934c5,           // Q.x limb0
+            0x748d85ad870959a54bca47ba,           // Q.x limb1
+            0x6decdae5e1b9b254,                   // Q.x limb2
+            0x0,                                  // Q.x limb3
+            0xaa008e6009b43d5c309fa848,           // Q.y limb0
+            0x5b26ec9e21237560e1866183,           // Q.y limb1
+            0x7191bfaa5a23d0cb,                   // Q.y limb2
+            0x0,                                  // Q.y limb3
+            0x1569bc348ca5e9beecb728fdbfea1cd6,   // s1
+            0x28e2d5faa7b8c3b25a1678149337cad3   // s2_encoded
+        ].span();
+        
         let mut calldata = ArrayTrait::new();
         hashlock.serialize(ref calldata);
         Serde::serialize(@FUTURE_TIMESTAMP, ref calldata);
@@ -143,6 +159,7 @@ mod full_swap_flow_tests {
         Serde::serialize(@TEST_SECOND_POINT_SQRT_HINT, ref calldata);
         Serde::serialize(@TESTVECTOR_CHALLENGE_LOW, ref calldata);
         Serde::serialize(@TESTVECTOR_RESPONSE_LOW, ref calldata);
+        Serde::serialize(@fake_glv_hint, ref calldata);
         Serde::serialize(@s_hint_for_g, ref calldata);
         Serde::serialize(@s_hint_for_y, ref calldata);
         Serde::serialize(@c_neg_hint_for_t, ref calldata);
@@ -163,20 +180,52 @@ mod full_swap_flow_tests {
         let zero_address: ContractAddress = 0.try_into().unwrap();
         assert(contract.contract_address != zero_address, 'Contract deployed');
         
-        // TODO: Call verify_and_unlock with correct secret
-        // TODO: Verify unlocked == true
-        // This requires the secret scalar that matches the adaptor point
-        // For now, we verify deployment succeeds
+        // Verify contract starts locked
+        assert(!contract.is_unlocked(), 'Contract should start locked');
+        
+        // Secret from test_vectors.json: 1212121212121212121212121212121212121212121212121212121212121212
+        // This secret's SHA-256 matches TESTVECTOR_HASHLOCK
+        let mut secret: ByteArray = Default::default();
+        // Append all 32 bytes (0x12 repeated 32 times)
+        secret.append_byte(0x12_u8); secret.append_byte(0x12_u8); secret.append_byte(0x12_u8); secret.append_byte(0x12_u8);
+        secret.append_byte(0x12_u8); secret.append_byte(0x12_u8); secret.append_byte(0x12_u8); secret.append_byte(0x12_u8);
+        secret.append_byte(0x12_u8); secret.append_byte(0x12_u8); secret.append_byte(0x12_u8); secret.append_byte(0x12_u8);
+        secret.append_byte(0x12_u8); secret.append_byte(0x12_u8); secret.append_byte(0x12_u8); secret.append_byte(0x12_u8);
+        secret.append_byte(0x12_u8); secret.append_byte(0x12_u8); secret.append_byte(0x12_u8); secret.append_byte(0x12_u8);
+        secret.append_byte(0x12_u8); secret.append_byte(0x12_u8); secret.append_byte(0x12_u8); secret.append_byte(0x12_u8);
+        secret.append_byte(0x12_u8); secret.append_byte(0x12_u8); secret.append_byte(0x12_u8); secret.append_byte(0x12_u8);
+        secret.append_byte(0x12_u8); secret.append_byte(0x12_u8); secret.append_byte(0x12_u8); secret.append_byte(0x12_u8);
+        
+        // Call verify_and_unlock with correct secret
+        // Note: This will fail if token transfer is required (amount > 0)
+        // For now, we test with amount = 0 (no token transfer)
+        let success = contract.verify_and_unlock(secret);
+        assert(success, 'Unlock should succeed');
+        assert(contract.is_unlocked(), 'Contract should be unlocked');
     }
     
     /// Test: Unlock with wrong secret should fail
     #[test]
-    #[should_panic]
     fn test_unlock_with_wrong_secret() {
         let contract = deploy_contract();
         
-        // TODO: Call verify_and_unlock with wrong secret
-        // Should panic with appropriate error
+        // Create wrong secret (different from test_vectors.json)
+        let mut wrong_secret: ByteArray = Default::default();
+        // Append wrong bytes (0x00 repeated 32 times instead of 0x12)
+        wrong_secret.append_byte(0x00_u8); wrong_secret.append_byte(0x00_u8); wrong_secret.append_byte(0x00_u8); wrong_secret.append_byte(0x00_u8);
+        wrong_secret.append_byte(0x00_u8); wrong_secret.append_byte(0x00_u8); wrong_secret.append_byte(0x00_u8); wrong_secret.append_byte(0x00_u8);
+        wrong_secret.append_byte(0x00_u8); wrong_secret.append_byte(0x00_u8); wrong_secret.append_byte(0x00_u8); wrong_secret.append_byte(0x00_u8);
+        wrong_secret.append_byte(0x00_u8); wrong_secret.append_byte(0x00_u8); wrong_secret.append_byte(0x00_u8); wrong_secret.append_byte(0x00_u8);
+        wrong_secret.append_byte(0x00_u8); wrong_secret.append_byte(0x00_u8); wrong_secret.append_byte(0x00_u8); wrong_secret.append_byte(0x00_u8);
+        wrong_secret.append_byte(0x00_u8); wrong_secret.append_byte(0x00_u8); wrong_secret.append_byte(0x00_u8); wrong_secret.append_byte(0x00_u8);
+        wrong_secret.append_byte(0x00_u8); wrong_secret.append_byte(0x00_u8); wrong_secret.append_byte(0x00_u8); wrong_secret.append_byte(0x00_u8);
+        wrong_secret.append_byte(0x00_u8); wrong_secret.append_byte(0x00_u8); wrong_secret.append_byte(0x00_u8); wrong_secret.append_byte(0x00_u8);
+        
+        // Call verify_and_unlock with wrong secret - should return false (not panic)
+        // The function returns false if hashlock doesn't match
+        let success = contract.verify_and_unlock(wrong_secret);
+        assert(!success, 'Unlock should fail');
+        assert(!contract.is_unlocked(), 'Contract should remain locked');
     }
     
     /// Test: Refund after expiry
