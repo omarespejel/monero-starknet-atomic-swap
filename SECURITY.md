@@ -112,6 +112,12 @@ An attacker could provide an incorrect secret when attempting to unlock. The con
 
 An attacker could attempt to call `refund()` before the timelock expires. The contract checks `assert(now >= lock_until)` before processing any refund. The constructor enforces `assert(lock_until > now)` to ensure a valid timelock is set at deployment.
 
+### Cross-Chain Race Conditions
+
+A protocol-level race condition exists between secret revelation and cross-chain transaction confirmation. When the secret `t` is revealed on Starknet, tokens transfer immediately. However, if the corresponding Monero transaction fails or experiences a blockchain reorganization, funds may be at risk.
+
+The September 2025 Monero network experienced an 18-block reorganization, demonstrating this is not theoretical. Mitigation requires implementing a two-phase unlock with a grace period, allowing time for cross-chain confirmation before final token transfer. This mitigation is planned for version 0.8.0.
+
 ## Cryptographic Library Security
 
 ### curve25519-dalek
@@ -165,6 +171,24 @@ An external security audit by a third-party firm is pending. While the implement
 The Monero integration is at demo level and not suitable for production use. A full production wallet integration would require implementing complete CLSAG signing, key image handling, change outputs, and multi-output transactions.
 
 ### Known Limitations
+
+**Race Condition Vulnerability**
+
+A protocol-level race condition exists between secret revelation on Starknet and cross-chain transaction confirmation. When a party reveals the secret `t` on Starknet, they immediately receive tokens. However, if the corresponding Monero transaction fails or experiences a blockchain reorganization, funds may be at risk.
+
+The September 2025 Monero network experienced an 18-block reorganization (approximately 36 minutes), demonstrating that this is not a theoretical concern. In such scenarios, a party could receive tokens on one chain while the transaction on the other chain is reverted, resulting in fund loss or double-spending.
+
+**Mitigation Strategy (Planned)**
+
+Priority 0 mitigations include implementing a two-phase unlock mechanism with a grace period. After secret revelation, tokens would not transfer immediately. Instead, a grace period of two hours would allow time for cross-chain confirmation. Only after the grace period expires would tokens transfer to the unlocker.
+
+Additional mitigations include enforcing a minimum timelock of three hours and implementing a watchtower service for production deployments. These mitigations are planned for version 0.8.0.
+
+**Current Status**
+
+The protocol is suitable for testnet use and low-value swaps (under $100) with documented warnings. Production deployment requires implementation of the race condition mitigations.
+
+**Other Limitations**
 
 The protocol is designed for testnet use only and has not been deployed to mainnet. The implementation assumes a trusted setup for the second generator point `Y`, though this could be replaced with hash-to-curve in a future version.
 

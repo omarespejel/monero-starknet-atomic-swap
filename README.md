@@ -612,6 +612,31 @@ This approach provides native snforge support with easy filtering: `snforge test
 
 ### Known Limitations
 
+**Race Condition (Protocol-Level)**
+
+A race condition exists between secret revelation on Starknet and Monero transaction confirmation. If a Monero transaction fails or experiences a blockchain reorganization after the secret is revealed:
+
+- Funds may be at risk
+- September 2025: Monero had an 18-block reorg (36 minutes)
+
+**Current Flow Risk:**
+1. Alice reveals `t` on Starknet → Gets Starknet tokens IMMEDIATELY
+2. Bob learns `t` → Tries to spend Monero
+3. If Bob's Monero TX fails or reorgs → Alice has tokens, Bob lost Monero funds
+
+**OR (reverse direction):**
+1. Alice reveals `t` → Gets Starknet tokens
+2. Alice's Monero is now spendable by Bob
+3. If 18-block Monero reorg happens → Bob's TX reverted, Alice can re-spend Monero
+4. Result: Alice has BOTH tokens AND Monero
+
+**Mitigations (Planned for v0.8.0):**
+- Two-phase unlock with 2-hour grace period
+- Minimum 3-hour timelock
+- Watchtower service for production
+
+**Current Recommendation**: Use only for testnet or swaps < $100 until mitigations are implemented.
+
 **Monero Integration:**
 - Minimal adaptor-signature demo (not full CLSAG)
 - No key image handling, change outputs, or multi-output transactions
@@ -619,8 +644,9 @@ This approach provides native snforge support with easy filtering: `snforge test
 
 **Production Readiness:**
 - Security audit in progress
+- Race condition mitigation pending (P0 priority)
 - Account signing implementation pending
-- Mainnet deployment pending audit completion
+- Mainnet deployment pending audit completion and race condition fixes
 
 ## References
 
