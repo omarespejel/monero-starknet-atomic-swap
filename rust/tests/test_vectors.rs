@@ -4,11 +4,11 @@
 //! to verify that BLAKE2s challenge computation produces identical results.
 
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
-use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar;
 use serde_json::json;
+use sha2::{Digest, Sha256};
 use std::fs;
-use xmr_secret_gen::dleq::{generate_dleq_proof, DleqProof};
+use xmr_secret_gen::dleq::generate_dleq_proof;
 
 /// Generate test vectors for Cairo integration tests
 #[test]
