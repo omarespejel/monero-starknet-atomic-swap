@@ -608,15 +608,17 @@ pub mod AtomicLock {
         // 2. Challenge comparison issue (felt252 comparison)
         // 3. Challenge passed via calldata differs from computed
         // 
-        // CRITICAL: Compare truncated FULL challenges (before reduction)
-        // Hints were generated for truncated FULL challenge scalars (not reduced)
-        // TEST_VECTOR_C_TRUNCATED is the low 128 bits of the FULL challenge
-        // So we compare the truncated FULL challenge, not the truncated reduced challenge
+        // CRITICAL: Compare truncated REDUCED challenges
+        // Rust stores the REDUCED scalar in test_vectors.json as big-endian bytes
+        // TEST_VECTOR_C_TRUNCATED is the low 128 bits of the REDUCED challenge (big-endian)
+        // Cairo computes: BLAKE2s digest -> reduce mod order -> felt252
+        // The felt252 represents the reduced scalar, but we need to compare the truncated value
         // Convert felt252 to u256 first (always succeeds), then extract low 128 bits
         let c_prime_u256: u256 = c_prime.into();
         let dleq_challenge_u256: u256 = dleq_challenge.into();
         
-        // Compare low 128 bits of FULL challenge (matching hints and test vector)
+        // Compare low 128 bits of REDUCED challenge (matching Rust's format)
+        // Both c_prime and dleq_challenge are already reduced scalars
         if c_prime_u256.low != dleq_challenge_u256.low {
             // The challenge mismatch indicates either:
             // 1. Challenge computation difference (BLAKE2s implementation?)

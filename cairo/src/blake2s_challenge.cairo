@@ -383,19 +383,18 @@ pub fn compute_dleq_challenge_blake2s(
     let low = w0 + base * w1 + base * base * w2 + base * base * base * w3;
     let high = w4 + base * w5 + base * base * w6 + base * base * base * w7;
     
-    // Convert to u256
-    // CRITICAL: Return the FULL hash (before reduction) as felt252
-    // The reduction happens in the constructor where it's used for MSM
-    // But for challenge comparison, we need the truncated FULL challenge
-    // (matching what hints were generated with)
+    // Convert to u256 and reduce mod curve order (matches Rust: Scalar::from_bytes_mod_order)
+    // CRITICAL: Rust stores the REDUCED scalar in test_vectors.json, not the full digest
+    // So we must reduce here to match Rust's format
     let hash_u256 = u256 { low, high };
+    let scalar = hash_u256 % ed25519_order;
     
-    // Convert full hash to felt252 (for challenge comparison)
-    // The constructor will reduce it mod order when using it for MSM
+    // Convert reduced scalar to felt252 (for challenge comparison)
+    // This matches Rust's Scalar::to_bytes() format (little-endian bytes)
     let base_128: felt252 = 0x100000000000000000000000000000000; // 2^128
-    let low_felt: felt252 = hash_u256.low.try_into().unwrap();
-    let high_felt: felt252 = hash_u256.high.try_into().unwrap();
-    let hash_felt = low_felt + high_felt * base_128;
-    hash_felt
+    let low_felt: felt252 = scalar.low.try_into().unwrap();
+    let high_felt: felt252 = scalar.high.try_into().unwrap();
+    let scalar_felt = low_felt + high_felt * base_128;
+    scalar_felt
 }
 
