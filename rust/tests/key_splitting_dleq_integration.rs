@@ -5,7 +5,6 @@
 //! 1. Monero key splitting: x = x_partial + t
 //! 2. Starknet DLEQ proof: T = t·G, U = t·Y
 
-use curve25519_dalek::scalar::Scalar;
 use sha2::{Digest, Sha256};
 use xmr_secret_gen::dleq::generate_dleq_proof;
 use xmr_secret_gen::monero::SwapKeyPair;
