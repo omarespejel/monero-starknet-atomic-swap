@@ -81,7 +81,9 @@ assert_cmd = "2.0"
 proptest = "1"  # Property-based testing for cryptographic code
 criterion = "0.5"  # Benchmarking
 tempfile = "3"  # Temporary files for testing
-tarpaulin = "0.27"  # Test coverage reporting
+# Note: tarpaulin is installed via cargo, not as a dev-dependency
+# Install with: cargo install cargo-tarpaulin
+# Usage: cargo tarpaulin --out Html --output-dir coverage
 
 [profile.release]
 opt-level = 3
