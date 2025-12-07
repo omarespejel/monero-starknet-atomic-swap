@@ -7,6 +7,10 @@
 pub mod key_splitting;
 pub mod adaptor_sig;
 
+// Re-export from monero module (key splitting approach)
+pub use crate::monero::SwapKeyPair;
+
+// Legacy exports for backward compatibility (deprecated)
 pub use key_splitting::{split_monero_key, KeyPair};
 pub use adaptor_sig::{create_adaptor_signature, finalize_signature, verify_signature, AdaptorSignature};
 
