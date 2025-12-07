@@ -349,6 +349,17 @@ pub fn compute_dleq_challenge_blake2s(
     // CRITICAL: Validate span length before accessing elements
     assert(hash_span.len() == 8, 'BLAKE2s state must have 8 words');
     
+    // DEBUG: Extract state words for comparison with Rust
+    // These will be used in debug assertions to print values
+    let h0 = *hash_span.at(0);
+    let h1 = *hash_span.at(1);
+    let h2 = *hash_span.at(2);
+    let h3 = *hash_span.at(3);
+    let h4 = *hash_span.at(4);
+    let h5 = *hash_span.at(5);
+    let h6 = *hash_span.at(6);
+    let h7 = *hash_span.at(7);
+    
     // Extract all 8 u32 words in original order (no reversal, no byte-swap)
     // Rust's Scalar::from_bytes_mod_order treats 32 bytes as little-endian u256:
     // - h[0] contains bytes[0..4] (little-endian u32)
@@ -357,14 +368,14 @@ pub fn compute_dleq_challenge_blake2s(
     // - h[7] contains bytes[28..32] (little-endian u32)
     // So: low = h[0] + h[1]*2^32 + h[2]*2^64 + h[3]*2^96
     //     high = h[4] + h[5]*2^32 + h[6]*2^64 + h[7]*2^96
-    let w0: u128 = (*hash_span.at(0)).into();
-    let w1: u128 = (*hash_span.at(1)).into();
-    let w2: u128 = (*hash_span.at(2)).into();
-    let w3: u128 = (*hash_span.at(3)).into();
-    let w4: u128 = (*hash_span.at(4)).into();
-    let w5: u128 = (*hash_span.at(5)).into();
-    let w6: u128 = (*hash_span.at(6)).into();
-    let w7: u128 = (*hash_span.at(7)).into();
+    let w0: u128 = h0.into();
+    let w1: u128 = h1.into();
+    let w2: u128 = h2.into();
+    let w3: u128 = h3.into();
+    let w4: u128 = h4.into();
+    let w5: u128 = h5.into();
+    let w6: u128 = h6.into();
+    let w7: u128 = h7.into();
     
     // Reconstruct u256: low = w0 + w1·2^32 + w2·2^64 + w3·2^96
     //                   high = w4 + w5·2^32 + w6·2^64 + w7·2^96
