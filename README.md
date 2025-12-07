@@ -7,7 +7,7 @@
 Prototype implementation of a trustless atomic swap protocol between Monero and Starknet. 
 Uses hashlock + MSM verification + DLEQ proofs for cryptographic binding.
 
-**Status**: v0.5.3-rc2 - Cryptographic implementation verified. E2E Rust↔Cairo compatibility test passes.
+**Status**: v0.7.0 - Key splitting approach implemented. E2E Rust↔Cairo compatibility test passes.
 
 ## Overview
 
@@ -15,7 +15,7 @@ This project implements a prototype implementation and reference proof-of-concep
 
 **Current Implementation:**
 - SHA-256 Hashlock: Cryptographic lock on Starknet
-- Ed25519 Adaptor Signatures: Monero-side signature binding (simplified demo, not full CLSAG)
+- Key Splitting: Monero-side key splitting (x = x_partial + t) - no custom CLSAG modification
 - Garaga MSM Verification: Efficient on-chain Ed25519 point verification (t·G == adaptor_point)
 - DLEQ Proofs: Cryptographic binding between hashlock and adaptor point (implemented)
 
@@ -39,10 +39,10 @@ This project implements a prototype implementation and reference proof-of-concep
 ### Protocol Flow
 
 1. **Maker (Alice)**:
-   - Generates secret scalar `t`
-   - Creates simplified adaptor signature (demo, not full CLSAG)
+   - Generates secret scalar `t` and splits Monero key: x = x_partial + t
+   - Creates DLEQ proof binding hashlock to adaptor point T = t·G
    - Deploys AtomicLock contract on Starknet Sepolia
-   - Waits for secret reveal
+   - Waits for secret reveal, then recovers full key to spend Monero
 
 2. **Taker (Bob)**:
    - Watches for AtomicLock contracts

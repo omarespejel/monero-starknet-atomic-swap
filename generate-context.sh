@@ -23,9 +23,9 @@ echo ""
   printf '%s\n' "to an Ed25519 adaptor point, enabling trustless cross-chain swaps."
   printf '%s\n' ""
   printf '%s\n' "## Current Status & Debugging Context"
-  printf '%s\n' "**Release**: v0.6.0 (2025-12-06) - CLSAG Adaptor Signatures Implementation Started"
+  printf '%s\n' "**Release**: v0.7.0 (2025-12-06) - Key Splitting Approach Implemented"
   printf '%s\n' "**MAJOR ACHIEVEMENT**: E2E DLEQ test PASSES - Rust↔Cairo compatibility verified!"
-  printf '%s\n' "**NEW FEATURE**: CLSAG adaptor signatures implementation in progress for Monero atomic swaps"
+  printf '%s\n' "**NEW APPROACH**: Key splitting for Monero atomic swaps (replaces custom CLSAG)"
   printf '%s\n' "**Progress Made**:"
   printf '%s\n' "- ✅ Fixed sequential MSM call issue by replacing reduce_felt_to_scalar() with direct scalar construction"
   printf '%s\n' "- ✅ Fixed double consumption bug: removed redundant challenge recomputation from _verify_dleq_proof()"
@@ -70,24 +70,18 @@ echo ""
   printf '%s\n' "- ✅ Fixed refund tests: test_refund_returns_exact_amount and test_refund_fails_with_insufficient_balance now pass"
   printf '%s\n' "- ✅ Fixed unlock tests: test_unlock_fails_with_insufficient_balance expects correct ERC20 error message"
   printf '%s\n' "- ✅ Fixed reentrancy test: test_reentrancy_attack_blocked properly tests ReentrancyGuard protection"
-  printf '%s\n' "- ✅ Version 0.6.0: CLSAG adaptor signatures implementation started"
-  printf '%s\n' "- ✅ CLSAG hash-to-point: Implemented Hp() function for Monero key images (hash_to_point.rs)"
-  printf '%s\n' "- ✅ CLSAG standard: Implemented standard CLSAG signing and verification (standard.rs)"
-  printf '%s\n' "- ✅ CLSAG adaptor: Implemented adaptor CLSAG for atomic swaps (adaptor.rs)"
-  printf '%s\n' "  * ClsagAdaptorSigner::sign_adaptor() - Creates partial signatures with embedded adaptor"
-  printf '%s\n' "  * ClsagAdaptorSignature::finalize() - Completes signature when adaptor scalar t is revealed"
-  printf '%s\n' "  * extract_adaptor_scalar() - Extracts adaptor scalar from partial + finalized signatures"
-  printf '%s\n' "- ✅ CLSAG dependencies: Added monero, sha3 (Keccak256), zeroize to Cargo.toml"
-  printf '%s\n' "- ✅ CLSAG documentation: Created CLSAG_MATH.md with mathematical foundations"
-  printf '%s\n' "- ✅ CLSAG layered test suite: Created comprehensive test suite per auditor recommendations"
-  printf '%s\n' "  * clsag_unit_tests.rs: 11 unit tests (8 passing, 3 failing - catching bugs early!)"
-  printf '%s\n' "  * clsag_dleq_integration.rs: 3 integration tests (2 passing, 1 failing)"
-  printf '%s\n' "  * atomic_swap_e2e.rs: 2 E2E tests (1 passing, 1 failing)"
-  printf '%s\n' "  * README_CLSAG_TESTS.md: Test documentation and strategy"
-  printf '%s\n' "- 🔍 Issues found by tests (early detection working!):"
-  printf '%s\n' "  * Standard CLSAG verification failing (ring closure computation bug in compute_c1())"
-  printf '%s\n' "  * Adaptor finalization producing invalid signatures (formula bug in finalize())"
-  printf '%s\n' "- 🔍 Current state: CLSAG core implementation complete, tests catching bugs at unit level"
+  printf '%s\n' "- ✅ Version 0.7.0: Key splitting approach implemented (replaces custom CLSAG)"
+  printf '%s\n' "- ✅ Key splitting module: Implemented SwapKeyPair for Monero atomic swaps"
+  printf '%s\n' "  * SwapKeyPair::generate() - Creates key pair with x = x_partial + t"
+  printf '%s\n' "  * SwapKeyPair::recover() - Recovers full key when t is revealed on Starknet"
+  printf '%s\n' "  * SwapKeyPair::verify() - Verifies key splitting math (T + partial·G = X)"
+  printf '%s\n' "  * SwapKeyPair::adaptor_scalar_bytes() - Gets bytes for hashlock computation"
+  printf '%s\n' "- ✅ Removed custom CLSAG code: Deleted ~500 lines of buggy custom implementation"
+  printf '%s\n' "- ✅ Updated dependencies: Added keccak (Monero Keccak256), bs58, getrandom"
+  printf '%s\n' "- ✅ Removed unnecessary deps: num-bigint, num-traits (not needed for key splitting)"
+  printf '%s\n' "- ✅ Key splitting tests: All 4 tests passing (math, recovery, adaptor point, public key)"
+  printf '%s\n' "- ✅ Approach: Uses only audited libraries (curve25519-dalek, RustCrypto)"
+  printf '%s\n' "- ✅ Matches Serai DEX pattern: Same approach used by audited Serai DEX (Cypher Stack audit)"
   printf '%s\n' ""
   printf '%s\n' "## Architecture Components"
   printf '%s\n' ""
@@ -510,19 +504,16 @@ RUST_ADAPTOR=(
   "rust/src/adaptor/key_splitting.rs"
 )
 
-# Rust CLSAG module (NEW in v0.6.0)
-# NOTE: Migrated to audited monero-clsag-mirror library
-# Custom hash_to_point.rs and standard.rs removed - using audited library
-RUST_CLSAG=(
-  "rust/src/clsag/mod.rs"
-  "rust/src/clsag/adaptor.rs"
-  "rust/src/clsag/adaptor_audited.rs"
+# Rust Monero module (v0.7.0 - Key Splitting Approach)
+# NOTE: Custom CLSAG code removed - using key splitting instead
+RUST_MONERO=(
+  "rust/src/monero/mod.rs"
+  "rust/src/monero/key_splitting.rs"
+  "rust/src/monero/transaction.rs"
 )
 
 # Rust documentation
 RUST_DOCS=(
-  "rust/docs/CLSAG_MATH.md"
-  "rust/MIGRATION_TO_AUDITED_CLSAG.md"
   "rust/AUDIT_DEPENDENCIES.md"
 )
 
@@ -546,18 +537,10 @@ RUST_TESTS=(
   "rust/test_vectors.json"
 )
 
-# Rust CLSAG test files (NEW in v0.6.0)
-RUST_CLSAG_TESTS=(
-  "rust/tests/clsag_hash_to_point.rs"
-  "rust/tests/clsag_standard.rs"
-  "rust/tests/clsag_adaptor.rs"
-  "rust/tests/clsag_integration.rs"
-  "rust/tests/clsag_unit_tests.rs"
-  "rust/tests/clsag_dleq_integration.rs"
-  "rust/tests/atomic_swap_e2e.rs"
-  "rust/tests/clsag_verify_audited.rs"
-  "rust/tests/clsag_mirror_smoke.rs"
-  "rust/tests/README_CLSAG_TESTS.md"
+# Rust Monero test files (v0.7.0 - Key Splitting)
+# NOTE: Old CLSAG tests removed - key splitting tests are in key_splitting.rs module tests
+RUST_MONERO_TESTS=(
+  "rust/tests/integration_test.rs"
 )
 
 # Python tooling (all)
@@ -638,7 +621,7 @@ for path in "${RUST_ADAPTOR[@]}"; do
   add_file "$path"
 done
 
-for path in "${RUST_CLSAG[@]}"; do
+for path in "${RUST_MONERO[@]}"; do
   add_file "$path"
 done
 
@@ -654,7 +637,7 @@ for path in "${RUST_TESTS[@]}"; do
   add_file "$path"
 done
 
-for path in "${RUST_CLSAG_TESTS[@]}"; do
+for path in "${RUST_MONERO_TESTS[@]}"; do
   add_file "$path"
 done
 
@@ -681,11 +664,11 @@ TOTAL_FILES=$((
   ${#CAIRO_TEST_CONSTANTS[@]} +
   ${#RUST_SOURCE[@]} +
   ${#RUST_ADAPTOR[@]} +
-  ${#RUST_CLSAG[@]} +
+  ${#RUST_MONERO[@]} +
   ${#RUST_DOCS[@]} +
   ${#RUST_BIN[@]} +
   ${#RUST_TESTS[@]} +
-  ${#RUST_CLSAG_TESTS[@]} +
+  ${#RUST_MONERO_TESTS[@]} +
   ${#TOOLS_PYTHON[@]} +
   ${#ROOT_PYTHON[@]} +
   ${#TOOLS_DATA[@]}
@@ -702,11 +685,11 @@ echo "  - Cairo data files: ${#CAIRO_DATA[@]}"
 echo "  - Cairo test constants: ${#CAIRO_TEST_CONSTANTS[@]}"
 echo "  - Rust source files: ${#RUST_SOURCE[@]}"
 echo "  - Rust adaptor module: ${#RUST_ADAPTOR[@]}"
-echo "  - Rust CLSAG module: ${#RUST_CLSAG[@]}"
+echo "  - Rust Monero module: ${#RUST_MONERO[@]}"
 echo "  - Rust documentation: ${#RUST_DOCS[@]}"
 echo "  - Rust binary tools: ${#RUST_BIN[@]}"
 echo "  - Rust test files: ${#RUST_TESTS[@]}"
-echo "  - Rust CLSAG test files: ${#RUST_CLSAG_TESTS[@]}"
+echo "  - Rust Monero test files: ${#RUST_MONERO_TESTS[@]}"
 echo "  - Python tooling: ${#TOOLS_PYTHON[@]}"
 echo "  - Root Python scripts: ${#ROOT_PYTHON[@]}"
 echo "  - Tooling data files: ${#TOOLS_DATA[@]}"
@@ -744,30 +727,24 @@ echo "   - Comprehensive test suite: negative tests, edge cases, multiple vector
   echo "   - Security audit tests: double-unlock prevention, state transitions, point rejection (ALL FIXED)"
   echo "   - Point rejection tests: zero and low-order point rejection verified (CRITICAL security invariant)"
 echo "   - Cross-platform verification: tools/verify_full_compatibility.py"
-echo "   - CLSAG adaptor signatures: Monero atomic swap cryptographic core (v0.6.0)"
-echo "     * Hash-to-point (Hp) for key images using Keccak256"
-echo "     * Standard CLSAG ring signatures with aggregation coefficients"
-echo "     * Adaptor CLSAG with partial signature creation and finalization"
-echo "     * Integration with DLEQ proofs for Starknet atomic swaps"
-echo "   - CLSAG migration to audited library: ⚠️ IN PROGRESS - Using Verification Oracle"
-echo "     * Using monero-clsag-mirror (audited by Cypher Stack for Serai DEX)"
-echo "     * ✅ Deleted custom hash_to_point.rs and standard.rs (buggy code removed)"
-echo "     * ✅ Updated mod.rs to remove deleted module references"
-echo "     * ✅ Created verification test using Clsag::verify() as oracle"
-echo "     * ✅ Verification test confirms InvalidC1 bug (audited library catching bugs!)"
-echo "     * Strategy: Option B - Custom signing + Audited verification (80% benefit, 20% effort)"
-echo "     * 🔴 CRITICAL: Buggy compute_c1 logic confirmed by verification test"
-echo "     * ⏳ Next: Fix compute_c1 using verify() as oracle to validate fixes"
-echo "     * Migration plan: MIGRATION_TO_AUDITED_CLSAG.md (includes API analysis and strategy)"
-echo "     * Audit dependencies: AUDIT_DEPENDENCIES.md (complete audit status)"
-echo "     * Benefits: Audited verification catches bugs, reduces audit scope (~1,500→350 lines)"
-echo "     * Leverages \$100k+ of community-funded audits from Monero ecosystem"
-echo "     * Architecture separation: Only CLSAG tests need updating (~16 tests)"
-echo "     * Cairo/DLEQ tests remain unchanged (all 107 Cairo tests should pass)"
-echo "   - CLSAG layered test suite: Comprehensive testing strategy catching bugs early"
-echo "     * Unit tests (11 tests): Hash-to-point, standard CLSAG, adaptor CLSAG"
-echo "     * Integration tests (3 tests): DLEQ-CLSAG bridge verification"
-echo "     * E2E tests (2 tests): Full atomic swap flow simulation"
-echo "     * Current status: 11/16 tests passing, 5 bugs identified at unit level"
-echo "     * Issues found: Ring closure computation bug, adaptor finalization formula bug"
-echo "     * Note: Bugs will be eliminated by migration to audited library"
+echo "   - Key splitting approach: Monero atomic swap cryptographic core (v0.7.0)"
+echo "     * SwapKeyPair::generate() - Split key: x = x_partial + t"
+echo "     * Send T = t·G to Starknet with DLEQ proof"
+echo "     * When t revealed, recover x = x_partial + t"
+echo "     * Create standard Monero transaction with full key (using Serai's audited code)"
+echo "   - Key splitting migration: ✅ COMPLETE - Custom CLSAG removed"
+echo "     * ✅ Deleted all custom CLSAG code (~500 lines of buggy code)"
+echo "     * ✅ Implemented key splitting module (~50 lines of correct code)"
+echo "     * ✅ Uses only audited libraries (curve25519-dalek, RustCrypto)"
+echo "     * ✅ Matches Serai DEX approach (audited by Cypher Stack)"
+echo "     * ✅ All 4 key splitting tests passing"
+echo "     * ✅ Reduced audit scope: No custom cryptographic primitives"
+echo "     * ✅ Clear audit trail: Only scalar addition (x = a + b)"
+echo "     * Benefits: Eliminates ~500 lines of buggy code, uses \$100k+ of community audits"
+echo "     * Architecture: Key splitting + DLEQ proofs (Cairo tests unchanged - 107 tests)"
+echo "   - Key splitting test suite: Simple and correct"
+echo "     * test_key_splitting_math: Verifies T + partial·G = X"
+echo "     * test_key_recovery: Verifies x_partial + t = x_full"
+echo "     * test_adaptor_point_derivation: Verifies T = t·G"
+echo "     * test_public_key_derivation: Verifies X = x·G"
+echo "     * Status: 4/4 tests passing - all cryptographic properties verified"
