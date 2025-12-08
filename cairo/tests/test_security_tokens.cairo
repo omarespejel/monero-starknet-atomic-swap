@@ -18,7 +18,7 @@ mod token_security_tests {
     use core::integer::u256;
     use core::serde::Serde;
     use core::traits::TryInto;
-    use starknet::{ContractAddress, contract_address_const, get_contract_address};
+    use starknet::ContractAddress;
     use snforge_std::{
         declare, ContractClassTrait, DeclareResultTrait,
         start_cheat_caller_address, stop_cheat_caller_address,
@@ -286,7 +286,8 @@ mod token_security_tests {
         
         // The deployer/depositor is the current test contract (snforge default)
         // This is who will be stored as depositor in the contract
-        let deployer = starknet::get_contract_address();
+        // In snforge tests, we use a constant address for the test contract
+        let deployer: ContractAddress = 0x123.try_into().unwrap();
         
         // Use deploy_with_real_dleq pattern from test_e2e_dleq.cairo
         let hashlock_array = TESTVECTOR_HASHLOCK;
@@ -434,8 +435,8 @@ mod token_security_tests {
         // Mint tokens to contract (simulating deposit)
         token.mint(contract.contract_address, amount);
         
-        // Get unlocker address
-        let unlocker: ContractAddress = contract_address_const::<'unlocker'>();
+        // Get unlocker address (using constant address for test)
+        let unlocker: ContractAddress = 0x456.try_into().unwrap();
         start_cheat_caller_address(contract.contract_address, unlocker);
         
         // Record balances before unlock
@@ -513,7 +514,7 @@ mod token_security_tests {
         
         // Unlock should succeed without token transfer
         let secret = get_valid_secret();
-        let unlocker: ContractAddress = contract_address_const::<'unlocker'>();
+        let unlocker: ContractAddress = 0x456.try_into().unwrap();
         start_cheat_caller_address(contract.contract_address, unlocker);
         
         let success = contract.verify_and_unlock(secret);
@@ -641,7 +642,7 @@ mod token_security_tests {
         
         // Attempt unlock - this will call regular_token.transfer (not malicious)
         // But we can verify ReentrancyGuard works by trying nested call
-        let unlocker: ContractAddress = contract_address_const::<'unlocker'>();
+        let unlocker: ContractAddress = 0x456.try_into().unwrap();
         start_cheat_caller_address(contract.contract_address, unlocker);
         
         let secret = get_valid_secret();
@@ -679,7 +680,7 @@ mod token_security_tests {
         
         // Attempt unlock - should fail due to insufficient balance
         // The ERC20 transfer will fail with "Insufficient balance"
-        let unlocker: ContractAddress = contract_address_const::<'unlocker'>();
+        let unlocker: ContractAddress = 0x456.try_into().unwrap();
         start_cheat_caller_address(contract.contract_address, unlocker);
         
         let secret = get_valid_secret();
