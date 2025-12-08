@@ -8,85 +8,32 @@ mod tests {
     use core::serde::Serde;
     use starknet::contract_address::ContractAddress;
     use snforge_std::{declare, ContractClassTrait, DeclareResultTrait, start_cheat_block_timestamp, stop_cheat_block_timestamp};
+    use crate::fixtures::deployment_helpers::deploy_with_test_vectors;
     
     // Future timestamp for test deployments (far enough in future to pass validation)
     const FUTURE_TIMESTAMP: u64 = 9999999999_u64;
+    
+    /// Get test vector secret [0x12; 32] for unlock operations
+    fn get_test_vector_secret() -> ByteArray {
+        let mut secret = ByteArray::default();
+        // Append 32 bytes of 0x12
+        let mut i = 0;
+        while i < 32 {
+            secret.append_byte(0x12_u8);
+            i += 1;
+        };
+        secret
+    }
 
     #[test]
     fn test_cryptographic_handshake() {
-        // Use real secret/hash from generator to satisfy MSM.
-        let expected_hash = array![
-            3606997102_u32, 3756602050_u32, 1811765011_u32, 1576844653_u32,
-            61256116_u32, 2110839708_u32, 540553134_u32, 3341226206_u32
-        ].span();
-        let mut secret_input: ByteArray = Default::default();
-        secret_input.append_byte(0x09_u8);
-        secret_input.append_byte(0x9d_u8);
-        secret_input.append_byte(0xd9_u8);
-        secret_input.append_byte(0xb7_u8);
-        secret_input.append_byte(0x3e_u8);
-        secret_input.append_byte(0x2e_u8);
-        secret_input.append_byte(0x84_u8);
-        secret_input.append_byte(0xdb_u8);
-        secret_input.append_byte(0x47_u8);
-        secret_input.append_byte(0x2b_u8);
-        secret_input.append_byte(0x34_u8);
-        secret_input.append_byte(0x2d_u8);
-        secret_input.append_byte(0xc3_u8);
-        secret_input.append_byte(0xab_u8);
-        secret_input.append_byte(0x05_u8);
-        secret_input.append_byte(0x20_u8);
-        secret_input.append_byte(0xf6_u8);
-        secret_input.append_byte(0x54_u8);
-        secret_input.append_byte(0xfd_u8);
-        secret_input.append_byte(0x8a_u8);
-        secret_input.append_byte(0x81_u8);
-        secret_input.append_byte(0xd6_u8);
-        secret_input.append_byte(0x44_u8);
-        secret_input.append_byte(0x18_u8);
-        secret_input.append_byte(0x04_u8);
-        secret_input.append_byte(0x77_u8);
-        secret_input.append_byte(0x73_u8);
-        secret_input.append_byte(0x0a_u8);
-        secret_input.append_byte(0x90_u8);
-        secret_input.append_byte(0xaf_u8);
-        secret_input.append_byte(0x89_u8);
-        secret_input.append_byte(0x00_u8);
-
-        let x_limbs = (
-            0x460f72719199c63ec398673f,
-            0xf27a4af146a52a7dbdeb4cfb,
-            0x5f9c70ec759789a0,
-            0x0
-        );
-        let y_limbs = (
-            0x6b43e318a2a02d8241549109,
-            0x40e30afa4cce98c21e473980,
-            0x5e243e1eed1aa575,
-            0x0
-        );
-        let hint = array![
-            0x460f72719199c63ec398673f,
-            0xf27a4af146a52a7dbdeb4cfb,
-            0x5f9c70ec759789a0,
-            0x0,
-            0x6b43e318a2a02d8241549109,
-            0x40e30afa4cce98c21e473980,
-            0x5e243e1eed1aa575,
-            0x0,
-            0x10b51d41eab43e36d3ac30cda9707f92,
-            0x110538332d2eae09bf756dfd87431ded7
-        ].span();
-
-        let dispatcher = deploy_with_full(
-            expected_hash,
+        // Use test vector data: hashlock and secret [0x12; 32]
+        let secret_input = get_test_vector_secret();
+        
+        let dispatcher = deploy_with_test_vectors(
             FUTURE_TIMESTAMP,
             0.try_into().unwrap(),
             u256 { low: 0, high: 0 },
-            x_limbs,
-            y_limbs,
-            (0, 0),
-            hint,
         );
 
         let success = dispatcher.verify_and_unlock(secret_input);
