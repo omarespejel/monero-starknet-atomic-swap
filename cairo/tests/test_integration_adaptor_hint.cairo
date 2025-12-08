@@ -2,7 +2,7 @@
 /// This test decompresses the adaptor point and shows its x,y limbs
 
 #[cfg(test)]
-mod get_adaptor_hint_tests {
+mod tests {
     use garaga::signatures::eddsa_25519::decompress_edwards_pt_from_y_compressed_le_into_weirstrass_point;
     use garaga::ec_ops::G1PointTrait;
     use core::integer::u256;
@@ -14,9 +14,11 @@ mod get_adaptor_hint_tests {
         high: 0x427dde0adb325f957d29ad71e4643882,
     };
 
+    // CORRECT sqrt hint - matches test_e2e_dleq.cairo (PASSING TESTS)
+    // Updated from wrong value: 0xbb73e7230cbed81eed006ba59a2103f1/0x689ee25ca0c65d5a1c560224726871b0
     const TEST_ADAPTOR_POINT_SQRT_HINT: u256 = u256 {
-        low: 0xbb73e7230cbed81eed006ba59a2103f1,
-        high: 0x689ee25ca0c65d5a1c560224726871b0,
+        low: 0x448c18dcf34127e112ff945a65defbfc,
+        high: 0x17611da35f39a2a5e3a9fddb8d978e4f,
     };
 
     #[test]

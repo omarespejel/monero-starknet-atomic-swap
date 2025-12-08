@@ -413,16 +413,16 @@ fn generate_deterministic_nonce(
     let mut counter = 0u32;
     
     loop {
-        let mut hasher = Sha256::new();
+    let mut hasher = Sha256::new();
         // Domain separation: prevents hash collisions with other protocol hashes
         hasher.update(b"DLEQ_NONCE_V1");
         hasher.update(secret.deref().to_bytes()); // Use deref() for Zeroizing
-        hasher.update(hashlock);
+    hasher.update(hashlock);
         hasher.update(&counter.to_le_bytes()); // Counter for retry if k is invalid
 
-        let hash = hasher.finalize();
-        let mut scalar_bytes = [0u8; 32];
-        scalar_bytes.copy_from_slice(&hash);
+    let hash = hasher.finalize();
+    let mut scalar_bytes = [0u8; 32];
+    scalar_bytes.copy_from_slice(&hash);
         let k = Scalar::from_bytes_mod_order(scalar_bytes);
 
         // Validate nonce is non-zero

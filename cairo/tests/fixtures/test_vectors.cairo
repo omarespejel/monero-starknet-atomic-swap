@@ -78,5 +78,33 @@ pub const TESTVECTOR_RESPONSE_LOW: felt252 = 0xc09b9a31d72db277d1bb402e80ef5008;
 
 /// Response scalar (high 124 bits)
 pub const TESTVECTOR_RESPONSE_HIGH: felt252 = 0x004efaf601adbf89a8283471b5f7cf47;
+
+/// Sqrt hints for point decompression (Garaga format)
+/// CRITICAL: These must match the compressed points exactly
+/// Generated using tools/generate_sqrt_hints.py with Garaga's exact decompression format
+
+/// Adaptor Point T sqrt hint (CORRECT - matches test_e2e_dleq.cairo)
+pub const TESTVECTOR_T_SQRT_HINT: u256 = u256 {
+    low: 0x448c18dcf34127e112ff945a65defbfc,
+    high: 0x17611da35f39a2a5e3a9fddb8d978e4f,
+};
+
+/// Second Point U sqrt hint (CORRECT - matches test_e2e_dleq.cairo)
+pub const TESTVECTOR_U_SQRT_HINT: u256 = u256 {
+    low: 0xdcad2173817c163b5405cec7698eb4b8,
+    high: 0x742bb3c44b13553c8ddff66565b44cac,
+};
+
+/// R1 Commitment Point sqrt hint (CORRECT - matches test_e2e_dleq.cairo)
+pub const TESTVECTOR_R1_SQRT_HINT: u256 = u256 {
+    low: 0x72a9698d3171817c239f4009cc36fc97,
+    high: 0x3f2b84592a9ee701d24651e3aa3c837d,
+};
+
+/// R2 Commitment Point sqrt hint (CORRECT - matches test_e2e_dleq.cairo)
+pub const TESTVECTOR_R2_SQRT_HINT: u256 = u256 {
+    low: 0x43f2c451f9ca69ff1577d77d646a50e,
+    high: 0x4ee64b0e07d89e906f9e8b7bea09283e,
+};
 }
 

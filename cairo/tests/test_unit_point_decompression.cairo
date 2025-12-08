@@ -17,9 +17,11 @@ mod point_decompression_tests {
         high: 0x427dde0adb325f957d29ad71e4643882,
     };
 
+    // CORRECT sqrt hint - matches test_e2e_dleq.cairo (PASSING TESTS)
+    // Updated from wrong value: 0xbb73e7230cbed81eed006ba59a2103f1/0x689ee25ca0c65d5a1c560224726871b0
     const TEST_ADAPTOR_POINT_SQRT_HINT: u256 = u256 {
-        low: 0xbb73e7230cbed81eed006ba59a2103f1,
-        high: 0x689ee25ca0c65d5a1c560224726871b0,
+        low: 0x448c18dcf34127e112ff945a65defbfc,
+        high: 0x17611da35f39a2a5e3a9fddb8d978e4f,
     };
 
     const TEST_SECOND_POINT_COMPRESSED: u256 = u256 {
@@ -32,25 +34,28 @@ mod point_decompression_tests {
         high: 0x742bb3c44b13553c8ddff66565b44cac,
     };
 
+    // CORRECT R1 from test_vectors.cairo (matches test_e2e_dleq.cairo)
     const TEST_R1_COMPRESSED: u256 = u256 {
-        low: 0x0fa325f321fdf41a1630e19e36ababb8,
-        high: 0xabe2cf84b1246b428bce04d66cdb9b7e,
+        low: 0x90b1ab352981d43ec51fba0af7ab51c7,
+        high: 0xc21ebc88e5e59867b280909168338026,
     };
 
+    // CORRECT R1 sqrt hint (matches test_e2e_dleq.cairo)
     const TEST_R1_SQRT_HINT: u256 = u256 { 
-        low: 0x4f1efce2a44c72b5d316cc9b8d8e4673,
-        high: 0x28bde2dde999d287316395d449669102,
+        low: 0x72a9698d3171817c239f4009cc36fc97,
+        high: 0x3f2b84592a9ee701d24651e3aa3c837d,
     };
     
-    // R2 uses Ed25519 base point (R2 from test_vectors.json is invalid)
+    // CORRECT R2 from test_vectors.cairo (matches test_e2e_dleq.cairo)
     const TEST_R2_COMPRESSED: u256 = u256 {
-        low: 0x66666666666666666666666666666658,
-        high: 0x66666666666666666666666666666666,
+        low: 0x02d386e8fd6bd85a339171211735bcba,
+        high: 0x10defc0130a9f3055798b1f5a99aeb67,
     };
     
+    // CORRECT R2 sqrt hint (matches test_e2e_dleq.cairo)
     const TEST_R2_SQRT_HINT: u256 = u256 { 
-        low: 0x96d3389f6ada584d36a9d29f70da2ad3,
-        high: 0x5e96c92c3291ac013f5b1dce022923a3,
+        low: 0x43f2c451f9ca69ff1577d77d646a50e,
+        high: 0x4ee64b0e07d89e906f9e8b7bea09283e,
     };
 
     #[test]

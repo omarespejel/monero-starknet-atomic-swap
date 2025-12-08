@@ -14,7 +14,7 @@ on:
 
 env:
   SCARB_VERSION: "2.10.0"
-  SNFORGE_VERSION: "0.37.0"
+  SNFORGE_VERSION: "0.53.0"
 
 jobs:
   test:

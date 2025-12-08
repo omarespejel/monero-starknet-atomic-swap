@@ -74,17 +74,17 @@ where
     use serde::de::Error;
     // Parse as Value first to get raw access
     let value = serde_json::Value::deserialize(deserializer)?;
-
+    
     // Extract the raw JSON string and parse manually to preserve large integers
     let _json_str = serde_json::to_string(&value).map_err(D::Error::custom)?;
-
+    
     // Parse the array manually from raw JSON
     // This is a workaround for serde_json converting large integers to f64
     // We'll use a simpler approach: parse as Value and handle each element
     let array = value
         .as_array()
         .ok_or_else(|| D::Error::custom("Expected array"))?;
-
+    
     array
         .iter()
         .map(|v| {
@@ -135,7 +135,7 @@ fn generate_adaptor_point_from_python(
     let mut tools_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     tools_dir.pop(); // Go up from rust/ to repo root
     tools_dir.push("tools");
-
+    
     let script_path = tools_dir.join("generate_ed25519_test_data.py");
     if !script_path.exists() {
         return Err("Python tool not found".to_string());
@@ -163,7 +163,7 @@ fn generate_adaptor_point_from_python(
     let json_path = tools_dir.join("ed25519_test_data.json");
     let json_content = std::fs::read_to_string(&json_path)
         .map_err(|e| format!("Failed to read JSON file: {}", e))?;
-
+    
     let data: PythonToolOutput = serde_json::from_str(&json_content)
         .map_err(|e| format!("Failed to parse Python tool output: {}", e))?;
 
@@ -235,7 +235,7 @@ pub fn generate_swap_secret() -> SwapSecret {
 
     // Generate real adaptor point and fake-GLV hint using Python tool for consistency with Cairo.
     let secret_hex = hex::encode(secret_bytes);
-    let (adaptor_point_x_limbs, adaptor_point_y_limbs, fake_glv_hint) =
+    let (adaptor_point_x_limbs, adaptor_point_y_limbs, fake_glv_hint) = 
         generate_adaptor_point_from_python(&secret_hex).unwrap_or_else(|e| {
             // Fallback to placeholder if Python tool unavailable (e.g., in tests without Python env)
             // In production, ensure Python tool is available or use pre-generated values
@@ -271,7 +271,7 @@ pub fn generate_swap_secret() -> SwapSecret {
     // For now, use placeholder - in production, call Python tool similar to adaptor point
     let dleq_second_point_x_limbs = ["0x0", "0x0", "0x0", "0x0"].map(str::to_string);
     let dleq_second_point_y_limbs = ["0x0", "0x0", "0x0", "0x0"].map(str::to_string);
-
+    
     // Format DLEQ challenge and response as hex strings (felt252 in Cairo)
     // Convert scalar bytes to hex, then format as felt252 (big-endian u256)
     let challenge_bytes = dleq_proof.challenge.to_bytes();

@@ -24,7 +24,8 @@ openzeppelin = { git = "https://github.com/OpenZeppelin/cairo-contracts.git", ta
 [dev-dependencies]
 # Testing framework (Starknet Foundry)
 # CRITICAL: Must match snforge version in CI workflow
-snforge_std = { git = "https://github.com/foundry-rs/starknet-foundry", tag = "v0.37.0" }
+# Updated to v0.53.0 to match installed snforge version (requires >=0.50.0)
+snforge_std = { git = "https://github.com/foundry-rs/starknet-foundry", tag = "v0.53.0" }
 assert_macros = "2.10.0"
 
 [tool.scarb]
