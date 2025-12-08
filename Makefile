@@ -49,18 +49,42 @@ check-format:
 
 context:
 	@echo "Generating full project context..."
-	repomix --config repomix.config.json
-	@echo "✅ Context written to context-full.xml"
+	@DATE=$$(date '+%Y-%m-%d_%H-%M-%S_%Z'); \
+	OUTPUT_FILE="context-full-$${DATE}.xml"; \
+	cp repomix.config.json repomix.config.json.bak && \
+	jq ".output.filePath = \"$$OUTPUT_FILE\"" repomix.config.json > repomix.config.json.tmp && \
+	mv repomix.config.json.tmp repomix.config.json && \
+	(repomix --config repomix.config.json || (mv repomix.config.json.bak repomix.config.json && exit 1)) && \
+	jq ".output.filePath = \"context-full.xml\"" repomix.config.json > repomix.config.json.tmp && \
+	mv repomix.config.json.tmp repomix.config.json && \
+	rm -f repomix.config.json.bak && \
+	echo "✅ Context written to $$OUTPUT_FILE"
 
 context-monero:
 	@echo "Generating Monero-focused context..."
-	repomix --config repomix.monero.json
-	@echo "✅ Context written to context-monero.xml"
+	@DATE=$$(date '+%Y-%m-%d_%H-%M-%S_%Z'); \
+	OUTPUT_FILE="context-monero-$${DATE}.xml"; \
+	cp repomix.monero.json repomix.monero.json.bak && \
+	jq ".output.filePath = \"$$OUTPUT_FILE\"" repomix.monero.json > repomix.monero.json.tmp && \
+	mv repomix.monero.json.tmp repomix.monero.json && \
+	(repomix --config repomix.monero.json || (mv repomix.monero.json.bak repomix.monero.json && exit 1)) && \
+	jq ".output.filePath = \"context-monero.xml\"" repomix.monero.json > repomix.monero.json.tmp && \
+	mv repomix.monero.json.tmp repomix.monero.json && \
+	rm -f repomix.monero.json.bak && \
+	echo "✅ Context written to $$OUTPUT_FILE"
 
 context-cairo:
 	@echo "Generating Cairo-focused context..."
-	repomix --config repomix.cairo.json
-	@echo "✅ Context written to context-cairo.xml"
+	@DATE=$$(date '+%Y-%m-%d_%H-%M-%S_%Z'); \
+	OUTPUT_FILE="context-cairo-$${DATE}.xml"; \
+	cp repomix.cairo.json repomix.cairo.json.bak && \
+	jq ".output.filePath = \"$$OUTPUT_FILE\"" repomix.cairo.json > repomix.cairo.json.tmp && \
+	mv repomix.cairo.json.tmp repomix.cairo.json && \
+	(repomix --config repomix.cairo.json || (mv repomix.cairo.json.bak repomix.cairo.json && exit 1)) && \
+	jq ".output.filePath = \"context-cairo.xml\"" repomix.cairo.json > repomix.cairo.json.tmp && \
+	mv repomix.cairo.json.tmp repomix.cairo.json && \
+	rm -f repomix.cairo.json.bak && \
+	echo "✅ Context written to $$OUTPUT_FILE"
 
 # Testing
 test: test-rust test-cairo
@@ -94,8 +118,11 @@ fmt: format
 clean:
 	@echo "Cleaning generated files..."
 	rm -f context*.xml
+	rm -f context-*-*.xml
 	rm -f monero-swap-context-*.txt
 	rm -f xmr-starknet-swap-context-*.txt
+	rm -f repomix.*.json.bak
+	rm -f repomix.*.json.tmp
 	cd rust && cargo clean
 	cd cairo && scarb clean
 

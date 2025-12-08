@@ -28,7 +28,6 @@
     "deny.toml",
     "docs/ARCHITECTURE.md",
     "docs/PROTOCOL.md",
-    "docs/AUDITOR_GUIDE.md",
     "docs/decisions/001-key-splitting.md",
     "KEY_SPLITTING_SECURITY_ANALYSIS.md",
     "RACE_CONDITION_MITIGATION.md",
