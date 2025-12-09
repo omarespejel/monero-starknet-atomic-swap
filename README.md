@@ -7,7 +7,7 @@
 Prototype implementation of a trustless atomic swap protocol between Monero and Starknet. 
 Uses hashlock + MSM verification + DLEQ proofs for cryptographic binding.
 
-**Status**: v0.7.1-alpha — Security reviewed, E2E tests passing
+**Status**: v0.7.1-alpha — Security reviewed, E2E tests passing, deployment pipeline validated
 
 | Component | Status |
 |-----------|--------|
@@ -16,6 +16,7 @@ Uses hashlock + MSM verification + DLEQ proofs for cryptographic binding.
 | Rust Tests | ✅ 32/32 passing |
 | Cairo Tests | ✅ 107/107 passing |
 | Security Review | ✅ Key splitting validated |
+| Deployment Pipeline | ✅ Golden rule enforced |
 | External Audit | 🔄 Pending |
 | Mainnet | ⬜ Not deployed |
 
@@ -154,12 +155,19 @@ Garaga's `msm_g1` function requires fake-GLV hints for efficient scalar multipli
 
 **Generating Hints:**
 
-Tool: `tools/generate_hints_exact.py` (uses exact Garaga decompression)
+Tool: `tools/generate_hints_from_test_vectors.py` (uses exact Garaga decompression)
 
 ```bash
 cd tools
-python3 generate_hints_exact.py
+uv run python generate_hints_from_test_vectors.py ../rust/test_vectors.json
 ```
+
+**Sqrt Hints - Golden Rule:**
+
+🔴 **NEVER** generate sqrt hints from Python/Rust mathematical computation.  
+✅ **ALWAYS** use empirically-validated hints from `cairo/tests/fixtures/AUTHORITATIVE_SQRT_HINTS.cairo`.
+
+The deployment script (`scripts/deploy.sh`) enforces this rule programmatically. See `docs/SQRT_HINT_PREVENTION.md` for details.
 
 ### Gas Benchmarks
 
@@ -407,6 +415,35 @@ cd ../cairo
 scarb build
 ```
 
+### Deployment
+
+**⚠️ CRITICAL: Always use the deployment script** - it enforces the golden rule for sqrt hints.
+
+```bash
+# Run the auditor-approved deployment pipeline
+./scripts/deploy.sh sepolia 0xYOUR_DEPLOYER_ADDRESS
+
+# This will:
+# - Phase 0: Validate sqrt hints (GOLDEN RULE GATE - cannot be skipped)
+# - Phase 1-2: Generate test vectors and MSM hints
+# - Phase 3-5: Run all validation tests
+# - Phase 6: Build contract
+# - Phase 7-8: Generate calldata and manifest
+
+# Deployment package will be in: deployments/sepolia_TIMESTAMP/
+```
+
+**Golden Rule Enforcement:**
+- Sqrt hints are validated against Garaga decompression BEFORE any deployment
+- Deployment is blocked if sqrt hints fail validation
+- See `docs/SQRT_HINT_PREVENTION.md` for details
+
+**Manual Deployment (Not Recommended):**
+If you must deploy manually, ensure you:
+1. Use sqrt hints from `cairo/tests/fixtures/AUTHORITATIVE_SQRT_HINTS.cairo`
+2. Never generate sqrt hints from Python/Rust
+3. Validate with: `cd cairo && snforge test test_e2e_dleq --exact`
+
 ### Running the Demo
 
 #### Maker (Alice) Side
@@ -480,9 +517,15 @@ cargo run --bin taker -- \
 │   ├── generate_ed25519_test_data.py
 │   ├── generate_hints_exact.py  # MSM hint generation (exact Garaga decompression)
 │   ├── generate_hints_from_test_vectors.py
+│   ├── validate_sqrt_hints.py  # Validate sqrt hints with Garaga
+│   ├── discover_sqrt_hints.py  # Discover candidate sqrt hints
 │   ├── verify_challenge_computation.py
 │   ├── verify_full_compatibility.py  # Cross-platform verification
 │   └── verify_rust_cairo_equivalence.py
+├── scripts/                    # Deployment automation
+│   └── deploy.sh               # Auditor-approved deployment pipeline (golden rule enforced)
+├── docs/                       # Documentation
+│   └── SQRT_HINT_PREVENTION.md # Sqrt hint prevention strategy
 └── README.md
 ```
 
@@ -590,6 +633,16 @@ This approach provides native snforge support with easy filtering: `snforge test
 - Contract invariants documentation (`INVARIANTS.md`)
 - Test coverage configuration (`coverage.toml`)
 - Comprehensive README with technical and security details
+- Sqrt hint prevention strategy (`docs/SQRT_HINT_PREVENTION.md`)
+- Authoritative sqrt hints (`cairo/tests/fixtures/AUTHORITATIVE_SQRT_HINTS.cairo`)
+
+**Deployment Infrastructure:**
+- Auditor-approved deployment script (`scripts/deploy.sh`)
+- Golden rule enforcement (mandatory sqrt hint validation)
+- Automated validation gates (Rust compatibility, Cairo E2E, contract build)
+- Deployment manifest with audit trail
+- Pre-commit hooks for validation
+- CI/CD workflows for vector validation
 
 ### Recent Achievements
 
