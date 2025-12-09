@@ -20,15 +20,16 @@ fn test_full_atomic_swap_flow() {
     assert!(alice_keys.verify(), "Key splitting math must be correct");
     
     // 2. Alice computes hashlock H = SHA-256(t)
-    let hashlock: [u8; 32] = Sha256::digest(
-        alice_keys.adaptor_scalar_bytes()
-    ).into();
+    // TODO: SwapKeyPair should track raw bytes from generation for Cairo compatibility
+    let secret_bytes = alice_keys.adaptor_scalar_bytes();
+    let hashlock: [u8; 32] = Sha256::digest(secret_bytes).into();
     
     // 3. Alice generates DLEQ proof binding hashlock to adaptor point
     // Wrap adaptor_scalar in Zeroizing for memory safety
     let adaptor_scalar_zeroizing = Zeroizing::new(alice_keys.adaptor_scalar);
     let dleq_proof = generate_dleq_proof(
         &adaptor_scalar_zeroizing,
+        &secret_bytes,
         &alice_keys.adaptor_point,
         &hashlock,
     ).expect("DLEQ proof generation should succeed with valid inputs");
@@ -90,15 +91,15 @@ fn test_full_atomic_swap_flow() {
 fn test_swap_fails_with_wrong_secret() {
     // Test that wrong secret cannot unlock the swap
     let alice_keys = SwapKeyPair::generate();
-    let hashlock: [u8; 32] = Sha256::digest(
-        alice_keys.adaptor_scalar_bytes()
-    ).into();
+    let secret_bytes = alice_keys.adaptor_scalar_bytes();
+    let hashlock: [u8; 32] = Sha256::digest(secret_bytes).into();
     
     // Generate DLEQ proof
     // Wrap adaptor_scalar in Zeroizing for memory safety
     let adaptor_scalar_zeroizing = Zeroizing::new(alice_keys.adaptor_scalar);
     let _dleq_proof = generate_dleq_proof(
         &adaptor_scalar_zeroizing,
+        &secret_bytes,
         &alice_keys.adaptor_point,
         &hashlock,
     ).expect("DLEQ proof generation should succeed with valid inputs");

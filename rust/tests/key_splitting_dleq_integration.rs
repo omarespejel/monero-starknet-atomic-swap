@@ -17,12 +17,15 @@ fn test_swap_keypair_with_dleq_proof() {
     assert!(keys.verify(), "Key splitting math failed");
 
     // 2. Compute hashlock = SHA256(t.to_bytes())
-    let hashlock: [u8; 32] = Sha256::digest(keys.adaptor_scalar_bytes()).into();
+    // TODO: SwapKeyPair should track raw bytes from generation for Cairo compatibility
+    // For now, using scalar.to_bytes() - warning will catch if scalar reduction changed bytes
+    let secret_bytes = keys.adaptor_scalar_bytes();
+    let hashlock: [u8; 32] = Sha256::digest(secret_bytes).into();
 
-    // 3. Generate DLEQ proof - THIS IS THE CONFIRMED API
+    // 3. Generate DLEQ proof
     // Wrap adaptor_scalar in Zeroizing for memory safety
     let adaptor_scalar_zeroizing = Zeroizing::new(keys.adaptor_scalar);
-    let proof = generate_dleq_proof(&adaptor_scalar_zeroizing, &keys.adaptor_point, &hashlock)
+    let proof = generate_dleq_proof(&adaptor_scalar_zeroizing, &secret_bytes, &keys.adaptor_point, &hashlock)
         .expect("DLEQ proof generation should succeed with valid inputs");
 
     // 4. Basic proof validity checks

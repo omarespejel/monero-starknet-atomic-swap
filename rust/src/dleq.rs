@@ -19,6 +19,7 @@ use blake2::{Blake2s256, Digest as Blake2Digest};
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
 use curve25519_dalek::scalar::Scalar;
+use hex;
 use sha2::{Digest, Sha256};
 use std::ops::Deref;
 use thiserror::Error;
@@ -99,13 +100,14 @@ pub struct DleqProofForCairo {
 /// This function validates all inputs before generating the proof:
 /// - Secret must be non-zero
 /// - Adaptor point must equal secret * G
-/// - Hashlock must equal SHA256(secret)
+/// - Hashlock must equal SHA256(raw_secret_bytes)
 ///
 /// # Arguments
 ///
 /// * `secret` - The secret scalar t (wrapped in Zeroizing for automatic memory clearing)
+/// * `secret_bytes` - The raw secret bytes (32 bytes) BEFORE scalar reduction
 /// * `adaptor_point` - The adaptor point T = t·G
-/// * `hashlock` - The hashlock (32-byte SHA-256 hash of the secret)
+/// * `hashlock` - The hashlock (32-byte SHA-256 hash of raw_secret_bytes)
 ///
 /// # Returns
 ///
@@ -117,14 +119,21 @@ pub struct DleqProofForCairo {
 ///
 /// Returns `DleqError::ZeroScalar` if secret is zero.
 /// Returns `DleqError::PointMismatch` if adaptor_point ≠ secret * G.
-/// Returns `DleqError::HashlockMismatch` if hashlock ≠ SHA256(secret).
+/// Returns `DleqError::HashlockMismatch` if hashlock ≠ SHA256(raw_secret_bytes).
 ///
 /// # Security
 ///
 /// The secret is wrapped in `Zeroizing<Scalar>` to ensure it's automatically zeroed
 /// when dropped. The nonce `k` is also wrapped in `Zeroizing` and automatically cleared.
+///
+/// # Hashlock Format (CRITICAL)
+///
+/// This function uses `SHA-256(raw_secret_bytes)` to match Cairo's `verify_and_unlock`
+/// implementation. DO NOT use `SHA-256(scalar.to_bytes())` as scalar reduction may
+/// change the bytes, causing hashlock mismatch.
 pub fn generate_dleq_proof(
     secret: &Zeroizing<Scalar>,
+    secret_bytes: &[u8; 32],
     adaptor_point: &EdwardsPoint,
     hashlock: &[u8; 32],
 ) -> Result<DleqProof, DleqError> {
@@ -142,8 +151,17 @@ pub fn generate_dleq_proof(
         return Err(DleqError::PointMismatch);
     }
     
-    // 3. Verify hashlock = SHA256(secret) (use deref() for Zeroizing)
-    let computed_hash: [u8; 32] = Sha256::digest(secret.deref().to_bytes()).into();
+    // 3. Verify hashlock = SHA256(raw_secret_bytes) for Cairo compatibility
+    // AUDIT: Warn if scalar reduction changed the bytes (could cause hashlock mismatch)
+    let scalar_bytes = secret.to_bytes();
+    if scalar_bytes != *secret_bytes {
+        eprintln!("⚠️  WARNING: Scalar reduction changed bytes!");
+        eprintln!("    Raw:    {}", hex::encode(secret_bytes));
+        eprintln!("    Scalar: {}", hex::encode(scalar_bytes));
+        eprintln!("    Using raw bytes for hashlock (Cairo-compatible)");
+    }
+    
+    let computed_hash: [u8; 32] = Sha256::digest(secret_bytes).into();
     if computed_hash != *hashlock {
         return Err(DleqError::HashlockMismatch);
     }
@@ -181,6 +199,7 @@ pub fn generate_dleq_proof(
         r2: R2,
     })
 }
+
 
 /// Convert an Edwards point to compressed format and sqrt hint.
 ///
@@ -507,15 +526,14 @@ mod tests {
         let secret_bytes = [0x42u8; 32];
         let secret = Scalar::from_bytes_mod_order(secret_bytes);
         let secret_zeroizing = Zeroizing::new(secret);
-        // Hashlock must be computed from secret.to_bytes() (not raw secret_bytes)
-        // This matches the validation in generate_dleq_proof
-        let hashlock: [u8; 32] = Sha256::digest(secret_zeroizing.deref().to_bytes()).into();
+        // Use raw bytes for hashlock (Cairo-compatible)
+        let hashlock: [u8; 32] = Sha256::digest(secret_bytes).into();
 
         // Compute adaptor point
         let adaptor_point = ED25519_BASEPOINT_POINT * *secret_zeroizing;
 
         // Generate DLEQ proof
-        let proof = generate_dleq_proof(&secret_zeroizing, &adaptor_point, &hashlock)
+        let proof = generate_dleq_proof(&secret_zeroizing, &secret_bytes, &adaptor_point, &hashlock)
             .expect("Proof generation should succeed for valid inputs");
 
         // Verify proof structure: U should equal t·Y
@@ -536,10 +554,11 @@ mod tests {
     fn test_dleq_validation_zero_scalar() {
         use zeroize::Zeroizing;
         let secret = Zeroizing::new(Scalar::ZERO);
+        let secret_bytes = [0u8; 32]; // Zero scalar bytes
         let adaptor_point = ED25519_BASEPOINT_POINT; // arbitrary
         let hashlock = [0u8; 32]; // arbitrary
 
-        let result = generate_dleq_proof(&secret, &adaptor_point, &hashlock);
+        let result = generate_dleq_proof(&secret, &secret_bytes, &adaptor_point, &hashlock);
         assert_eq!(result, Err(DleqError::ZeroScalar), "Zero scalar must be rejected");
     }
 
@@ -548,10 +567,11 @@ mod tests {
         use zeroize::Zeroizing;
         use std::ops::Deref;
         let secret = Zeroizing::new(Scalar::from(42u64));
+        let secret_bytes = secret.deref().to_bytes(); // Use scalar bytes for test
         let wrong_point = ED25519_BASEPOINT_POINT * Scalar::from(99u64); // wrong!
-        let hashlock: [u8; 32] = Sha256::digest(secret.deref().to_bytes()).into();
+        let hashlock: [u8; 32] = Sha256::digest(secret_bytes).into();
 
-        let result = generate_dleq_proof(&secret, &wrong_point, &hashlock);
+        let result = generate_dleq_proof(&secret, &secret_bytes, &wrong_point, &hashlock);
         assert_eq!(
             result,
             Err(DleqError::PointMismatch),
@@ -564,10 +584,11 @@ mod tests {
         use zeroize::Zeroizing;
         use std::ops::Deref;
         let secret = Zeroizing::new(Scalar::from(42u64));
+        let secret_bytes = secret.deref().to_bytes(); // Use scalar bytes for test
         let adaptor_point = ED25519_BASEPOINT_POINT * *secret;
         let wrong_hashlock = [0xFF; 32]; // wrong!
 
-        let result = generate_dleq_proof(&secret, &adaptor_point, &wrong_hashlock);
+        let result = generate_dleq_proof(&secret, &secret_bytes, &adaptor_point, &wrong_hashlock);
         assert_eq!(
             result,
             Err(DleqError::HashlockMismatch),
@@ -615,11 +636,12 @@ mod tests {
         use std::ops::Deref;
         // Test edge case: Scalar::ONE (smallest non-zero scalar)
         let secret = Zeroizing::new(Scalar::ONE);
+        let secret_bytes = secret.deref().to_bytes(); // Use scalar bytes for test
         let adaptor_point = ED25519_BASEPOINT_POINT * *secret;
-        let hashlock: [u8; 32] = Sha256::digest(secret.deref().to_bytes()).into();
+        let hashlock: [u8; 32] = Sha256::digest(secret_bytes).into();
 
         // Should succeed (ONE is valid, only ZERO is rejected)
-        let result = generate_dleq_proof(&secret, &adaptor_point, &hashlock);
+        let result = generate_dleq_proof(&secret, &secret_bytes, &adaptor_point, &hashlock);
         assert!(result.is_ok(), "Scalar::ONE should be accepted");
     }
 
@@ -637,10 +659,11 @@ mod tests {
         ];
         let max_scalar = Zeroizing::new(Scalar::from_bytes_mod_order(max_scalar_bytes));
         let adaptor_point = ED25519_BASEPOINT_POINT * *max_scalar;
-        let hashlock: [u8; 32] = Sha256::digest(max_scalar.deref().to_bytes()).into();
+        // Use raw bytes for hashlock (Cairo-compatible)
+        let hashlock: [u8; 32] = Sha256::digest(max_scalar_bytes).into();
 
         // Should succeed (max scalar is valid)
-        let result = generate_dleq_proof(&max_scalar, &adaptor_point, &hashlock);
+        let result = generate_dleq_proof(&max_scalar, &max_scalar_bytes, &adaptor_point, &hashlock);
         assert!(result.is_ok(), "Maximum scalar should be accepted");
     }
 

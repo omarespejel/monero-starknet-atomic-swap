@@ -261,9 +261,10 @@ pub fn generate_swap_secret() -> SwapSecret {
     });
 
     // Generate DLEQ proof (wrap scalar in Zeroizing for memory safety)
+    // Note: secret_bytes is already raw bytes here, which is correct for Cairo compatibility
     let secret_zeroizing = Zeroizing::new(scalar);
     let adaptor_point_edwards = ED25519_BASEPOINT_POINT * *secret_zeroizing;
-    let dleq_proof = generate_dleq_proof(&secret_zeroizing, &adaptor_point_edwards, &hashlock)
+    let dleq_proof = generate_dleq_proof(&secret_zeroizing, &secret_bytes, &adaptor_point_edwards, &hashlock)
         .expect("DLEQ proof generation should succeed for valid test inputs");
 
     // Convert DLEQ second point to Weierstrass and get limbs

@@ -24,14 +24,13 @@ fn generate_cairo_test_vectors() {
     // Generate adaptor point T = secret·G (correct protocol)
     let adaptor_point = ED25519_BASEPOINT_POINT * *secret_zeroizing;
 
-    // Generate hashlock H = SHA-256(secret) (must match secret)
+    // Generate hashlock H = SHA-256(raw_secret_bytes) (Cairo-compatible)
     use sha2::{Digest, Sha256};
-    // Hashlock must be computed from secret.to_bytes() (not raw secret_bytes)
-    // This matches the validation in generate_dleq_proof
-    let hashlock: [u8; 32] = Sha256::digest(secret_zeroizing.deref().to_bytes()).into();
+    // CRITICAL: Use raw bytes to match Cairo's verify_and_unlock
+    let hashlock: [u8; 32] = Sha256::digest(secret_bytes).into();
 
     // Generate DLEQ proof
-    let proof = generate_dleq_proof(&secret_zeroizing, &adaptor_point, &hashlock)
+    let proof = generate_dleq_proof(&secret_zeroizing, &secret_bytes, &adaptor_point, &hashlock)
         .expect("Proof generation should succeed for valid inputs");
 
     // Convert to Cairo format
@@ -81,10 +80,10 @@ fn generate_multiple_test_vectors() {
         let secret_zeroizing = Zeroizing::new(secret);
         let adaptor_point = ED25519_BASEPOINT_POINT * *secret_zeroizing;
 
-        // Generate hashlock from secret (must match for validation)
-        let hashlock: [u8; 32] = Sha256::digest(secret_zeroizing.deref().to_bytes()).into();
+        // Generate hashlock from raw bytes (Cairo-compatible)
+        let hashlock: [u8; 32] = Sha256::digest(secret_bytes).into();
 
-        let proof = generate_dleq_proof(&secret_zeroizing, &adaptor_point, &hashlock)
+        let proof = generate_dleq_proof(&secret_zeroizing, &secret_bytes, &adaptor_point, &hashlock)
             .expect("Proof generation should succeed for valid inputs");
         let cairo_format = proof.to_cairo_format(&adaptor_point);
 
