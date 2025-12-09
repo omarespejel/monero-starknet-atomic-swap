@@ -24,9 +24,12 @@ impl MoneroStagenet {
     /// Tries multiple public stagenet nodes as fallbacks
     pub async fn connect_public() -> Result<Self> {
         // Try multiple public stagenet nodes (fallback if one is down)
+        // Prioritize verified working nodes from auditor research
         let rpc_urls = vec![
-            "http://stagenet.melo.tools:38081/json_rpc",
-            "http://stagenet.community.rino.io:38081/json_rpc",
+            "http://stagenet.xmr-tw.org:38081/json_rpc", // ✅ Verified working
+            "http://monero-stagenet.exan.tech:38081/json_rpc", // Fallback
+            "http://stagenet.melo.tools:38081/json_rpc", // Legacy fallback
+            "http://stagenet.community.rino.io:38081/json_rpc", // Legacy fallback
             "http://localhost:38081/json_rpc", // Local fallback
         ];
 

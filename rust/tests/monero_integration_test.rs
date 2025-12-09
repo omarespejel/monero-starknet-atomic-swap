@@ -7,7 +7,6 @@ use anyhow::Result;
 use helpers::monero::MoneroStagenet;
 
 #[tokio::test]
-#[ignore] // Requires active Monero stagenet node - run with: cargo test --test monero_integration_test -- --ignored
 async fn test_monero_stagenet_connection() -> Result<()> {
     // Initialize tracing for debugging
     tracing_subscriber::fmt::init();
@@ -32,7 +31,6 @@ async fn test_monero_stagenet_connection() -> Result<()> {
 }
 
 #[tokio::test]
-#[ignore] // Requires active Monero stagenet node - run with: cargo test --test monero_integration_test -- --ignored
 async fn test_monero_10_confirmation_timing() -> Result<()> {
     let monero = MoneroStagenet::connect_public().await?;
 
