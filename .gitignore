@@ -54,3 +54,4 @@ deployments/
 *.keys
 *.address.txt
 monero-test-*.log
+wallet-rpc.log
