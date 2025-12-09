@@ -191,6 +191,6 @@ Future enhancement. Aggregate multiple swaps into single transaction for gas eff
 
 ---
 
-**Version**: 0.7.1-alpha  
+**Version**: 0.8.0-alpha  
 **Last Updated**: 2025-12-07
 

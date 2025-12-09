@@ -243,7 +243,7 @@ The protocol implements multiple layers of security through cryptographic primit
 
 The security properties have been verified through mathematical analysis, comparison to audited implementations, and comprehensive testing. While external audit is pending, the implementation follows industry best practices and is ready for formal security review.
 
-**Version**: 0.7.1-alpha  
+**Version**: 0.8.0-alpha  
 **Last Updated**: 2025-12-07  
 **Status**: Security reviewed, pending external audit
 

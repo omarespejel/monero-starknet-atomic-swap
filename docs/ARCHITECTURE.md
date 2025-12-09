@@ -144,6 +144,6 @@ The protocol is designed for testnet use only. Mainnet deployment requires exter
 
 ---
 
-**Version**: 0.7.1-alpha  
+**Version**: 0.8.0-alpha  
 **Last Updated**: 2025-12-07
 
