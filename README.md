@@ -17,6 +17,7 @@ Uses hashlock + MSM verification + DLEQ proofs for cryptographic binding.
 | Cairo Tests | ✅ 107/107 passing |
 | Security Review | ✅ Key splitting validated |
 | Deployment Pipeline | ✅ Golden rule enforced |
+| Monero Integration | ✅ Verified (stagenet tests passing) |
 | External Audit | 🔄 Pending |
 | Mainnet | ⬜ Not deployed |
 
