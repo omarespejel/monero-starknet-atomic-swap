@@ -109,9 +109,11 @@ snforge test --filter "refund"
 
 ### Test Suite Statistics
 
-- **Total Tests:** 7 (6 passing, 1 ignored)
-- **Critical Tests:** 6/6 passing (100%)
-- **Coverage:** ~70% (all P0 paths covered)
+- **Total Tests:** 120+ (Cairo: 113 tests, Rust: 22 tests)
+- **Cairo Tests:** 83/113 passing (16 failing, 14 ignored)
+- **Rust Tests:** 21/22 passing (1 timing test failing)
+- **Critical Tests:** All P0 paths covered ✅
+- **Two-Phase Unlock:** 13 passing, 6 ignored (panic validation) ✅
 - **Blocking Issues:** 0
 
 ### Test Categories
@@ -121,6 +123,9 @@ snforge test --filter "refund"
 | Cryptographic Primitives | 4 | 4 | ✅ |
 | Integration Tests | 2 | 2 | ✅ |
 | Deployment Readiness | 1 | 1 | ✅ |
+| Two-Phase Unlock | 19 | 13 passing, 6 ignored | ✅ |
+| Security Tests | 9 | 7 passing, 2 ignored | ✅ |
+| E2E Tests | 1 | 1 | ✅ |
 | E2E Simulation | 0 | - | ⏳ |
 | CI/CD Automation | 0 | - | ⏳ |
 

@@ -14,7 +14,8 @@ Uses hashlock + MSM verification + DLEQ proofs for cryptographic binding.
 | Core Protocol | ✅ Feature-complete |
 | Cryptographic Approach | ✅ Validated against Serai DEX pattern |
 | Rust Tests | ⚠️ 21/22 passing (1 timing test failing) |
-| Cairo Tests | ⚠️ 81/105 passing (24 failing, 8 ignored) |
+| Cairo Tests | ⚠️ 83/113 passing (16 failing, 14 ignored) |
+| Two-Phase Unlock | ✅ 13 passing, 6 ignored (panic validation) |
 | Security Review | ✅ Key splitting validated |
 | Deployment Pipeline | ✅ Golden rule enforced |
 | Monero Integration | ✅ Daemon RPC verified (stagenet tests passing) |
@@ -597,7 +598,7 @@ This approach provides native snforge support with easy filtering: `snforge test
 
 - ✅ Rust ↔ Cairo compatibility (E2E test passes)
 
-- ✅ Security test suite (9/9 passing)
+- ✅ Security test suite (7/9 passing, 2 constructor panic tests marked as ignored)
 
 ### Known Limitations
 
@@ -624,11 +625,12 @@ This approach provides native snforge support with easy filtering: `snforge test
 - Conversion utilities (Garaga-compatible)
 
 **Testing Infrastructure:**
-- Comprehensive test suite (37+ test files, 105+ tests)
+- Comprehensive test suite (37+ test files, 113 tests: 83 passing, 16 failing, 14 ignored)
+- Two-phase unlock tests (19 tests: 13 passing, 6 ignored for panic validation)
 - Organized test structure (unit/integration/e2e/security/debug)
 - E2E Rust↔Cairo compatibility test (PASSES)
 - Security audit tests (most passing, some failing)
-- Token security tests (some failing - depositor validation issues)
+- Token security tests (6/6 passing - depositor validation fixed)
 - Edge case tests (max scalar, zero, boundary values)
 - Negative tests (wrong challenge/response/hashlock rejection)
 - Full swap lifecycle tests
@@ -688,10 +690,10 @@ A race condition exists between secret revelation on Starknet and Monero transac
 3. If 18-block Monero reorg happens → Bob's TX reverted, Alice can re-spend Monero
 4. Result: Alice has BOTH tokens AND Monero
 
-**Mitigations (Planned for v0.8.0):**
-- Two-phase unlock with 2-hour grace period
-- Minimum 3-hour timelock
-- Watchtower service for production
+**Mitigations:**
+- ✅ Minimum 3-hour timelock (implemented in P0 fixes)
+- ⏳ Two-phase unlock with 2-hour grace period (planned)
+- ⏳ Watchtower service for production (planned)
 
 **Current Recommendation**: Use only for testnet or swaps < $100 until mitigations are implemented.
 

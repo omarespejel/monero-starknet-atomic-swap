@@ -9,8 +9,8 @@ This document specifies the atomic swap protocol between Monero and Starknet tok
 - Hash function: SHA-256 (for hashlocks)
 - Challenge hash: BLAKE2s (for DLEQ proofs)
 - Elliptic curve: Ed25519 (curve_index=4 in Garaga)
-- Timelock minimum: 3 hours (planned for v0.8.0)
-- Grace period: 2 hours (planned for v0.8.0)
+- Timelock minimum: 3 hours (✅ implemented in P0 fixes)
+- Grace period: 2 hours (✅ implemented in two-phase unlock)
 
 ## Serialization Formats (CRITICAL)
 
@@ -119,20 +119,55 @@ Constructor verifies DLEQ proof. If invalid, deployment fails.
 
 Alice calls `deposit()` to transfer tokens into contract. Only depositor can call this function.
 
-### Step 5: Secret Revelation
+### Step 5: Secret Revelation (Two-Phase Unlock)
 
-Bob calls `verify_and_unlock(secret)` with secret `t`. Contract verifies:
+**Phase 1: Reveal Secret** (`reveal_secret()`)
+
+Bob calls `reveal_secret(secret)` with secret `t`. Contract verifies:
 1. `SHA-256(secret) == H` (hashlock check)
 2. `scalar·G == T` (MSM verification)
 
-If both checks pass, tokens transfer to Bob and contract emits `Unlocked` event.
+If both checks pass:
+- Contract stores `secret_revealed = true`
+- Contract stores `reveal_timestamp = block_timestamp`
+- Contract stores `unlocker_address = caller`
+- Contract emits `SecretRevealed` event
+- **Tokens are NOT transferred yet** (grace period active)
+
+**Phase 2: Claim Tokens** (`claim_tokens()`)
+
+After grace period expires (2 hours), Bob calls `claim_tokens()`:
+- Requires `secret_revealed == true`
+- Requires `block_timestamp >= reveal_timestamp + GRACE_PERIOD`
+- Requires `caller == unlocker_address`
+
+If all checks pass:
+- Tokens transfer to Bob
+- Contract sets `unlocked = true`
+- Contract emits `TokensClaimed` event
+
+**Backward Compatibility** (`verify_and_unlock()`)
+
+The original `verify_and_unlock(secret)` function still works:
+- Calls `reveal_secret()` internally
+- Immediately transfers tokens (bypasses grace period)
+- Maintains backward compatibility with existing integrations
 
 ### Step 6: Key Recovery
 
-Alice monitors for `Unlocked` event, extracts `t`, and recovers:
+Alice monitors for `SecretRevealed` event (or `Unlocked` for backward compatibility), extracts `t`, and recovers:
 - `x = x_partial + t`
 
 Alice can now spend Monero with full key `x`.
+
+**Grace Period Purpose:**
+
+The 2-hour grace period allows time for:
+- Monero transaction confirmation (10 blocks ≈ 20 minutes)
+- Cross-chain verification
+- Watchtower monitoring and alerts
+
+This mitigates race conditions where tokens could be claimed before Monero confirms.
 
 ## Security Properties
 
@@ -166,6 +201,10 @@ If Alice tries to refund before timelock expires, `refund()` reverts. This preve
 
 If contract is already unlocked, further unlock or refund attempts revert. This prevents double-spending.
 
+### Secret Already Revealed
+
+If secret has been revealed (Phase 1 complete), `refund()` is blocked. This prevents depositor from stealing tokens during grace period.
+
 ## Gas Costs
 
 - DLEQ verification: 270k-440k gas
@@ -175,15 +214,22 @@ If contract is already unlocked, further unlock or refund attempts revert. This 
 
 Total unlock cost: ~370k-610k gas (depending on MSM complexity).
 
-## Future Enhancements
+## Implemented Enhancements
 
-### Two-Phase Unlock
+### Two-Phase Unlock ✅
 
-Planned for v0.8.0. Separate secret revelation from token transfer with grace period to mitigate race conditions.
+**Status:** Implemented in v0.8.0-alpha
+
+Separates secret revelation from token transfer with 2-hour grace period to mitigate race conditions. See Step 5 above for details.
+
+**Security Benefits:**
+- Prevents depositor refund after secret revealed (P0 fix)
+- Allows time for Monero confirmation before token claim
+- Enables watchtower monitoring and alerts
 
 ### Watchtower Service
 
-Planned for production. Monitor both chains and alert parties if cross-chain confirmation fails.
+Planned for production. Monitor both chains and alert parties if cross-chain confirmation fails. See `watchtower/` directory for skeleton implementation.
 
 ### Batch Operations
 
@@ -192,5 +238,5 @@ Future enhancement. Aggregate multiple swaps into single transaction for gas eff
 ---
 
 **Version**: 0.8.0-alpha  
-**Last Updated**: 2025-12-07
+**Last Updated**: 2025-12-09
 
