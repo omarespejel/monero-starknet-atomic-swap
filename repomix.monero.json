@@ -29,9 +29,13 @@
     "docs/ARCHITECTURE.md",
     "docs/PROTOCOL.md",
     "docs/TEST_STATUS.md",
+    "docs/SETUP.md",
+    "docs/DOCKER_SETUP.md",
+    "docs/DOCKER_PUBLISHING.md",
+    "docs/AUDIT_DEPENDENCIES.md",
     "docs/decisions/001-key-splitting.md",
     "rust/Cargo.toml",
-    "rust/AUDIT_DEPENDENCIES.md",
+    "rust/docs/MONERO_WALLET_INTEGRATION.md",
     "rust/src/lib.rs",
     "rust/src/main.rs",
     "rust/src/dleq.rs",
@@ -46,8 +50,13 @@
     "rust/src/bin/maker.rs",
     "rust/src/bin/taker.rs",
     "rust/src/bin/generate_test_vector.rs",
+    "rust/src/monero_wallet/**",
+    "rust/tests/helpers/monero_wallet.rs",
+    "rust/tests/wallet_integration_test.rs",
     "tools/verify_full_compatibility.py",
-    "tools/verify_rust_cairo_equivalence.py"
+    "tools/verify_rust_cairo_equivalence.py",
+    "docker-compose.yml",
+    "Dockerfile.wallet-rpc"
   ]
 }
 

@@ -34,12 +34,15 @@
     "Makefile",
     "docs/ARCHITECTURE.md",
     "docs/PROTOCOL.md",
-    "docs/CONTEXT_GENERATION.md",
     "docs/TEST_STATUS.md",
     "docs/SQRT_HINT_PREVENTION.md",
+    "docs/SETUP.md",
+    "docs/DOCKER_SETUP.md",
+    "docs/DOCKER_PUBLISHING.md",
+    "docs/AUDIT_DEPENDENCIES.md",
     "docs/decisions/**",
     "rust/Cargo.toml",
-    "rust/AUDIT_DEPENDENCIES.md",
+    "rust/docs/MONERO_WALLET_INTEGRATION.md",
     "rust/src/lib.rs",
     "rust/src/main.rs",
     "rust/src/dleq.rs",
@@ -84,7 +87,10 @@
     "tools/fix_compressed_points.py",
     "tools/validate_sqrt_hints.py",
     "tools/discover_sqrt_hints.py",
+    "tools/validate_sqrt_hints.py",
     "scripts/deploy.sh",
+    "docker-compose.yml",
+    "Dockerfile.wallet-rpc",
     "generate-context.sh"
   ]
 }
