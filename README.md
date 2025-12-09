@@ -7,7 +7,7 @@
 Prototype implementation of a trustless atomic swap protocol between Monero and Starknet. 
 Uses hashlock + MSM verification + DLEQ proofs for cryptographic binding.
 
-**Status**: v0.7.1-alpha — Security reviewed, E2E tests passing, deployment pipeline validated
+**Status**: v0.8.0-alpha — Security reviewed, E2E tests passing, deployment pipeline validated, Docker image published
 
 | Component | Status |
 |-----------|--------|
@@ -18,7 +18,7 @@ Uses hashlock + MSM verification + DLEQ proofs for cryptographic binding.
 | Security Review | ✅ Key splitting validated |
 | Deployment Pipeline | ✅ Golden rule enforced |
 | Monero Integration | ✅ Daemon RPC verified (stagenet tests passing) |
-| Monero Wallet RPC | ✅ Code complete (testing pending) |
+| Monero Wallet RPC | ✅ Verified (Docker + integration tests passing) |
 | External Audit | 🔄 Pending |
 | Mainnet | ⬜ Not deployed |
 
@@ -697,7 +697,7 @@ A race condition exists between secret revelation on Starknet and Monero transac
 
 **Monero Integration:**
 
-### Wallet RPC Integration (NEW)
+### Wallet RPC Integration
 
 Production-grade Monero wallet RPC client based on COMIT Network's battle-tested patterns:
 
@@ -707,6 +707,7 @@ Production-grade Monero wallet RPC client based on COMIT Network's battle-tested
 - ✅ Key image verification (prevents double-spending)
 - ✅ Comprehensive integration tests
 - ✅ Docker setup for easy testing
+- ✅ Published Docker image: `espejelomar/monero-wallet-rpc`
 
 **Quick Start:**
 ```bash
