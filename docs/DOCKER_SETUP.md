@@ -4,6 +4,8 @@
 
 This guide covers setting up Monero wallet-rpc using Docker, which provides isolation and avoids antivirus false positives.
 
+**Published Image**: [`espejelomar/monero-wallet-rpc`](https://hub.docker.com/r/espejelomar/monero-wallet-rpc) on Docker Hub
+
 ## Quick Start
 
 ```bash

@@ -8,6 +8,8 @@ Complete guide for setting up Monero wallet-rpc for atomic swap development and 
 
 **Benefits**: Avoids antivirus false positives, easy setup, consistent environment.
 
+**Published Image**: [`espejelomar/monero-wallet-rpc`](https://hub.docker.com/r/espejelomar/monero-wallet-rpc) on Docker Hub
+
 ```bash
 # Start wallet-rpc container
 docker-compose up -d

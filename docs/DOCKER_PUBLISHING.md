@@ -6,7 +6,7 @@ This guide covers publishing the Monero wallet-rpc Docker image to Docker Hub an
 
 ## Published Images
 
-- **Docker Hub**: `espejelomar/monero-wallet-rpc`
+- **Docker Hub**: [`espejelomar/monero-wallet-rpc`](https://hub.docker.com/r/espejelomar/monero-wallet-rpc)
 - **GitHub Container Registry**: `ghcr.io/omarespejel/monero-wallet-rpc`
 
 ## Quick Publish
@@ -126,9 +126,9 @@ docker push ghcr.io/yourusername/monero-wallet-rpc:latest
 | Documentation | ✅ Comprehensive | ⚠️ Minimal |
 | ARM64 support | ✅ Works | ⚠️ Issues |
 
-## Usage After Publishing
+## Usage
 
-Once published, others can use:
+The image is now published and available:
 
 ```bash
 # Pull image
