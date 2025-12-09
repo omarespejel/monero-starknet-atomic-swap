@@ -1,0 +1,17 @@
+{
+  "adaptor_point_compressed": "85ce3cf603efcf45b599cce75369e854823864e471ad297d955f32db0ade7d42",
+  "adaptor_point_sqrt_hint": "5229357bbd30a2e270c96220e0b860e05d145aae28943fc7329d4a56f6707110",
+  "challenge": "b2cd06dd3134e6e8b6fa532a1dd2c41ab963849e6c41ccc97b1fb425a163f00c",
+  "description": "Complete DLEQ proof test vector for deployment",
+  "dleq_second_point_compressed": "be7b5c4cf816760b7709df6b47b393d8cdd1605e06e2e2080944d684fad0795c",
+  "expected_verification": true,
+  "g_compressed": "5866666666666666666666666666666666666666666666666666666666666666",
+  "hashlock": "b6acca81a0939a856c35e4c4188e95b91731aab1d4629a4cee79dd09ded4fc94",
+  "notes": "Complete test vector with all DLEQ proof data needed for deployment",
+  "r1_compressed": "34e31fa42ec011caed7fa1d72125b03ca52659e04a0e7aca42d9906f2509ef11",
+  "r2_compressed": "2ff0af08f9d4654db8e6cb72c226fbb42592f4f2df3f6f06cafbc033fd9884f5",
+  "response": "1eedaa629d5bb28d173153ff275608169dc822d2c9dfb450af3254d9ff100802",
+  "second_point_sqrt_hint": "8deb942bc4b4e13c81c7a86c96349c5710c2d0c4174dd439144588f905c37c61",
+  "secret": "1212121212121212121212121212121212121212121212121212121212121212",
+  "y_compressed": "c9a3f86aae465f0e56513864510f3997561fa2c9e85ea21dc2292309f3cd6022"
+}
