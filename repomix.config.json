@@ -37,6 +37,8 @@
     "docs/PROTOCOL.md",
     "docs/CONTEXT_GENERATION.md",
     "docs/TEST_STATUS.md",
+    "docs/TEST_SUITE_STATUS.md",
+    "docs/AUDITOR_REMAINING_ISSUES.md",
     "docs/CONSOLIDATION_PLAN.md",
     "docs/CONSOLIDATION_PROGRESS.md",
     "docs/CONSOLIDATION_STATUS.md",
