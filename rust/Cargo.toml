@@ -76,6 +76,10 @@ path = "src/bin/get_all_sqrt_hints.rs"
 name = "regenerate_r1"
 path = "src/bin/regenerate_r1.rs"
 
+[[bin]]
+name = "generate_canonical_test_vectors"
+path = "src/bin/generate_canonical_test_vectors.rs"
+
 [dev-dependencies]
 assert_cmd = "2.0"
 proptest = "1"  # Property-based testing for cryptographic code
