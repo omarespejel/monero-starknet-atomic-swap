@@ -244,6 +244,7 @@ pub mod AtomicLock {
         pub const ZERO_HINT_SCALARS: felt252 = 'Hint s1/s2 cannot be zero';
         pub const SMALL_ORDER_POINT: felt252 = 'Small order point rejected';
         pub const INVALID_LOCK_TIME: felt252 = 'lock_until must be future';
+        pub const TIMELOCK_TOO_SHORT: felt252 = 'Timelock must be >= 3 hours';
         pub const ZERO_AMOUNT: felt252 = 'Amount must be non-zero';
         pub const ZERO_TOKEN: felt252 = 'Token address must be non-zero';
         pub const DLEQ_VERIFICATION_FAILED: felt252 = 'DLEQ verification failed';
@@ -345,6 +346,12 @@ pub mod AtomicLock {
         // AUDIT: Timelock ensures depositor has time to refund if swap fails
         let now = get_block_timestamp();
         assert(lock_until > now, Errors::INVALID_LOCK_TIME);
+        
+        // P0 FIX: Enforce minimum timelock of 3 hours for production safety
+        // This ensures sufficient time for cross-chain confirmation and prevents
+        // race conditions between secret revelation and Monero transaction confirmation
+        const MIN_TIMELOCK: u64 = 10800; // 3 hours in seconds
+        assert(lock_until >= now + MIN_TIMELOCK, Errors::TIMELOCK_TOO_SHORT);
         
         // INVARIANT: For real swaps, amount and token must both be non-zero
         // Allow both zero (for testing) OR both non-zero (for production), but reject mixed states
