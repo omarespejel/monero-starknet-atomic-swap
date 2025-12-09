@@ -1,8 +1,10 @@
 use anyhow::Result;
 use starknet_core::types::{BlockId, BlockTag, EventFilter, Felt};
+use starknet_core::utils::starknet_keccak;
 use starknet_providers::{Provider, SequencerGatewayProvider};
 use tokio::sync::mpsc;
 use tracing::{info, warn, error};
+use lazy_static::lazy_static;
 
 use crate::types::{SecretRevealedEvent, TokensClaimedEvent};
 
@@ -21,9 +23,19 @@ pub enum SwapEvent {
 }
 
 // Event selector hashes (keccak256 of event signature)
-// These need to be computed from the actual Cairo event signatures
-const SECRET_REVEALED_SELECTOR: Felt = Felt::ZERO; // TODO: Compute actual selector
-const TOKENS_CLAIMED_SELECTOR: Felt = Felt::ZERO;  // TODO: Compute actual selector
+lazy_static! {
+    /// Selector for SecretRevealed(revealer, secret_hash, claimable_after)
+    pub static ref SECRET_REVEALED_SELECTOR: Felt = 
+        starknet_keccak(b"SecretRevealed");
+    
+    /// Selector for TokensClaimed(claimer, amount, reveal_timestamp, claim_timestamp)
+    pub static ref TOKENS_CLAIMED_SELECTOR: Felt = 
+        starknet_keccak(b"TokensClaimed");
+    
+    /// Selector for Unlocked(unlocker, secret_hash) - backward compatibility
+    pub static ref UNLOCKED_SELECTOR: Felt = 
+        starknet_keccak(b"Unlocked");
+}
 
 impl StarknetListener {
     pub fn new(
@@ -31,7 +43,16 @@ impl StarknetListener {
         watched_contracts: Vec<Felt>,
         event_tx: mpsc::Sender<SwapEvent>,
     ) -> Result<Self> {
-        let provider = SequencerGatewayProvider::starknet_alpha_sepolia();
+        // Use custom RPC URL if provided, otherwise default to Sepolia
+        let provider = if rpc_url.contains("zan.top") || rpc_url.contains("blastapi") || rpc_url.contains("nethermind") {
+            // Custom RPC endpoint
+            SequencerGatewayProvider::new(
+                starknet_core::chain_id::SEPOLIA,
+                url::Url::parse(rpc_url)?,
+            )
+        } else {
+            SequencerGatewayProvider::starknet_alpha_sepolia()
+        };
         
         Ok(Self {
             provider,
@@ -99,15 +120,135 @@ impl StarknetListener {
     ) -> Result<()> {
         let selector = event.keys.first().copied().unwrap_or(Felt::ZERO);
         
-        // TODO: Parse events based on selector
-        // This requires knowing the exact event structure from Cairo
-        
-        if selector == SECRET_REVEALED_SELECTOR {
-            info!("SecretRevealed event detected in block {}", block_number);
-            // Parse and send event
-        } else if selector == TOKENS_CLAIMED_SELECTOR {
-            info!("TokensClaimed event detected in block {}", block_number);
-            // Parse and send event
+        if selector == *SECRET_REVEALED_SELECTOR {
+            // SecretRevealed event structure:
+            // Keys: [selector, revealer (indexed)]
+            // Data: [secret_hash (u32), claimable_after (u64)]
+            let revealer = event.keys.get(1).copied().unwrap_or(Felt::ZERO);
+            
+            // Parse data array
+            // secret_hash is u32, stored as Felt (low 32 bits)
+            let secret_hash = event.data.get(0)
+                .map(|f| {
+                    // Felt can be converted to u64, then truncated to u32
+                    // Use try_into or mask to get low 32 bits
+                    let val = f.to_bytes_be();
+                    if val.len() >= 4 {
+                        u32::from_be_bytes([
+                            val[val.len() - 4],
+                            val[val.len() - 3],
+                            val[val.len() - 2],
+                            val[val.len() - 1],
+                        ])
+                    } else {
+                        0
+                    }
+                })
+                .unwrap_or(0);
+            
+            // claimable_after is u64, stored as Felt
+            let claimable_after = event.data.get(1)
+                .map(|f| {
+                    let val = f.to_bytes_be();
+                    if val.len() >= 8 {
+                        u64::from_be_bytes([
+                            val[val.len() - 8], val[val.len() - 7],
+                            val[val.len() - 6], val[val.len() - 5],
+                            val[val.len() - 4], val[val.len() - 3],
+                            val[val.len() - 2], val[val.len() - 1],
+                        ])
+                    } else {
+                        0
+                    }
+                })
+                .unwrap_or(0);
+            
+            let evt = SecretRevealedEvent {
+                contract_address: event.from_address,
+                revealer,
+                secret_hash,
+                claimable_after,
+                block_number,
+                transaction_hash: event.transaction_hash,
+            };
+            
+            info!("SecretRevealed event detected: contract {:x}, claimable after {}", 
+                evt.contract_address, evt.claimable_after);
+            
+            self.event_tx.send(SwapEvent::SecretRevealed(evt)).await?;
+            
+        } else if selector == *TOKENS_CLAIMED_SELECTOR {
+            // TokensClaimed event structure:
+            // Keys: [selector, claimer (indexed)]
+            // Data: [amount (u256 low, u256 high), reveal_timestamp (u64), claim_timestamp (u64)]
+            let claimer = event.keys.get(1).copied().unwrap_or(Felt::ZERO);
+            
+            // Parse amount (u256 = 2 Felts: low, high)
+            // For simplicity, we'll parse amount_low as u128
+            let amount_low = event.data.get(0)
+                .map(|f| {
+                    let val = f.to_bytes_be();
+                    if val.len() >= 16 {
+                        u128::from_be_bytes([
+                            val[val.len() - 16], val[val.len() - 15],
+                            val[val.len() - 14], val[val.len() - 13],
+                            val[val.len() - 12], val[val.len() - 11],
+                            val[val.len() - 10], val[val.len() - 9],
+                            val[val.len() - 8], val[val.len() - 7],
+                            val[val.len() - 6], val[val.len() - 5],
+                            val[val.len() - 4], val[val.len() - 3],
+                            val[val.len() - 2], val[val.len() - 1],
+                        ])
+                    } else {
+                        0
+                    }
+                })
+                .unwrap_or(0);
+            
+            let reveal_timestamp = event.data.get(2)
+                .map(|f| {
+                    let val = f.to_bytes_be();
+                    if val.len() >= 8 {
+                        u64::from_be_bytes([
+                            val[val.len() - 8], val[val.len() - 7],
+                            val[val.len() - 6], val[val.len() - 5],
+                            val[val.len() - 4], val[val.len() - 3],
+                            val[val.len() - 2], val[val.len() - 1],
+                        ])
+                    } else {
+                        0
+                    }
+                })
+                .unwrap_or(0);
+            
+            let claim_timestamp = event.data.get(3)
+                .map(|f| {
+                    let val = f.to_bytes_be();
+                    if val.len() >= 8 {
+                        u64::from_be_bytes([
+                            val[val.len() - 8], val[val.len() - 7],
+                            val[val.len() - 6], val[val.len() - 5],
+                            val[val.len() - 4], val[val.len() - 3],
+                            val[val.len() - 2], val[val.len() - 1],
+                        ])
+                    } else {
+                        0
+                    }
+                })
+                .unwrap_or(0);
+            
+            let evt = TokensClaimedEvent {
+                contract_address: event.from_address,
+                claimer,
+                amount: amount_low,
+                reveal_timestamp,
+                claim_timestamp,
+            };
+            
+            info!("TokensClaimed event detected: contract {:x}, amount {}", 
+                evt.contract_address, evt.amount);
+            
+            self.event_tx.send(SwapEvent::TokensClaimed(evt)).await?;
         }
         
         Ok(())

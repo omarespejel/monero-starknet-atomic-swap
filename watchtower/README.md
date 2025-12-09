@@ -14,8 +14,12 @@ Monitoring service for XMR↔Starknet atomic swaps.
 Create a `.env` file:
 
 ```
-# Starknet RPC
-STARKNET_RPC_URL=https://starknet-sepolia.public.blastapi.io
+# Starknet RPC (ZAN public endpoint - recommended)
+STARKNET_RPC_URL=https://api.zan.top/public/starknet-sepolia
+
+# Alternative endpoints:
+# - https://starknet-sepolia.public.blastapi.io
+# - https://free-rpc.nethermind.io/sepolia-juno
 
 # Discord Alerts (optional)
 DISCORD_WEBHOOK=https://discord.com/api/webhooks/...
@@ -24,7 +28,7 @@ DISCORD_WEBHOOK=https://discord.com/api/webhooks/...
 TELEGRAM_BOT_TOKEN=123456:ABC-DEF...
 TELEGRAM_CHAT_ID=-100123456789
 
-# Contracts to monitor (comma-separated)
+# Contracts to monitor (comma-separated hex addresses)
 WATCHED_CONTRACTS=0x123...,0x456...
 ```
 
@@ -68,10 +72,13 @@ cargo run --release
 
 **Current Status**: Skeleton implementation
 
+**Status**: Event selectors and parsing implemented ✅
+
 **TODO**:
-- [ ] Compute event selectors from Cairo contract
+- [x] Compute event selectors from Cairo contract
+- [x] Implement event parsing (SecretRevealed, TokensClaimed)
+- [x] Add grace period warning scheduler
 - [ ] Implement Monero watcher (requires monero-rs integration)
-- [ ] Add configuration file support
 - [ ] Add database for state persistence
 - [ ] Add health check endpoint
 - [ ] Deploy and test on Sepolia testnet
