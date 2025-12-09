@@ -91,9 +91,12 @@ def main():
     
     # Extract points (compressed Edwards format)
     T_compressed = test_vector["adaptor_point_compressed"]
-    U_compressed = test_vector["second_point_compressed"]
-    T_sqrt_hint = test_vector["adaptor_point_sqrt_hint"]
-    U_sqrt_hint = test_vector["second_point_sqrt_hint"]
+    # Handle both field name variations
+    U_compressed = test_vector.get("dleq_second_point_compressed") or test_vector.get("second_point_compressed")
+    if U_compressed is None:
+        raise KeyError("Missing 'dleq_second_point_compressed' or 'second_point_compressed' in test vector")
+    T_sqrt_hint = test_vector.get("adaptor_point_sqrt_hint")
+    U_sqrt_hint = test_vector.get("second_point_sqrt_hint") or test_vector.get("dleq_second_point_sqrt_hint")
     
     print(f"Adaptor point T (compressed): {T_compressed}")
     print(f"DLEQ second point U (compressed): {U_compressed}")
