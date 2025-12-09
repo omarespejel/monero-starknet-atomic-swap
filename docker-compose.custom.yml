@@ -1,0 +1,23 @@
+# Alternative docker-compose using custom-built image
+# Build the image first: docker build -f Dockerfile.wallet-rpc -t monero-wallet-rpc:local .
+
+services:
+  monero-wallet-rpc:
+    image: monero-wallet-rpc:local
+    container_name: monero-wallet-rpc
+    ports:
+      - "38088:38088"
+    volumes:
+      - wallet-data:/wallets
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:38088/json_rpc -X POST -H 'Content-Type: application/json' -d '{\"jsonrpc\":\"2.0\",\"id\":\"0\",\"method\":\"get_version\"}' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  wallet-data:
+
+
