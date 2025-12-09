@@ -13,7 +13,7 @@
 use curve25519_dalek::{
     constants::ED25519_BASEPOINT_POINT as G, edwards::EdwardsPoint, scalar::Scalar,
 };
-use rand::rngs::OsRng;
+use rand::{rngs::OsRng, RngCore};
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 /// Atomic swap key pair for Monero side.
@@ -43,8 +43,16 @@ impl SwapKeyPair {
     /// Generate a new atomic swap key pair.
     pub fn generate() -> Self {
         let mut rng = OsRng;
-        let partial_key = Scalar::random(&mut rng);
-        let adaptor_scalar = Scalar::random(&mut rng);
+        
+        // Generate random scalars (v4.x API: use from_bytes_mod_order)
+        let mut partial_bytes = [0u8; 32];
+        rng.fill_bytes(&mut partial_bytes);
+        let partial_key = Scalar::from_bytes_mod_order(partial_bytes);
+        
+        let mut adaptor_bytes = [0u8; 32];
+        rng.fill_bytes(&mut adaptor_bytes);
+        let adaptor_scalar = Scalar::from_bytes_mod_order(adaptor_bytes);
+        
         let full_spend_key = partial_key + adaptor_scalar;
 
         let adaptor_point = adaptor_scalar * G;
