@@ -8,6 +8,7 @@
 pub mod adaptor;
 pub mod dleq;
 pub mod monero;
+pub mod monero_wallet;
 pub mod starknet;
 // TODO: Uncomment when Poseidon is fully implemented
 // pub mod poseidon;
