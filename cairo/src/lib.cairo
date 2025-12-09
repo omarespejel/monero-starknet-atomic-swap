@@ -29,7 +29,13 @@
 /// Future: add DLEQ verification to bind hashlock to adaptor point cryptographically.
 #[starknet::interface]
 pub trait IAtomicLock<TContractState> {
-    /// Verify the secret and unlock the contract (one-time only).
+    /// Phase 1: Reveal secret (verifies hashlock and MSM, but does NOT transfer tokens).
+    /// Tokens can be claimed via claim_tokens() after grace period expires.
+    fn reveal_secret(ref self: TContractState, secret: ByteArray) -> bool;
+    /// Phase 2: Claim tokens after grace period (only callable by unlocker after reveal_secret).
+    fn claim_tokens(ref self: TContractState) -> bool;
+    /// Legacy: Verify secret and unlock immediately (backward compatibility).
+    /// Internally calls reveal_secret() then claim_tokens() if grace period allows.
     fn verify_and_unlock(ref self: TContractState, secret: ByteArray) -> bool;
     /// Get the stored target hash as 8 u32 words.
     fn get_target_hash(self: @TContractState) -> Span<u32>;
@@ -37,6 +43,10 @@ pub trait IAtomicLock<TContractState> {
     fn is_unlocked(self: @TContractState) -> bool;
     /// Get the timelock expiry (block timestamp).
     fn get_lock_until(self: @TContractState) -> u64;
+    /// Check if secret has been revealed (Phase 1 complete).
+    fn is_secret_revealed(self: @TContractState) -> bool;
+    /// Get timestamp when tokens can be claimed (reveal_timestamp + grace_period).
+    fn get_claimable_after(self: @TContractState) -> u64;
     /// Refund to the depositor after expiry if not unlocked.
     fn refund(ref self: TContractState) -> bool;
     /// Optional: pull tokens from depositor (requires prior approval).
@@ -94,6 +104,10 @@ pub mod AtomicLock {
     /// Ed25519 curve index in Garaga (curve_index = 4)
     const ED25519_CURVE_INDEX: u32 = 4;
     
+    /// Two-phase unlock: Grace period after secret revelation (2 hours in seconds).
+    /// This allows time for cross-chain confirmation before tokens are transferred.
+    const GRACE_PERIOD: u64 = 7200;  // 2 hours
+    
     /// Ed25519 Base Point G (compressed Edwards format)
     /// Generated from Rust: ED25519_BASEPOINT_POINT.compress()
     /// Hex: 5866666666666666666666666666666666666666666666666666666666666666
@@ -137,6 +151,27 @@ pub mod AtomicLock {
         pub amount: u256,
     }
 
+    /// Emitted when secret is revealed (Phase 1 of two-phase unlock).
+    /// Tokens are NOT transferred yet - unlocker must call claim_tokens() after grace period.
+    #[derive(Drop, starknet::Event)]
+    pub struct SecretRevealed {
+        #[key]
+        pub revealer: starknet::ContractAddress,
+        pub secret_hash: u32,  // First word of hashlock for identification
+        pub claimable_after: u64,  // Timestamp when tokens can be claimed
+    }
+
+    /// Emitted when tokens are claimed after grace period (Phase 2 of two-phase unlock).
+    /// P2: Added for better observability and watchtower integration.
+    #[derive(Drop, starknet::Event)]
+    pub struct TokensClaimed {
+        #[key]
+        pub claimer: starknet::ContractAddress,
+        pub amount: u256,
+        pub reveal_timestamp: u64,  // When secret was revealed
+        pub claim_timestamp: u64,    // When tokens were claimed (now)
+    }
+
     /// Emitted when DLEQ proof verification succeeds.
     #[derive(Drop, starknet::Event)]
     pub struct DleqVerified {
@@ -163,6 +198,8 @@ pub mod AtomicLock {
     pub enum Event {
         Unlocked: Unlocked,
         Refunded: Refunded,
+        SecretRevealed: SecretRevealed,
+        TokensClaimed: TokensClaimed,
         DleqVerified: DleqVerified,
         DleqVerificationFailed: DleqVerificationFailed,
         /// PRODUCTION: OpenZeppelin ReentrancyGuard events
@@ -223,6 +260,12 @@ pub mod AtomicLock {
         lock_until: u64,
         /// Depositor address.
         depositor: ContractAddress,
+        /// Two-phase unlock: Whether secret has been revealed (Phase 1).
+        secret_revealed: bool,
+        /// Two-phase unlock: Timestamp when secret was revealed.
+        reveal_timestamp: u64,
+        /// Two-phase unlock: Address who revealed the secret (can claim tokens after grace period).
+        unlocker_address: ContractAddress,
         /// ERC20 token to release (optional).
         token: ContractAddress,
         /// Amount to release (optional; 0 means no token transfer).
@@ -248,6 +291,10 @@ pub mod AtomicLock {
         pub const ZERO_AMOUNT: felt252 = 'Amount must be non-zero';
         pub const ZERO_TOKEN: felt252 = 'Token address must be non-zero';
         pub const DLEQ_VERIFICATION_FAILED: felt252 = 'DLEQ verification failed';
+        pub const SECRET_NOT_REVEALED: felt252 = 'Secret not yet revealed';
+        pub const GRACE_PERIOD_NOT_EXPIRED: felt252 = 'Grace period not expired';
+        pub const NOT_UNLOCKER: felt252 = 'Not unlocker';
+        pub const SECRET_ALREADY_REVEALED: felt252 = 'Secret already revealed';
         pub const DLEQ_POINT_NOT_ON_CURVE: felt252 = 'DLEQ: point not on curve';
         pub const DLEQ_SMALL_ORDER_POINT: felt252 = 'DLEQ: small order point';
         pub const MSM_LEN_MISMATCH: felt252 = 'MSM len mismatch';
@@ -592,6 +639,11 @@ pub mod AtomicLock {
         self.unlocked.write(false);
         self.lock_until.write(lock_until);
         self.depositor.write(get_caller_address());
+        // Initialize two-phase unlock state
+        self.secret_revealed.write(false);
+        self.reveal_timestamp.write(0);
+        let zero_address: ContractAddress = 0.try_into().unwrap();
+        self.unlocker_address.write(zero_address);
         self.token.write(token);
         self.amount.write(amount);
         
@@ -621,6 +673,137 @@ pub mod AtomicLock {
         dispatcher.transfer_from(depositor, get_contract_address(), amount)
     }
 
+    /// Internal function: Reveal secret without reentrancy guard (for use by verify_and_unlock)
+    /// @dev P1 FIX: Factored out to avoid reentrancy guard gaps when called from verify_and_unlock
+    /// @dev This function does NOT start/end reentrancy guard - caller must handle it
+    /// @param secret The revealed Monero secret (must match stored hashlock)
+    /// @return true if verification succeeds and secret is revealed
+    fn _reveal_secret_internal(ref self: ContractState, secret: ByteArray) -> bool {
+        // Cannot reveal if already unlocked
+        assert(!self.unlocked.read(), Errors::ALREADY_UNLOCKED);
+        
+        // Cannot reveal if already revealed (one-time only)
+        assert(!self.secret_revealed.read(), Errors::ALREADY_UNLOCKED);
+
+        // Reconstruct adaptor point and MSM hint from storage
+        let adaptor_point = storage_adaptor_point(@self);
+        
+        let fake_glv_hint: Array<felt252> = array![
+            self.fake_glv_hint0.read(),
+            self.fake_glv_hint1.read(),
+            self.fake_glv_hint2.read(),
+            self.fake_glv_hint3.read(),
+            self.fake_glv_hint4.read(),
+            self.fake_glv_hint5.read(),
+            self.fake_glv_hint6.read(),
+            self.fake_glv_hint7.read(),
+            self.fake_glv_hint8.read(),
+            self.fake_glv_hint9.read(),
+        ];
+
+        // Extract secret bytes (same logic as verify_and_unlock)
+        let secret_len = secret.len();
+        assert(secret_len == 32, Errors::INVALID_HASH_LENGTH);
+        
+        let byte0 = secret.at(0).unwrap();
+        let byte1 = secret.at(1).unwrap();
+        let byte2 = secret.at(2).unwrap();
+        let byte3 = secret.at(3).unwrap();
+        let byte4 = secret.at(4).unwrap();
+        let byte5 = secret.at(5).unwrap();
+        let byte6 = secret.at(6).unwrap();
+        let byte7 = secret.at(7).unwrap();
+        let byte8 = secret.at(8).unwrap();
+        let byte9 = secret.at(9).unwrap();
+        let byte10 = secret.at(10).unwrap();
+        let byte11 = secret.at(11).unwrap();
+        let byte12 = secret.at(12).unwrap();
+        let byte13 = secret.at(13).unwrap();
+        let byte14 = secret.at(14).unwrap();
+        let byte15 = secret.at(15).unwrap();
+        let byte16 = secret.at(16).unwrap();
+        let byte17 = secret.at(17).unwrap();
+        let byte18 = secret.at(18).unwrap();
+        let byte19 = secret.at(19).unwrap();
+        let byte20 = secret.at(20).unwrap();
+        let byte21 = secret.at(21).unwrap();
+        let byte22 = secret.at(22).unwrap();
+        let byte23 = secret.at(23).unwrap();
+        let byte24 = secret.at(24).unwrap();
+        let byte25 = secret.at(25).unwrap();
+        let byte26 = secret.at(26).unwrap();
+        let byte27 = secret.at(27).unwrap();
+        let byte28 = secret.at(28).unwrap();
+        let byte29 = secret.at(29).unwrap();
+        let byte30 = secret.at(30).unwrap();
+        let byte31 = secret.at(31).unwrap();
+        
+        let s0: u32 = byte0.into() + (byte1.into() * 256) + (byte2.into() * 65536) + (byte3.into() * 16777216);
+        let s1: u32 = byte4.into() + (byte5.into() * 256) + (byte6.into() * 65536) + (byte7.into() * 16777216);
+        let s2: u32 = byte8.into() + (byte9.into() * 256) + (byte10.into() * 65536) + (byte11.into() * 16777216);
+        let s3: u32 = byte12.into() + (byte13.into() * 256) + (byte14.into() * 65536) + (byte15.into() * 16777216);
+        let s4: u32 = byte16.into() + (byte17.into() * 256) + (byte18.into() * 65536) + (byte19.into() * 16777216);
+        let s5: u32 = byte20.into() + (byte21.into() * 256) + (byte22.into() * 65536) + (byte23.into() * 16777216);
+        let s6: u32 = byte24.into() + (byte25.into() * 256) + (byte26.into() * 65536) + (byte27.into() * 16777216);
+        let s7: u32 = byte28.into() + (byte29.into() * 256) + (byte30.into() * 65536) + (byte31.into() * 16777216);
+
+        // Verify hashlock
+        let computed_hash = compute_sha256_byte_array(@secret);
+        let [h0, h1, h2, h3, h4, h5, h6, h7] = computed_hash;
+
+        if h0 != self.h0.read() { 
+            return false; 
+        }
+        if h1 != self.h1.read() { 
+            return false; 
+        }
+        if h2 != self.h2.read() { 
+            return false; 
+        }
+        if h3 != self.h3.read() { 
+            return false; 
+        }
+        if h4 != self.h4.read() { 
+            return false; 
+        }
+        if h5 != self.h5.read() { 
+            return false; 
+        }
+        if h6 != self.h6.read() { 
+            return false; 
+        }
+        if h7 != self.h7.read() { 
+            return false; 
+        }
+
+        // Verify MSM: scalar·G == adaptor_point
+        let scalar = secret_to_scalar_u256(s0, s1, s2, s3, s4, s5, s6, s7);
+        let computed = msm_g1(
+            array![get_G(ED25519_CURVE_INDEX)].span(),
+            array![scalar].span(),
+            ED25519_CURVE_INDEX,
+            fake_glv_hint.span()
+        );
+        assert(computed == adaptor_point, 'MSM verification failed');
+
+        // Phase 1 complete: Store reveal state (NO token transfer yet)
+        let now = get_block_timestamp();
+        let caller = get_caller_address();
+        self.secret_revealed.write(true);
+        self.reveal_timestamp.write(now);
+        self.unlocker_address.write(caller);
+        
+        // Emit SecretRevealed event
+        let claimable_after = now + GRACE_PERIOD;
+        self.emit(SecretRevealed { 
+            revealer: caller, 
+            secret_hash: h0, 
+            claimable_after 
+        });
+        
+        true
+    }
+
     #[abi(embed_v0)]
     impl AtomicLockImpl of super::IAtomicLock<ContractState> {
         fn get_target_hash(self: @ContractState) -> Span<u32> {
@@ -644,153 +827,134 @@ pub mod AtomicLock {
             self.lock_until.read()
         }
 
-        /// @notice Verifies the secret and unlocks the contract (one-time only)
-        /// @dev Uses SHA-256 hashlock verification and Garaga MSM for cryptographic proof
-        /// @dev Protected by OpenZeppelin ReentrancyGuard against recursive calls
+        fn is_secret_revealed(self: @ContractState) -> bool {
+            self.secret_revealed.read()
+        }
+
+        fn get_claimable_after(self: @ContractState) -> u64 {
+            let reveal_ts = self.reveal_timestamp.read();
+            if reveal_ts == 0 {
+                return 0;
+            }
+            reveal_ts + GRACE_PERIOD
+        }
+
+        /// @notice Phase 1: Reveal secret (verifies hashlock and MSM, but does NOT transfer tokens)
+        /// @dev Tokens can be claimed via claim_tokens() after grace period expires
+        /// @param secret The revealed Monero secret (must match stored hashlock)
+        /// @return true if verification succeeds and secret is revealed
+        /// @security Protected by ReentrancyGuard. Secret can only be revealed once.
+        fn reveal_secret(ref self: ContractState, secret: ByteArray) -> bool {
+            // PRODUCTION: OpenZeppelin ReentrancyGuard - audited reentrancy protection
+            self.reentrancy_guard.start();
+            let result = _reveal_secret_internal(ref self, secret);
+            self.reentrancy_guard.end();
+            result
+        }
+
+        /// @notice Phase 2: Claim tokens after grace period
+        /// @dev Only callable by unlocker after reveal_secret() and grace period expires
+        /// @return true if tokens are successfully claimed
+        /// @security Protected by ReentrancyGuard. Only unlocker can claim, only after grace period.
+        fn claim_tokens(ref self: ContractState) -> bool {
+            // PRODUCTION: OpenZeppelin ReentrancyGuard - audited reentrancy protection
+            self.reentrancy_guard.start();
+            
+            // Must have revealed secret first
+            assert(self.secret_revealed.read(), Errors::SECRET_NOT_REVEALED);
+            
+            // Must not be already unlocked
+            assert(!self.unlocked.read(), Errors::ALREADY_UNLOCKED);
+            
+            // Grace period must have expired
+            let now = get_block_timestamp();
+            let reveal_ts = self.reveal_timestamp.read();
+            let claimable_after = reveal_ts + GRACE_PERIOD;
+            assert(now >= claimable_after, Errors::GRACE_PERIOD_NOT_EXPIRED);
+            
+            // Only unlocker can claim
+            let caller = get_caller_address();
+            assert(caller == self.unlocker_address.read(), Errors::NOT_UNLOCKER);
+
+            // Transfer tokens to unlocker
+            let amount = self.amount.read();
+            let token = self.token.read();
+            let ok = maybe_transfer(token, caller, amount);
+            assert(ok, Errors::TOKEN_TRANSFER_FAILED);
+
+            // Mark as unlocked
+            self.unlocked.write(true);
+            
+            // Emit both events for backward compatibility and observability
+            self.emit(Unlocked { unlocker: caller, secret_hash: self.h0.read() });
+            
+            // P2: Emit TokensClaimed event for better observability
+            let reveal_ts = self.reveal_timestamp.read();
+            self.emit(TokensClaimed {
+                claimer: caller,
+                amount,
+                reveal_timestamp: reveal_ts,
+                claim_timestamp: now,
+            });
+            
+            self.reentrancy_guard.end();
+            true
+        }
+
+        /// @notice Legacy: Verify secret and unlock immediately (BYPASSES GRACE PERIOD)
+        /// @dev DEPRECATED for production use. Use reveal_secret() + claim_tokens() instead.
+        /// @dev Kept for backward compatibility with existing integrations.
+        /// @dev WARNING: This bypasses the 2-hour grace period designed to mitigate cross-chain race conditions.
         /// @param secret The revealed Monero secret (must match stored hashlock)
         /// @return true if verification succeeds and tokens are unlocked
-        /// @security Protected by ReentrancyGuard. All arithmetic operations have Cairo's built-in overflow protection.
-        /// @invariant Secret must match stored hashlock (SHA-256 verification)
-        /// @invariant Scalar must satisfy MSM: scalar·G == adaptor_point (Garaga MSM verification)
-        /// @invariant Contract can only be unlocked once (enforced by unlocked flag)
+        /// @security Protected by ReentrancyGuard. P1 FIX: Uses internal function to avoid guard gaps.
         fn verify_and_unlock(ref self: ContractState, secret: ByteArray) -> bool {
             // PRODUCTION: OpenZeppelin ReentrancyGuard - audited reentrancy protection
+            // P1 FIX: Single guard wrapper - no gaps
             self.reentrancy_guard.start();
             
             // Additional defense-in-depth: unlocked flag check
             assert(!self.unlocked.read(), Errors::ALREADY_UNLOCKED);
-
-            // Reconstruct adaptor point and MSM hint from storage.
-            let adaptor_point = storage_adaptor_point(@self);
             
-            // FakeGlvHint structure (10 felts total):
-            // - felts[0..3]: Q.x limbs (u384, 4×96-bit limbs)
-            // - felts[4..7]: Q.y limbs (u384, 4×96-bit limbs)
-            // - felts[8]: s1 (scalar component for GLV decomposition)
-            // - felts[9]: s2_encoded (encoded scalar component)
-            // Q must equal adaptor_point for MSM to verify correctly.
-            let fake_glv_hint: Array<felt252> = array![
-                self.fake_glv_hint0.read(),  // Q.x limb0
-                self.fake_glv_hint1.read(),  // Q.x limb1
-                self.fake_glv_hint2.read(),  // Q.x limb2
-                self.fake_glv_hint3.read(),  // Q.x limb3
-                self.fake_glv_hint4.read(),  // Q.y limb0
-                self.fake_glv_hint5.read(),  // Q.y limb1
-                self.fake_glv_hint6.read(),  // Q.y limb2
-                self.fake_glv_hint7.read(),  // Q.y limb3
-                self.fake_glv_hint8.read(),  // s1
-                self.fake_glv_hint9.read(),  // s2_encoded
-            ];
-
-            // Extract secret bytes as u32 words (little-endian, 8 words for 32 bytes)
-            // Secret is a ByteArray of 32 bytes, we need to convert to 8 u32 words
-            // Format: bytes[0..3] = s0, bytes[4..7] = s1, ..., bytes[28..31] = s7
-            // Ensure secret is exactly 32 bytes
-            let secret_len = secret.len();
-            assert(secret_len == 32, Errors::INVALID_HASH_LENGTH);
+            // If secret already revealed, just transfer tokens (backward compat path)
+            if self.secret_revealed.read() {
+                let caller = get_caller_address();
+                assert(caller == self.unlocker_address.read(), Errors::NOT_UNLOCKER);
+                
+                // Transfer tokens immediately (bypass grace period for backward compat)
+                let amount = self.amount.read();
+                let token = self.token.read();
+                let ok = maybe_transfer(token, caller, amount);
+                assert(ok, Errors::TOKEN_TRANSFER_FAILED);
+                
+                self.unlocked.write(true);
+                self.emit(Unlocked { unlocker: caller, secret_hash: self.h0.read() });
+                self.reentrancy_guard.end();
+                return true;
+            }
             
-            // Extract bytes using .at() method (returns Option<u8>)
-            let byte0 = secret.at(0).unwrap();
-            let byte1 = secret.at(1).unwrap();
-            let byte2 = secret.at(2).unwrap();
-            let byte3 = secret.at(3).unwrap();
-            let byte4 = secret.at(4).unwrap();
-            let byte5 = secret.at(5).unwrap();
-            let byte6 = secret.at(6).unwrap();
-            let byte7 = secret.at(7).unwrap();
-            let byte8 = secret.at(8).unwrap();
-            let byte9 = secret.at(9).unwrap();
-            let byte10 = secret.at(10).unwrap();
-            let byte11 = secret.at(11).unwrap();
-            let byte12 = secret.at(12).unwrap();
-            let byte13 = secret.at(13).unwrap();
-            let byte14 = secret.at(14).unwrap();
-            let byte15 = secret.at(15).unwrap();
-            let byte16 = secret.at(16).unwrap();
-            let byte17 = secret.at(17).unwrap();
-            let byte18 = secret.at(18).unwrap();
-            let byte19 = secret.at(19).unwrap();
-            let byte20 = secret.at(20).unwrap();
-            let byte21 = secret.at(21).unwrap();
-            let byte22 = secret.at(22).unwrap();
-            let byte23 = secret.at(23).unwrap();
-            let byte24 = secret.at(24).unwrap();
-            let byte25 = secret.at(25).unwrap();
-            let byte26 = secret.at(26).unwrap();
-            let byte27 = secret.at(27).unwrap();
-            let byte28 = secret.at(28).unwrap();
-            let byte29 = secret.at(29).unwrap();
-            let byte30 = secret.at(30).unwrap();
-            let byte31 = secret.at(31).unwrap();
+            // P1 FIX: Use internal function (no nested guard) to avoid reentrancy gaps
+            let revealed = _reveal_secret_internal(ref self, secret);
+            if !revealed {
+                self.reentrancy_guard.end();
+                return false;
+            }
             
-            // Combine bytes into u32 words (little-endian)
-            let s0: u32 = byte0.into() + (byte1.into() * 256) + (byte2.into() * 65536) + (byte3.into() * 16777216);
-            let s1: u32 = byte4.into() + (byte5.into() * 256) + (byte6.into() * 65536) + (byte7.into() * 16777216);
-            let s2: u32 = byte8.into() + (byte9.into() * 256) + (byte10.into() * 65536) + (byte11.into() * 16777216);
-            let s3: u32 = byte12.into() + (byte13.into() * 256) + (byte14.into() * 65536) + (byte15.into() * 16777216);
-            let s4: u32 = byte16.into() + (byte17.into() * 256) + (byte18.into() * 65536) + (byte19.into() * 16777216);
-            let s5: u32 = byte20.into() + (byte21.into() * 256) + (byte22.into() * 65536) + (byte23.into() * 16777216);
-            let s6: u32 = byte24.into() + (byte25.into() * 256) + (byte26.into() * 65536) + (byte27.into() * 16777216);
-            let s7: u32 = byte28.into() + (byte29.into() * 256) + (byte30.into() * 65536) + (byte31.into() * 16777216);
-
-            // Compute SHA-256 of provided secret for hashlock verification.
-            let computed_hash = compute_sha256_byte_array(@secret);
-            let [h0, h1, h2, h3, h4, h5, h6, h7] = computed_hash;
-
-            // Compare against stored hash (fail fast, cheap check).
-            if h0 != self.h0.read() { return false; }
-            if h1 != self.h1.read() { return false; }
-            if h2 != self.h2.read() { return false; }
-            if h3 != self.h3.read() { return false; }
-            if h4 != self.h4.read() { return false; }
-            if h5 != self.h5.read() { return false; }
-            if h6 != self.h6.read() { return false; }
-            if h7 != self.h7.read() { return false; }
-
-            // INVARIANT: Mandatory MSM check - t·G must equal stored adaptor point
-            // AUDIT: This is the core cryptographic guarantee - cannot be bypassed
-            // Scalar derivation: secret bytes → 8×u32 words (little-endian) → u256 big integer → mod Ed25519 order
-            // This ensures the scalar is in the valid range for Ed25519 operations.
-            // AUDIT: All arithmetic has Cairo's built-in overflow protection
-            // NOTE: s0...s7 represent the SECRET bytes (not hashlock), as per auditor recommendation
-            // The hashlock check happens above to verify SHA-256(secret) == stored_hashlock
-            let scalar = secret_to_scalar_u256(s0, s1, s2, s3, s4, s5, s6, s7);
+            // Immediately transfer tokens (bypass grace period for backward compatibility)
+            let caller = get_caller_address();
+            assert(caller == self.unlocker_address.read(), Errors::NOT_UNLOCKER);
             
-            // Compute t·G using Garaga's MSM with fake-GLV optimization.
-            // MSM verifies: scalar·G == adaptor_point, proving knowledge of t without revealing it.
-            // AUDIT: Uses Garaga's audited MSM function - no custom crypto
-            let computed = msm_g1(
-                array![get_G(ED25519_CURVE_INDEX)].span(),
-                array![scalar].span(),
-                ED25519_CURVE_INDEX,
-                fake_glv_hint.span()
-            );
-            assert(computed == adaptor_point, 'MSM verification failed');
-
-            // NOTE: DLEQ verification is performed in the constructor.
-            // The DLEQ proof cryptographically binds the hashlock (H) and adaptor point (T)
-            // by proving: ∃t: SHA-256(t) = H ∧ t·G = T
-            // The proof is verified during contract deployment (see constructor).
-            // This unlock function only verifies the hashlock and MSM, as the DLEQ proof
-            // was already validated when the contract was created.
-
-            // Transfer tokens to caller if configured.
-            // PRODUCTION: External call happens before state update (checks-effects-interactions pattern)
-            // This ensures that if the transfer fails, the contract state remains unchanged
             let amount = self.amount.read();
             let token = self.token.read();
-            let caller = get_caller_address();
             let ok = maybe_transfer(token, caller, amount);
             assert(ok, Errors::TOKEN_TRANSFER_FAILED);
-
-            // Update state AFTER external call succeeds
-            self.unlocked.write(true);
-            self.emit(Unlocked { unlocker: caller, secret_hash: h0 });
             
-            // PRODUCTION: End reentrancy guard protection
+            self.unlocked.write(true);
+            self.emit(Unlocked { unlocker: caller, secret_hash: self.h0.read() });
             self.reentrancy_guard.end();
             true
         }
+
 
         /// @notice Refund tokens to depositor after lock expiry
         /// @dev Enforces strict refund rules to prevent unauthorized access
@@ -800,9 +964,15 @@ pub mod AtomicLock {
         /// @invariant Lock must still be locked (prevents double refund)
         /// @invariant Current timestamp >= lock_until (prevents early refund)
         /// @invariant Caller == depositor (prevents unauthorized refund)
+        /// @invariant Secret must NOT be revealed (P0 FIX: prevents depositor from stealing tokens during grace period)
         fn refund(ref self: ContractState) -> bool {
             // PRODUCTION: OpenZeppelin ReentrancyGuard - audited reentrancy protection
             self.reentrancy_guard.start();
+            
+            // P0 FIX: CRITICAL - Cannot refund if secret has been revealed
+            // This prevents depositor from stealing tokens during grace period after unlocker reveals secret
+            // Once secret is revealed, unlocker has earned the right to claim tokens
+            assert(!self.secret_revealed.read(), Errors::SECRET_ALREADY_REVEALED);
             
             // Rule 1: Lock must still be locked
             assert(!self.unlocked.read(), Errors::ALREADY_UNLOCKED);
