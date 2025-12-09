@@ -48,3 +48,9 @@ context.xml
 context-*.xml
 monero-swap-context-*.txt
 deployments/
+
+# Monero test artifacts
+*.wallet
+*.keys
+*.address.txt
+monero-test-*.log
