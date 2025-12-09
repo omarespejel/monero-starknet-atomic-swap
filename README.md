@@ -2,9 +2,9 @@
   <img src="assets/project-banner.png" alt="Monero Atomic Swap" width="800"/>
 </div>
 
-# Monero Atomic Swap
+# Monero↔Starknet Atomic Swap
 
-Prototype implementation of a trustless atomic swap protocol between Monero and Starknet. 
+Production-grade prototype implementation of a trustless atomic swap protocol between Monero and Starknet. 
 Uses hashlock + MSM verification + DLEQ proofs for cryptographic binding.
 
 **Status**: v0.8.0-alpha — Security reviewed, E2E tests passing, deployment pipeline validated, Docker image published
