@@ -1,0 +1,51 @@
+name: Validate Test Vectors
+
+on:
+  push:
+    paths:
+      - 'rust/test_vectors.json'
+      - 'rust/deployment_vector.json'
+      - 'cairo/tests/fixtures/**'
+      - 'tools/**'
+  pull_request:
+    paths:
+      - 'rust/test_vectors.json'
+      - 'rust/deployment_vector.json'
+      - 'cairo/tests/fixtures/**'
+      - 'tools/**'
+
+jobs:
+  validate-sqrt-hints:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Scarb
+        uses: software-mansion/setup-scarb@v1
+        with:
+          scarb-version: "2.10.0"
+      
+      - name: Setup snforge
+        run: |
+          curl -L https://raw.githubusercontent.com/foundry-rs/starknet-foundry/master/scripts/install.sh | sh
+          snforge --version
+      
+      - name: Validate Sqrt Hints
+        run: |
+          cd cairo
+          snforge test test_unit_point_decompression --exact
+      
+      - name: Validate E2E DLEQ
+        run: |
+          cd cairo
+          snforge test test_e2e_dleq --exact
+      
+      - name: Fail if validation failed
+        if: failure()
+        run: |
+          echo "❌ Vector validation failed!"
+          echo "Sqrt hints may be incompatible with Garaga."
+          echo "Use the authoritative hints from:"
+          echo "  cairo/tests/fixtures/AUTHORITATIVE_SQRT_HINTS.cairo"
+          exit 1
+
