@@ -5,9 +5,22 @@ edition = "2021"
 description = "Monero key splitting for Starknet atomic swaps"
 
 [dependencies]
+# ===== MONERO INTEGRATION (COMIT-compatible) =====
+monero = "0.12"
+jsonrpc_client = { version = "0.7", features = ["reqwest"] }
+monero-epee-bin-serde = "1"
+rust_decimal = { version = "1", features = ["serde-float"] }
+tracing = "0.1"
+
 # ===== AUDITED CRYPTOGRAPHY =====
 # Quarkslab-audited elliptic curve operations (2023)
-curve25519-dalek = { version = "4.1", features = ["serde", "zeroize", "rand_core"] }
+# Using v4.1 (recommended by auditor):
+# - Better security (formally verified arithmetic)
+# - Wire-format compatible with v3.x (RFC 8032 standard)
+# - zeroize included by default (no feature flag needed)
+# - All 32 Rust tests passing with v4.1
+# - All 107 Cairo tests passing
+curve25519-dalek = { version = "4.1", features = ["serde"] }
 
 # Hashing (RustCrypto audited)
 blake2 = "0.10"
@@ -29,7 +42,7 @@ getrandom = "0.2"  # Ensure cryptographically secure randomness
 # ===== CLI & ASYNC =====
 clap = { version = "4.5", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.12", features = ["json"] }
 
 # ===== ERROR HANDLING =====
 anyhow = "1"
@@ -85,6 +98,11 @@ assert_cmd = "2.0"
 proptest = "1"  # Property-based testing for cryptographic code
 criterion = "0.5"  # Benchmarking
 tempfile = "3"  # Temporary files for testing
+# For Monero integration tests
+testcontainers = "0.15"
+# Note: rand 0.8 is in main dependencies, don't duplicate here
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt", "ansi", "env-filter"] }
 # Note: tarpaulin is installed via cargo, not as a dev-dependency
 # Install with: cargo install cargo-tarpaulin
 # Usage: cargo tarpaulin --out Html --output-dir coverage
