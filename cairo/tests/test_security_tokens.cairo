@@ -23,6 +23,7 @@ mod token_security_tests {
         declare, ContractClassTrait, DeclareResultTrait,
         start_cheat_caller_address, stop_cheat_caller_address,
         start_cheat_block_timestamp, stop_cheat_block_timestamp,
+        start_cheat_caller_address_global, stop_cheat_caller_address_global,
     };
     
     // Import test constants (define locally to avoid module import issues)
@@ -284,10 +285,13 @@ mod token_security_tests {
         const TEST_VECTOR_C_TRUNCATED: felt252 = 0xff93d53eda6f2910e3a1313a226533c5;
         const TEST_VECTOR_S_TRUNCATED: felt252 = 0xc09b9a31d72db277d1bb402e80ef5008;
         
-        // The deployer/depositor is the current test contract (snforge default)
-        // This is who will be stored as depositor in the contract
-        // In snforge tests, we use a constant address for the test contract
+        // FIXED: Define the depositor address we'll use
+        // This must match what we cheat the caller to before deployment
         let deployer: ContractAddress = 0x123.try_into().unwrap();
+        
+        // FIXED: Cheat caller address BEFORE deployment so constructor stores our chosen depositor
+        // This ensures the contract stores the expected depositor address
+        start_cheat_caller_address_global(deployer);
         
         // Use deploy_with_real_dleq pattern from test_e2e_dleq.cairo
         let hashlock_array = TESTVECTOR_HASHLOCK;
@@ -405,11 +409,14 @@ mod token_security_tests {
         Serde::serialize(@TESTVECTOR_R2_COMPRESSED, ref calldata);
         Serde::serialize(@TEST_R2_SQRT_HINT, ref calldata);
         
-        // Deploy - the caller during constructor is `deployer` (test contract)
+        // Deploy - the caller during constructor is now `deployer` (cheated)
         // The contract will store this as the depositor
         let (addr, _) = contract.deploy(@calldata).unwrap();
         
-        // Return the actual deployer as depositor
+        // FIXED: Stop cheating caller address after deployment
+        stop_cheat_caller_address_global();
+        
+        // Return the deployer address (which matches what's stored in contract)
         (IAtomicLockDispatcher { contract_address: addr }, deployer)
     }
     
