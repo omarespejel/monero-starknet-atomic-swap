@@ -92,6 +92,9 @@
     "scripts/validate_p0_fixes.sh",
     "docker-compose.yml",
     "Dockerfile.wallet-rpc",
-    "generate-context.sh"
+    "generate-context.sh",
+    "watchtower/Cargo.toml",
+    "watchtower/README.md",
+    "watchtower/src/**"
   ]
 }

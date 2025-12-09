@@ -60,6 +60,9 @@
     "tools/verify_challenge_computation.py",
     "tools/verify_full_compatibility.py",
     "scripts/deploy.sh",
-    "scripts/validate_p0_fixes.sh"
+    "scripts/validate_p0_fixes.sh",
+    "watchtower/Cargo.toml",
+    "watchtower/README.md",
+    "watchtower/src/**"
   ]
 }

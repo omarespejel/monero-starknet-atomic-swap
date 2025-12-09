@@ -56,7 +56,10 @@
     "tools/verify_full_compatibility.py",
     "tools/verify_rust_cairo_equivalence.py",
     "docker-compose.yml",
-    "Dockerfile.wallet-rpc"
+    "Dockerfile.wallet-rpc",
+    "watchtower/Cargo.toml",
+    "watchtower/README.md",
+    "watchtower/src/**"
   ]
 }
 
