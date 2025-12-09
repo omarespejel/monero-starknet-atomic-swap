@@ -123,7 +123,7 @@ Created a custom `Dockerfile.wallet-rpc` that:
 
 ## Alternative: Local Binary Setup
 
-If Docker isn't available, see `docs/WALLET_RPC_SETUP.md` for local binary setup instructions.
+If Docker isn't available, see `docs/SETUP.md` for local binary setup instructions.
 
 ## Production Deployment
 
