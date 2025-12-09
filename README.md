@@ -459,14 +459,14 @@ cd rust
 
 # Generate swap secret and prepare for deployment
 cargo run --bin maker -- \
-  --starknet-rpc https://starknet-sepolia.public.blastapi.io/rpc/v0_7 \
+  --starknet-rpc https://api.zan.top/public/starknet-sepolia \
   --monero-rpc http://stagenet.community.rino.io:38081 \
   --lock-duration 3600 \
   --output swap_state.json
 
 # After contract deployment, watch for unlock
 cargo run --bin maker -- \
-  --starknet-rpc https://starknet-sepolia.public.blastapi.io/rpc/v0_7 \
+  --starknet-rpc https://api.zan.top/public/starknet-sepolia \
   --contract-address <deployed_contract_address> \
   --watch
 ```
@@ -478,12 +478,12 @@ cd rust
 
 # Watch for new contracts
 cargo run --bin taker -- \
-  --starknet-rpc https://starknet-sepolia.public.blastapi.io/rpc/v0_7 \
+  --starknet-rpc https://api.zan.top/public/starknet-sepolia \
   --watch
 
 # Unlock a contract
 cargo run --bin taker -- \
-  --starknet-rpc https://starknet-sepolia.public.blastapi.io/rpc/v0_7 \
+  --starknet-rpc https://api.zan.top/public/starknet-sepolia \
   --contract-address <contract_address> \
   --secret <secret_hex>
 ```
@@ -692,8 +692,8 @@ A race condition exists between secret revelation on Starknet and Monero transac
 
 **Mitigations:**
 - ✅ Minimum 3-hour timelock (implemented in P0 fixes)
-- ⏳ Two-phase unlock with 2-hour grace period (planned)
-- ⏳ Watchtower service for production (planned)
+- ✅ Two-phase unlock with 2-hour grace period (implemented in v0.8.0-alpha)
+- ✅ Watchtower service skeleton (implemented, event monitoring ready)
 
 **Current Recommendation**: Use only for testnet or swaps < $100 until mitigations are implemented.
 
