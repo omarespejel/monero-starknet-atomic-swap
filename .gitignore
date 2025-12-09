@@ -1,5 +1,6 @@
 # Rust
 rust/target/
+watchtower/target/
 **/*.rs.bk
 
 # Cairo

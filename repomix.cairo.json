@@ -18,7 +18,8 @@
       "terminals/**",
       "rust/**",
       "tools/**",
-      "docs/archive/**"
+      "docs/archive/**",
+      "watchtower/target/**"
     ]
   },
   "include": [

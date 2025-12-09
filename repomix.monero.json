@@ -17,7 +17,8 @@
       ".cursor/**",
       "terminals/**",
       "cairo/**",
-      "docs/archive/**"
+      "docs/archive/**",
+      "watchtower/target/**"
     ]
   },
   "include": [
