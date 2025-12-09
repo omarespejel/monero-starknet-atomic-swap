@@ -12,6 +12,38 @@ This document specifies the atomic swap protocol between Monero and Starknet tok
 - Timelock minimum: 3 hours (planned for v0.8.0)
 - Grace period: 2 hours (planned for v0.8.0)
 
+## Serialization Formats (CRITICAL)
+
+### Hashlock Computation
+
+**H = SHA-256(secret_raw_bytes)**
+
+Where `secret_raw_bytes` is the 32-byte secret **BEFORE** any scalar reduction.
+
+⚠️ **DO NOT** use `Scalar::from_bytes_mod_order(secret).to_bytes()` - 
+this may produce different bytes after mod reduction, causing hashlock mismatch.
+
+**Why Raw Bytes?**
+
+Cairo's `verify_and_unlock` receives the secret as a `ByteArray` and computes
+`SHA-256(secret_bytes)` directly. There is no scalar reduction in Cairo's hashlock computation.
+
+**Example:**
+
+```rust
+// ✅ CORRECT (for deployment)
+let secret_bytes = [0x12u8; 32];
+let hashlock = SHA256::digest(secret_bytes);
+
+// ❌ WRONG (causes mismatch with Cairo)
+let secret = Scalar::from_bytes_mod_order(secret_bytes);
+let hashlock = SHA256::digest(secret.to_bytes());  // May differ!
+```
+
+**Storage Format:**
+
+Hashlock is stored in contract as 8 u32 words (big-endian from hash, little-endian interpretation).
+
 ## Message Formats
 
 ### DLEQ Proof
@@ -27,8 +59,20 @@ A DLEQ proof consists of:
 
 The hashlock is computed as:
 ```
-H = SHA-256(t.to_bytes())
+H = SHA-256(secret_raw_bytes)
 ```
+
+Where `secret_raw_bytes` is the 32-byte secret **BEFORE** any scalar reduction.
+
+⚠️ **CRITICAL**: DO NOT use `Scalar::from_bytes_mod_order(secret).to_bytes()` - 
+this may produce different bytes after mod reduction, causing hashlock mismatch.
+
+**Why Raw Bytes?**
+
+Cairo's `verify_and_unlock` receives the secret as a `ByteArray` and computes
+`SHA-256(secret_bytes)` directly. There is no scalar reduction in Cairo's hashlock computation.
+
+**Serialization Format:**
 
 Stored in contract as 8 u32 words (big-endian from hash, little-endian interpretation).
 
@@ -54,7 +98,7 @@ Alice generates:
 
 Alice computes:
 - `T = t·G`: Adaptor point
-- `H = SHA-256(t.to_bytes())`: Hashlock
+- `H = SHA-256(secret_raw_bytes)`: Hashlock (see Serialization Formats section)
 - `U = t·Y`: Second point for DLEQ
 - `k`: Deterministic nonce (domain-separated SHA-256)
 - `R1 = k·G`, `R2 = k·Y`: Commitments
