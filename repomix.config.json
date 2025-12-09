@@ -40,6 +40,7 @@
     "docs/DOCKER_SETUP.md",
     "docs/DOCKER_PUBLISHING.md",
     "docs/AUDIT_DEPENDENCIES.md",
+    "docs/P0_FIXES_STRATEGY.md",
     "docs/decisions/**",
     "rust/Cargo.toml",
     "rust/docs/MONERO_WALLET_INTEGRATION.md",
@@ -87,8 +88,8 @@
     "tools/fix_compressed_points.py",
     "tools/validate_sqrt_hints.py",
     "tools/discover_sqrt_hints.py",
-    "tools/validate_sqrt_hints.py",
     "scripts/deploy.sh",
+    "scripts/validate_p0_fixes.sh",
     "docker-compose.yml",
     "Dockerfile.wallet-rpc",
     "generate-context.sh"
