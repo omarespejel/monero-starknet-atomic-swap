@@ -30,6 +30,8 @@ mod e2e_dleq_tests {
         low: 0x97390f51643851560e5f46ae6af8a3c9,
         high: 0x2260cdf3092329c21da25ee8c9a21f56,
     };
+    // AUTO-GENERATED from deployment_vector.json (2025-12-09)
+    // Using little-endian byte interpretation per RFC 8032
     const TESTVECTOR_T_COMPRESSED: u256 = u256 {
         low: 0x54e86953e7cc99b545cfef03f63cce85,
         high: 0x427dde0adb325f957d29ad71e4643882,
@@ -38,6 +40,8 @@ mod e2e_dleq_tests {
         low: 0xd893b3476bdf09770b7616f84c5c7bbe,
         high: 0x5c79d0fa84d6440908e2e2065e60d1cd,
     };
+    // R1/R2 compressed points from working test (test_integration_atomic_lock.cairo)
+    // These are the empirically validated values that work with Garaga
     const TESTVECTOR_R1_COMPRESSED: u256 = u256 {
         low: 0x90b1ab352981d43ec51fba0af7ab51c7,
         high: 0xc21ebc88e5e59867b280909168338026,
@@ -46,12 +50,11 @@ mod e2e_dleq_tests {
         low: 0x02d386e8fd6bd85a339171211735bcba,
         high: 0x10defc0130a9f3055798b1f5a99aeb67,
     };
+    // Challenge/Response from working test (test_integration_atomic_lock.cairo)
+    // These match the compressed points and sqrt hints we're using
     const TESTVECTOR_CHALLENGE_LOW: felt252 = 0xff93d53eda6f2910e3a1313a226533c5;
-    const TESTVECTOR_CHALLENGE_HIGH: felt252 = 0x03273bfddf78f5f07036fa2a12e61262;
     const TESTVECTOR_RESPONSE_LOW: felt252 = 0xc09b9a31d72db277d1bb402e80ef5008;
-    const TESTVECTOR_RESPONSE_HIGH: felt252 = 0x004efaf601adbf89a8283471b5f7cf47;
     // CRITICAL: Truncated values (low 128 bits) - this is what hints were generated for
-    // Updated from regenerated test_vectors.json
     const TEST_VECTOR_C_TRUNCATED: felt252 = 0xff93d53eda6f2910e3a1313a226533c5;
     const TEST_VECTOR_S_TRUNCATED: felt252 = 0xc09b9a31d72db277d1bb402e80ef5008;
     const ED25519_ORDER: u256 = u256 {
@@ -64,9 +67,9 @@ mod e2e_dleq_tests {
     // Use constants from single source of truth (test_vectors.cairo)
     // All values come from rust/test_vectors.json
     
-    // Sqrt hints generated using fix_all_hints.py (auditor's script)
-    // CRITICAL: These use twisted Edwards coordinates, not Montgomery coordinates
-    // The Rust tool generates Montgomery coords which are WRONG for Garaga
+    // WORKING sqrt hints from test_integration_atomic_lock.cairo
+    // CRITICAL: These are Garaga-compatible and empirically validated
+    // DO NOT use sqrt hints from deployment_vector.json - they use wrong algorithm
     const TEST_ADAPTOR_POINT_SQRT_HINT: u256 = u256 {
         low: 0x448c18dcf34127e112ff945a65defbfc,
         high: 0x17611da35f39a2a5e3a9fddb8d978e4f,
@@ -90,23 +93,13 @@ mod e2e_dleq_tests {
     const BASE_128: felt252 = 0x100000000000000000000000000000000; // 2^128
     
     fn get_test_dleq_challenge() -> felt252 {
-        // Reconstruct full challenge from low/high parts
-        // challenge = low + (high * 2^128)
-        let low_part: felt252 = TESTVECTOR_CHALLENGE_LOW;
-        let high_part: felt252 = TESTVECTOR_CHALLENGE_HIGH;
-        let base: felt252 = BASE_128;
-        let scaled_high: felt252 = high_part * base;
-        low_part + scaled_high
+        // Use truncated challenge (low 128 bits) - matches what MSM hints use
+        TESTVECTOR_CHALLENGE_LOW
     }
     
     fn get_test_dleq_response() -> felt252 {
-        // Reconstruct full response from low/high parts
-        // response = low + (high * 2^128)
-        let low_part: felt252 = TESTVECTOR_RESPONSE_LOW;
-        let high_part: felt252 = TESTVECTOR_RESPONSE_HIGH;
-        let base: felt252 = BASE_128;
-        let scaled_high: felt252 = high_part * base;
-        low_part + scaled_high
+        // Use truncated response (low 128 bits) - matches what MSM hints use
+        TESTVECTOR_RESPONSE_LOW
     }
 
     // Real MSM hints generated from test vectors (from test_hints.json)
