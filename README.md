@@ -13,8 +13,8 @@ Uses hashlock + MSM verification + DLEQ proofs for cryptographic binding.
 |-----------|--------|
 | Core Protocol | ✅ Feature-complete |
 | Cryptographic Approach | ✅ Validated against Serai DEX pattern |
-| Rust Tests | ✅ 32/32 passing |
-| Cairo Tests | ✅ 107/107 passing |
+| Rust Tests | ⚠️ 21/22 passing (1 timing test failing) |
+| Cairo Tests | ⚠️ 81/105 passing (24 failing, 8 ignored) |
 | Security Review | ✅ Key splitting validated |
 | Deployment Pipeline | ✅ Golden rule enforced |
 | Monero Integration | ✅ Daemon RPC verified (stagenet tests passing) |
@@ -624,11 +624,11 @@ This approach provides native snforge support with easy filtering: `snforge test
 - Conversion utilities (Garaga-compatible)
 
 **Testing Infrastructure:**
-- Comprehensive test suite (37+ test files, 107+ tests)
+- Comprehensive test suite (37+ test files, 105+ tests)
 - Organized test structure (unit/integration/e2e/security/debug)
 - E2E Rust↔Cairo compatibility test (PASSES)
-- Security audit tests (9/9 passing)
-- Token security tests (6/6 passing)
+- Security audit tests (most passing, some failing)
+- Token security tests (some failing - depositor validation issues)
 - Edge case tests (max scalar, zero, boundary values)
 - Negative tests (wrong challenge/response/hashlock rejection)
 - Full swap lifecycle tests
