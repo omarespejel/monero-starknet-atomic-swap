@@ -1,75 +1,39 @@
-# Monero Wallet RPC Setup Guide
+# Setup Guide - Monero Wallet RPC
 
-## Overview
+Complete guide for setting up Monero wallet-rpc for atomic swap development and testing.
 
-This guide covers setting up Monero wallet-rpc for atomic swap development and testing. Two options are available: Docker (recommended) or local binary.
+## Quick Start
 
-## Option 1: Docker Setup (Recommended)
+### Option 1: Docker (Recommended)
 
 **Benefits**: Avoids antivirus false positives, easy setup, consistent environment.
 
-See `docs/DOCKER_SETUP.md` for complete Docker setup instructions.
-
-**Quick start**:
 ```bash
+# Start wallet-rpc container
 docker-compose up -d
+
+# Check status
+docker ps | grep monero-wallet-rpc
+
+# View logs
+docker logs -f monero-wallet-rpc
+
+# Test connection
+curl -X POST http://localhost:38088/json_rpc \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":"0","method":"get_version"}'
 ```
 
-## Option 2: Local Binary Setup
+See `docs/DOCKER_SETUP.md` for detailed Docker setup instructions.
 
-### Prerequisites
+### Option 2: Local Binary
 
-- Mac (Intel or Apple Silicon)
-- Terminal access
-- ~200MB disk space
-
-### Installation Steps
-
-#### Mac (Apple Silicon)
-
-```bash
-# Download Monero CLI
-curl -L -o monero-mac-arm8-v0.18.3.1.tar.bz2 \
-  https://downloads.getmonero.org/cli/monero-mac-arm8-v0.18.3.1.tar.bz2
-
-# Extract
-tar -xvf monero-mac-arm8-v0.18.3.1.tar.bz2
-
-# Navigate to extracted directory
-cd monero-aarch64-apple-darwin11-v0.18.3.1/
-
-# Make executable
-chmod +x monero-wallet-rpc
-```
-
-#### Mac (Intel)
-
-```bash
-# Download Monero CLI
-curl -L -o monero-mac-x64-v0.18.3.1.tar.bz2 \
-  https://downloads.getmonero.org/cli/monero-mac-x64-v0.18.3.1.tar.bz2
-
-# Extract
-tar -xvf monero-mac-x64-v0.18.3.1.tar.bz2
-
-# Navigate to extracted directory
-cd monero-x86_64-apple-darwin11-v0.18.3.1/
-
-# Make executable
-chmod +x monero-wallet-rpc
-```
+**Prerequisites**: Mac (Intel or Apple Silicon), Terminal access, ~200MB disk space
 
 #### Via Homebrew (Easiest)
 
 ```bash
 brew install monero
-```
-
-### Starting Wallet RPC
-
-```bash
-# Create wallets directory
-mkdir -p wallets
 
 # Start wallet-rpc
 monero-wallet-rpc \
@@ -82,12 +46,24 @@ monero-wallet-rpc \
   --log-level 2
 ```
 
-### Using Helper Script
+#### Manual Download
 
-A helper script is provided for convenience:
-
+**Mac (Apple Silicon)**:
 ```bash
-./start_wallet_rpc.sh
+curl -L -o monero-mac-arm8-v0.18.3.1.tar.bz2 \
+  https://downloads.getmonero.org/cli/monero-mac-arm8-v0.18.3.1.tar.bz2
+tar -xvf monero-mac-arm8-v0.18.3.1.tar.bz2
+cd monero-aarch64-apple-darwin11-v0.18.3.1/
+chmod +x monero-wallet-rpc
+```
+
+**Mac (Intel)**:
+```bash
+curl -L -o monero-mac-x64-v0.18.3.1.tar.bz2 \
+  https://downloads.getmonero.org/cli/monero-mac-x64-v0.18.3.1.tar.bz2
+tar -xvf monero-mac-x64-v0.18.3.1.tar.bz2
+cd monero-x86_64-apple-darwin11-v0.18.3.1/
+chmod +x monero-wallet-rpc
 ```
 
 ## Verification
@@ -183,6 +159,34 @@ cargo test --test wallet_integration_test test_wallet_connection_and_balance -- 
 
 **Solution**: Use Docker setup instead (see `docs/DOCKER_SETUP.md`)
 
+### Container Not Starting (Docker)
+
+```bash
+# Check logs
+docker logs monero-wallet-rpc
+
+# Restart container
+docker-compose restart
+
+# Rebuild if needed
+docker-compose down
+docker-compose build --no-cache
+docker-compose up -d
+```
+
+### Connection Refused (Docker)
+
+```bash
+# Verify container is running
+docker ps | grep monero-wallet-rpc
+
+# Check port mapping
+docker port monero-wallet-rpc
+
+# Test from inside container
+docker exec monero-wallet-rpc curl http://localhost:38088/json_rpc
+```
+
 ## Configuration Options
 
 ### Network Selection
@@ -220,7 +224,7 @@ For production deployment:
 
 ## Related Documentation
 
-- `docs/DOCKER_SETUP.md`: Docker-based setup
+- `docs/DOCKER_SETUP.md`: Detailed Docker setup guide
+- `docs/DOCKER_PUBLISHING.md`: Publishing Docker images
 - `rust/docs/MONERO_WALLET_INTEGRATION.md`: Rust client integration
-- `QUICK_START.md`: Quick reference guide
 

@@ -718,7 +718,7 @@ cd rust
 cargo test --test wallet_integration_test -- --ignored
 ```
 
-See `rust/docs/MONERO_WALLET_INTEGRATION.md` for complete documentation.
+See `docs/SETUP.md` for complete setup instructions.
 
 **Previous Status:**
 - Minimal adaptor-signature demo (not full CLSAG)
