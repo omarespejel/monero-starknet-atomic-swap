@@ -136,7 +136,6 @@ For production deployment, consider:
 
 ## Related Documentation
 
-- `docs/WALLET_RPC_SETUP.md`: Local binary setup
+- `docs/SETUP.md`: Complete setup guide (Docker + local binary)
 - `docs/DOCKER_PUBLISHING.md`: Publishing Docker images
-- `QUICK_START.md`: Quick reference guide
 
