@@ -1,0 +1,36 @@
+[package]
+name = "atomic-swap-watchtower"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Starknet
+starknet = "0.12"
+starknet-providers = "0.12"
+starknet-core = "0.12"
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Config
+config = "0.14"
+dotenvy = "0.15"
+
+# HTTP client (for alerts)
+reqwest = { version = "0.12", features = ["json"] }
+
+# Time
+chrono = "0.4"
+
+# Error handling
+anyhow = "1"
+thiserror = "1"
+
