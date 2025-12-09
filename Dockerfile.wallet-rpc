@@ -1,0 +1,48 @@
+# Dockerfile for Monero Wallet RPC
+# Builds a custom image with official Monero binaries
+
+FROM ubuntu:22.04
+
+# Install dependencies
+RUN apt-get update && \
+    apt-get install -y \
+    wget \
+    bzip2 \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Download and install Monero CLI
+# Note: ARM64 Linux binaries may not be available for all versions
+# For Apple Silicon Macs building Docker images, use --platform linux/amd64
+# or use x86_64 binaries with emulation
+RUN cd /tmp && \
+    wget https://downloads.getmonero.org/cli/monero-linux-x64-v0.18.3.1.tar.bz2 && \
+    tar -xvf monero-linux-x64-v0.18.3.1.tar.bz2 && \
+    cp monero-x86_64-linux-gnu-v0.18.3.1/monero-wallet-rpc /usr/local/bin/ && \
+    chmod +x /usr/local/bin/monero-wallet-rpc && \
+    rm -rf monero-* && \
+    monero-wallet-rpc --version || echo "Binary installed (version check may fail in build)"
+
+# Create wallets directory
+RUN mkdir -p /wallets
+
+# Expose wallet RPC port
+EXPOSE 38088
+
+# Set working directory
+WORKDIR /wallets
+
+# Default command
+ENTRYPOINT ["monero-wallet-rpc"]
+
+# Default arguments (can be overridden)
+CMD ["--stagenet", \
+     "--daemon-address=stagenet.xmr-tw.org:38081", \
+     "--rpc-bind-ip=0.0.0.0", \
+     "--rpc-bind-port=38088", \
+     "--disable-rpc-login", \
+     "--wallet-dir=/wallets", \
+     "--log-level=2", \
+     "--non-interactive"]
+

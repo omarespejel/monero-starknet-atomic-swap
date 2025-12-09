@@ -1,0 +1,42 @@
+services:
+  # Monero wallet-rpc (CRITICAL FOR ATOMIC SWAPS)
+  # Uses public stagenet daemon for simplicity
+  #
+  # This setup uses a lightweight Alpine-based image with Monero wallet-rpc.
+  # Docker provides isolation to avoid antivirus false positives.
+  monero-wallet-rpc:
+    platform: linux/amd64  # Force x86_64 architecture for Monero binaries
+    build:
+      context: .
+      dockerfile: Dockerfile.wallet-rpc
+    container_name: monero-wallet-rpc
+    command:
+      - "--stagenet"
+      - "--daemon-address"
+      - "stagenet.xmr-tw.org:38081"
+      - "--rpc-bind-ip"
+      - "0.0.0.0"
+      - "--rpc-bind-port"
+      - "38088"
+      - "--disable-rpc-login"
+      - "--wallet-dir"
+      - "/wallets"
+      - "--log-level"
+      - "2"
+      - "--non-interactive"
+      - "--confirm-external-bind"
+    ports:
+      - "38088:38088"  # Wallet RPC
+    volumes:
+      - wallet-data:/wallets
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:38088/json_rpc -X POST -H 'Content-Type: application/json' -d '{\"jsonrpc\":\"2.0\",\"id\":\"0\",\"method\":\"get_version\"}' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  wallet-data:
+
