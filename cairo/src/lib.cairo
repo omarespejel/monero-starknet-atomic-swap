@@ -47,6 +47,12 @@ pub trait IAtomicLock<TContractState> {
     fn is_secret_revealed(self: @TContractState) -> bool;
     /// Get timestamp when tokens can be claimed (reveal_timestamp + grace_period).
     fn get_claimable_after(self: @TContractState) -> u64;
+    /// Get the depositor address.
+    fn get_depositor(self: @TContractState) -> ContractAddress;
+    /// Get the token address.
+    fn get_token(self: @TContractState) -> ContractAddress;
+    /// Get the locked amount.
+    fn get_amount(self: @TContractState) -> u256;
     /// Refund to the depositor after expiry if not unlocked.
     fn refund(ref self: TContractState) -> bool;
     /// Optional: pull tokens from depositor (requires prior approval).
@@ -867,6 +873,18 @@ pub mod AtomicLock {
                 return 0;
             }
             reveal_ts + GRACE_PERIOD
+        }
+
+        fn get_depositor(self: @ContractState) -> ContractAddress {
+            self.depositor.read()
+        }
+
+        fn get_token(self: @ContractState) -> ContractAddress {
+            self.token.read()
+        }
+
+        fn get_amount(self: @ContractState) -> u256 {
+            self.amount.read()
         }
 
         /// @notice Phase 1: Reveal secret (verifies hashlock and MSM, but does NOT transfer tokens)
