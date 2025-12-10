@@ -193,9 +193,19 @@ pub mod AtomicLock {
         pub reason: felt252, // Error code: 'point_not_on_curve', 'challenge_mismatch', etc.
     }
 
+    /// Emitted when contract is deployed (for observability and debugging).
+    #[derive(Drop, starknet::Event)]
+    pub struct ContractDeployed {
+        #[key]
+        pub deployer: ContractAddress,
+        pub version: felt252,
+        pub lock_until: u64,
+    }
+
     #[event]
     #[derive(Drop, starknet::Event)]
     pub enum Event {
+        ContractDeployed: ContractDeployed,
         Unlocked: Unlocked,
         Refunded: Refunded,
         SecretRevealed: SecretRevealed,
@@ -659,6 +669,13 @@ pub mod AtomicLock {
         self.unlocker_address.write(zero_address);
         self.token.write(token);
         self.amount.write(amount);
+        
+        // Emit ContractDeployed event for observability
+        self.emit(ContractDeployed {
+            deployer: get_caller_address(),
+            version: self.contract_version.read(),
+            lock_until: lock_until,
+        });
         
         // PRODUCTION: OpenZeppelin ReentrancyGuard component doesn't require initialization
         // It's ready to use immediately after contract deployment
