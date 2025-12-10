@@ -62,6 +62,10 @@
     "tools/verify_full_compatibility.py",
     "scripts/deploy.sh",
     "scripts/validate_p0_fixes.sh",
+    "cairo/tests/test_security_audit.cairo",
+    "cairo/tests/test_security_dleq_negative.cairo",
+    "cairo/tests/test_security_tokens.cairo",
+    "cairo/tests/test_security_edge_cases.cairo",
     "watchtower/Cargo.toml",
     "watchtower/README.md",
     "watchtower/src/**"
