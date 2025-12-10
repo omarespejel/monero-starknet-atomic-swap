@@ -2,11 +2,11 @@
 name = "atomic_lock"
 version = "0.1.0"
 edition = "2024_07"
-cairo-version = "2.10.0"
+cairo-version = "2.14.0"
 
 [dependencies]
 # PRODUCTION: Official Starknet SDK (v2.10.0 stable)
-starknet = "2.10.0"
+starknet = "2.14.0"
 
 # PRODUCTION: Garaga v1.0.1 - Audited elliptic curve library
 # - Used by: Herodotus, keep-starknet-strange, major Starknet protocols

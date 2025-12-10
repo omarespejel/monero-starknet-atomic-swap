@@ -80,6 +80,7 @@
     "tools/generate_sqrt_hints.py",
     "tools/generate_adaptor_hint.py",
     "tools/generate_adaptor_point_hint.py",
+    "tools/generate_deploy_calldata.py",
     "tools/hex_to_cairo_u256.py",
     "tools/garaga_conversion.py",
     "tools/verify_challenge_computation.py",

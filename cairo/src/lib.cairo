@@ -207,6 +207,12 @@ pub mod AtomicLock {
         ReentrancyGuardEvent: ReentrancyGuardComponent::Event,
     }
 
+    // ========== DEPLOYMENT VERSION ==========
+    // Force new class hash after Starknet v0.14.1 Blake2s migration (Dec 10, 2025)
+    // Increment this value to generate a fresh Sierra hash when redeclaring
+    // v2: Blake2s migration fix (Poseidon → Blake2s CASM hash change)
+    const DEPLOYMENT_VERSION: felt252 = 2;
+
     #[storage]
     struct Storage {
         /// SHA-256 hash as 8 × u32 (big-endian words).
@@ -270,6 +276,9 @@ pub mod AtomicLock {
         token: ContractAddress,
         /// Amount to release (optional; 0 means no token transfer).
         amount: u256,
+        /// Contract version for class hash differentiation (Blake2s migration fix, Dec 10, 2025)
+        /// v2: Force new class hash after Starknet v0.14.1 Blake2s migration
+        contract_version: felt252,
         /// PRODUCTION: OpenZeppelin ReentrancyGuard storage for audited reentrancy protection
         #[substorage(v0)]
         reentrancy_guard: ReentrancyGuardComponent::Storage,
@@ -361,6 +370,10 @@ pub mod AtomicLock {
         dleq_r2_compressed: u256,
         dleq_r2_sqrt_hint: u256,
     ) {
+        // Force new class hash via storage write (cannot be optimized away)
+        // v3: Blake2s migration fix (Dec 10, 2025) - bumped to avoid CASM hash conflict
+        self.contract_version.write(3);
+        
         // ========== INPUT VALIDATION ==========
         // INVARIANT: Hashlock must be exactly 8 u32 words (SHA-256 = 32 bytes = 8×u32)
         assert(hash_words.len() == 8, Errors::INVALID_HASH_LENGTH);
