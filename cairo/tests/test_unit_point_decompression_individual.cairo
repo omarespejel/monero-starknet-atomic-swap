@@ -1,7 +1,7 @@
 //! Individual point decompression tests for debugging
 //! 
 //! These tests isolate each point decompression to identify which one fails.
-//! Per auditor guidance: test each point individually before running E2E test.
+//! Test each point individually before running E2E test.
 
 #[cfg(test)]
 mod test_point_decompression_individual {

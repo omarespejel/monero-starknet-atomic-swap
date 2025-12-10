@@ -297,7 +297,7 @@ mod token_security_tests {
         let hashlock_array = TESTVECTOR_HASHLOCK;
         let hashlock = hashlock_array.span();
         
-        // Use deploy helper from test_security_audit.cairo pattern
+        // Use deploy helper from test_security_audit.cairo pattern (security tests)
         let declare_res = declare("AtomicLock");
         let contract = declare_res.unwrap().contract_class();
         

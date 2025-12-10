@@ -1,10 +1,10 @@
-//! Security Audit Test Suite
+//! Security Test Suite
 //!
-//! Tests critical security properties per auditor recommendations
+//! Tests critical security properties
 //! Priority: 🔴 Critical | 🟠 High | 🟡 Medium | 🟢 Low
 
 #[cfg(test)]
-mod security_audit_tests {
+mod security_tests {
     use atomic_lock::IAtomicLockDispatcher;
     use atomic_lock::IAtomicLockDispatcherTrait;
     use core::array::ArrayTrait;

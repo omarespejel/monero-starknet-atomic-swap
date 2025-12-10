@@ -366,7 +366,7 @@ mod tests {
     // The panics shown in the output confirm the constructor IS working correctly.
     // This is a known limitation: #[should_panic] doesn't work for constructor panics in snforge.
     //
-    // AUDITOR NOTE: These tests use `deploy_with_full` to test constructor validation (zero point, wrong hint length, etc.).
+    // These tests use `deploy_with_full` to test constructor validation (zero point, wrong hint length, etc.).
     // These are NOT DLEQ verification tests - they test that the constructor properly rejects invalid inputs.
     // `deploy_with_full` is kept for these tests as they need to deploy with invalid data to test validation paths.
 
@@ -539,7 +539,7 @@ mod tests {
         );
     }
 
-    /// AUDITOR NOTE: This helper is ONLY for constructor validation tests.
+    /// This helper is ONLY for constructor validation tests.
     /// Do NOT use for regular integration tests - use deploy_with_test_vectors() instead.
     /// Constructor validation tests intentionally use invalid data to test rejection paths.
     /// 

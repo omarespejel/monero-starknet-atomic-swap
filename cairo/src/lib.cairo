@@ -4,7 +4,7 @@
 /// verification on Ed25519 (Weierstrass form, curve_index=4).
 ///
 /// **Status**: This is a prototype implementation and reference proof-of-concept.
-/// Production-ready status requires security audit and DLEQ proof implementation.
+/// Production-ready status requires security review and DLEQ proof implementation.
 ///
 /// **Hard Invariants (Enforced at Deployment)**:
 /// - Constructor: adaptor point must be non-zero, on-curve, not small-order; FakeGLV
@@ -47,12 +47,6 @@ pub trait IAtomicLock<TContractState> {
     fn is_secret_revealed(self: @TContractState) -> bool;
     /// Get timestamp when tokens can be claimed (reveal_timestamp + grace_period).
     fn get_claimable_after(self: @TContractState) -> u64;
-    /// Get the depositor address.
-    fn get_depositor(self: @TContractState) -> ContractAddress;
-    /// Get the token address.
-    fn get_token(self: @TContractState) -> ContractAddress;
-    /// Get the locked amount.
-    fn get_amount(self: @TContractState) -> u256;
     /// Refund to the depositor after expiry if not unlocked.
     fn refund(ref self: TContractState) -> bool;
     /// Optional: pull tokens from depositor (requires prior approval).
@@ -96,7 +90,7 @@ pub mod AtomicLock {
     use core::circuit::{u384, u96};
     use openzeppelin::security::ReentrancyGuardComponent;
     
-    // Import production-grade cryptographic modules (using audited libraries)
+    // Import production-grade cryptographic modules (using well-tested libraries)
     use super::blake2s_challenge::compute_dleq_challenge_blake2s;
     
     /// Ed25519 curve order (from RFC 8032)
@@ -132,7 +126,7 @@ pub mod AtomicLock {
         high: 0x2260cdf3092329c21da25ee8c9a21f56,
     };
 
-    // PRODUCTION: OpenZeppelin ReentrancyGuard component for audited reentrancy protection
+    // PRODUCTION: OpenZeppelin ReentrancyGuard component for production-grade reentrancy protection
     component!(
         path: ReentrancyGuardComponent,
         storage: reentrancy_guard,
@@ -189,7 +183,7 @@ pub mod AtomicLock {
     }
 
     /// Emitted when DLEQ proof verification fails (for security monitoring).
-    /// AUDIT: Helps track attack attempts and failed verification attempts.
+    /// Helps track attack attempts and failed verification attempts.
     #[derive(Drop, starknet::Event)]
     pub struct DleqVerificationFailed {
         #[key]
@@ -295,7 +289,7 @@ pub mod AtomicLock {
         /// Contract version for class hash differentiation (Blake2s migration fix, Dec 10, 2025)
         /// v2: Force new class hash after Starknet v0.14.1 Blake2s migration
         contract_version: felt252,
-        /// PRODUCTION: OpenZeppelin ReentrancyGuard storage for audited reentrancy protection
+        /// PRODUCTION: OpenZeppelin ReentrancyGuard storage for production-grade reentrancy protection
         #[substorage(v0)]
         reentrancy_guard: ReentrancyGuardComponent::Storage,
     }
@@ -359,7 +353,7 @@ pub mod AtomicLock {
     /// @param dleq_r1_sqrt_hint sqrt hint for R1 decompression
     /// @param dleq_r2_compressed Second commitment R2 = k·Y (compressed Edwards, 32 bytes = u256)
     /// @param dleq_r2_sqrt_hint sqrt hint for R2 decompression
-    /// @security All EC operations use Garaga's audited functions. All arithmetic has Cairo's built-in overflow protection.
+    /// @security All EC operations use Garaga's production-grade functions. All arithmetic has Cairo's built-in overflow protection.
     /// @invariant Adaptor point must be on-curve and not small-order
     /// @invariant DLEQ proof must be valid (verified in constructor)
     /// @invariant Timelock must be in the future
@@ -397,20 +391,20 @@ pub mod AtomicLock {
         // INVARIANT: Fake-GLV hint must be exactly 10 felts (Q.x[4], Q.y[4], s1, s2)
         assert(fake_glv_hint.len() == 10, Errors::INVALID_HINT_LENGTH);
         
-        // AUDIT: Per auditor recommendation - validate DLEQ hint lengths immediately
+        // Validate DLEQ hint lengths immediately
         // This catches calldata corruption early (e.g., double length prefix)
         assert(dleq_s_hint_for_g.len() == 10, Errors::INVALID_HINT_LENGTH);
         assert(dleq_s_hint_for_y.len() == 10, Errors::INVALID_HINT_LENGTH);
         assert(dleq_c_neg_hint_for_t.len() == 10, Errors::INVALID_HINT_LENGTH);
         assert(dleq_c_neg_hint_for_u.len() == 10, Errors::INVALID_HINT_LENGTH);
         
-        // AUDIT: Validate first element of fake_glv_hint to detect length prefix corruption
+        // Validate first element of fake_glv_hint to detect length prefix corruption
         // If calldata has double length prefix, first element will be the length (10) instead of Q.x limb0
         // Q.x limb0 should be a large value (96-bit), not a small value like 10
         let first_hint_value = *fake_glv_hint.at(0);
         // If first value is exactly 10, it's likely the length prefix (corruption detected)
         // Q.x limb0 should be much larger (typically > 2^32)
-        // AUDIT: Also check DLEQ hints for same corruption pattern
+        // Also check DLEQ hints for same corruption pattern
         let first_dleq_hint_g = *dleq_s_hint_for_g.at(0);
         assert(first_hint_value != 10, Errors::INVALID_HINT_LENGTH); // Detect length prefix corruption
         assert(first_dleq_hint_g != 10, Errors::INVALID_HINT_LENGTH); // Detect DLEQ hint corruption
@@ -419,7 +413,7 @@ pub mod AtomicLock {
         
         // Enforce swap-side invariants for production locks:
         // INVARIANT: lock_until must be in the future (prevents immediate expiry)
-        // AUDIT: Timelock ensures depositor has time to refund if swap fails
+        // Timelock ensures depositor has time to refund if swap fails
         let now = get_block_timestamp();
         assert(lock_until > now, Errors::INVALID_LOCK_TIME);
         
@@ -431,7 +425,7 @@ pub mod AtomicLock {
         
         // INVARIANT: For real swaps, amount and token must both be non-zero
         // Allow both zero (for testing) OR both non-zero (for production), but reject mixed states
-        // AUDIT: Prevents invalid contract states (e.g., token set but amount = 0)
+        // Prevents invalid contract states (e.g., token set but amount = 0)
         let amount_is_zero = is_zero(amount);
         let token_is_zero = token == starknet::contract_address_const::<0>();
         // Reject mixed states: if amount is zero, token must also be zero; if amount is non-zero, token must be non-zero
@@ -444,7 +438,7 @@ pub mod AtomicLock {
         let (dleq_challenge, dleq_response) = dleq;
 
         // INVARIANT: Adaptor point must not be zero/infinity
-        // AUDIT: Zero point would allow bypassing MSM verification
+        // Zero point would allow bypassing MSM verification
         assert(adaptor_point_edwards_compressed != u256 { low: 0, high: 0 }, Errors::ZERO_ADAPTOR_POINT);
 
         // Decompress Edwards point to Weierstrass using Garaga
@@ -453,7 +447,7 @@ pub mod AtomicLock {
             adaptor_point_sqrt_hint
         );
         
-        // AUDIT: Debug assertion to identify decompression failures
+        // Debug assertion to identify decompression failures
         // INVARIANT: Decompression must succeed (point must be valid Edwards)
         if adaptor_point_weierstrass.is_none() {
             assert(false, Errors::ADAPTOR_POINT_DECOMPRESS_FAILED);
@@ -482,7 +476,7 @@ pub mod AtomicLock {
         let hint_y = deserialize_u384(ref hint_ys_span);
         
         // INVARIANT: Hint Q must equal adaptor point (required for MSM verification)
-        // AUDIT: Prevents invalid hints that would cause MSM to fail
+        // Prevents invalid hints that would cause MSM to fail
         let hint_q = G1Point { x: hint_x, y: hint_y };
         assert(hint_q == point, Errors::HINT_Q_MISMATCH);
 
@@ -519,7 +513,7 @@ pub mod AtomicLock {
             dleq_second_point_sqrt_hint
         );
         
-        // AUDIT: Debug assertion to identify decompression failures
+        // Debug assertion to identify decompression failures
         if dleq_second_point_weierstrass.is_none() {
             assert(false, Errors::SECOND_POINT_DECOMPRESS_FAILED);
         }
@@ -551,7 +545,7 @@ pub mod AtomicLock {
             dleq_r1_compressed,
             dleq_r1_sqrt_hint
         );
-        // AUDIT: Debug assertion to identify decompression failures
+        // Debug assertion to identify decompression failures
         if dleq_r1_weierstrass.is_none() {
             assert(false, Errors::R1_DECOMPRESS_FAILED);
         }
@@ -563,7 +557,7 @@ pub mod AtomicLock {
             dleq_r2_compressed,
             dleq_r2_sqrt_hint
         );
-        // AUDIT: Debug assertion to identify decompression failures
+        // Debug assertion to identify decompression failures
         if dleq_r2_weierstrass.is_none() {
             assert(false, Errors::R2_DECOMPRESS_FAILED);
         }
@@ -592,11 +586,7 @@ pub mod AtomicLock {
         );
         
         // Verify that computed challenge matches provided challenge
-        // AUDIT: This is the critical Fiat-Shamir verification step
-        // If this fails, the DLEQ proof is invalid and contract deployment should fail
-        // 
-        // Verify that computed challenge matches provided challenge
-        // AUDIT: This is the critical Fiat-Shamir verification step
+        // This is the critical Fiat-Shamir verification step
         // If this fails, the DLEQ proof is invalid and contract deployment should fail
         // 
         // DEBUG: All inputs verified
@@ -875,25 +865,13 @@ pub mod AtomicLock {
             reveal_ts + GRACE_PERIOD
         }
 
-        fn get_depositor(self: @ContractState) -> ContractAddress {
-            self.depositor.read()
-        }
-
-        fn get_token(self: @ContractState) -> ContractAddress {
-            self.token.read()
-        }
-
-        fn get_amount(self: @ContractState) -> u256 {
-            self.amount.read()
-        }
-
         /// @notice Phase 1: Reveal secret (verifies hashlock and MSM, but does NOT transfer tokens)
         /// @dev Tokens can be claimed via claim_tokens() after grace period expires
         /// @param secret The revealed Monero secret (must match stored hashlock)
         /// @return true if verification succeeds and secret is revealed
         /// @security Protected by ReentrancyGuard. Secret can only be revealed once.
         fn reveal_secret(ref self: ContractState, secret: ByteArray) -> bool {
-            // PRODUCTION: OpenZeppelin ReentrancyGuard - audited reentrancy protection
+            // PRODUCTION: OpenZeppelin ReentrancyGuard - production-grade reentrancy protection
             self.reentrancy_guard.start();
             let result = _reveal_secret_internal(ref self, secret);
             self.reentrancy_guard.end();
@@ -905,7 +883,7 @@ pub mod AtomicLock {
         /// @return true if tokens are successfully claimed
         /// @security Protected by ReentrancyGuard. Only unlocker can claim, only after grace period.
         fn claim_tokens(ref self: ContractState) -> bool {
-            // PRODUCTION: OpenZeppelin ReentrancyGuard - audited reentrancy protection
+            // PRODUCTION: OpenZeppelin ReentrancyGuard - production-grade reentrancy protection
             self.reentrancy_guard.start();
             
             // Must have revealed secret first
@@ -957,7 +935,7 @@ pub mod AtomicLock {
         /// @return true if verification succeeds and tokens are unlocked
         /// @security Protected by ReentrancyGuard. P1 FIX: Uses internal function to avoid guard gaps.
         fn verify_and_unlock(ref self: ContractState, secret: ByteArray) -> bool {
-            // PRODUCTION: OpenZeppelin ReentrancyGuard - audited reentrancy protection
+            // PRODUCTION: OpenZeppelin ReentrancyGuard - production-grade reentrancy protection
             // P1 FIX: Single guard wrapper - no gaps
             self.reentrancy_guard.start();
             
@@ -1014,7 +992,7 @@ pub mod AtomicLock {
         /// @invariant Caller == depositor (prevents unauthorized refund)
         /// @invariant Secret must NOT be revealed (P0 FIX: prevents depositor from stealing tokens during grace period)
         fn refund(ref self: ContractState) -> bool {
-            // PRODUCTION: OpenZeppelin ReentrancyGuard - audited reentrancy protection
+            // PRODUCTION: OpenZeppelin ReentrancyGuard - production-grade reentrancy protection
             self.reentrancy_guard.start();
             
             // P0 FIX: CRITICAL - Cannot refund if secret has been revealed
@@ -1055,7 +1033,7 @@ pub mod AtomicLock {
         /// @security Protected by ReentrancyGuard. Only depositor can deposit.
         /// @invariant Caller == depositor (enforced access control)
         fn deposit(ref self: ContractState) -> bool {
-            // PRODUCTION: OpenZeppelin ReentrancyGuard - audited reentrancy protection
+            // PRODUCTION: OpenZeppelin ReentrancyGuard - production-grade reentrancy protection
             self.reentrancy_guard.start();
             
             let caller = get_caller_address();
@@ -1202,7 +1180,7 @@ pub mod AtomicLock {
 
     /// @notice Verify DLEQ proof: proves that log_G(T) = log_Y(U) without revealing the secret
     /// @dev DLEQ proves: ∃t such that T = t·G and U = t·Y
-    /// @dev Uses Garaga's audited EC operations and Poseidon hashing (10x cheaper than SHA-256)
+    /// @dev Uses Garaga's production-grade EC operations and Poseidon hashing (10x cheaper than SHA-256)
     /// @param T Adaptor point (t·G)
     /// @param U DLEQ second point (t·Y)
     /// @param hashlock SHA-256 hash of secret (8×u32 words)
@@ -1212,7 +1190,7 @@ pub mod AtomicLock {
     /// @param s_hint_for_y Fake-GLV hint for s·Y
     /// @param c_neg_hint_for_t Fake-GLV hint for (-c)·T
     /// @param c_neg_hint_for_u Fake-GLV hint for (-c)·U
-    /// @security All EC operations use Garaga's audited functions. All arithmetic has Cairo's built-in overflow protection.
+    /// @security All EC operations use Garaga's production-grade functions. All arithmetic has Cairo's built-in overflow protection.
     /// @invariant All points must be on Ed25519 curve (checked by assert_on_curve_excluding_infinity)
     /// @invariant All scalars must be < ED25519_ORDER (enforced by modulo reduction)
     /// @invariant Points must not have small order (8-torsion check for Ed25519)
@@ -1239,7 +1217,7 @@ pub mod AtomicLock {
         // PRODUCTION: Comprehensive input validation
         validate_dleq_inputs(T, U, c, s, curve_idx);
         
-        // AUDIT: Verify all points are valid before MSM calls (per auditor recommendation)
+        // Verify all points are valid before MSM calls
         // Check that points are on curve and not infinity
         G.assert_on_curve_excluding_infinity(curve_idx);
         Y.assert_on_curve_excluding_infinity(curve_idx);
@@ -1247,7 +1225,7 @@ pub mod AtomicLock {
         U.assert_on_curve_excluding_infinity(curve_idx);
 
         // Convert challenge and response to u256 scalars (reduced mod curve order)
-        // AUDIT: All scalar operations have Cairo's built-in overflow protection
+        // All scalar operations have Cairo's built-in overflow protection
         // No SafeMath needed - Cairo automatically reverts on overflow/underflow
         // 
         // FIX: Convert felt252 to u256 first, then extract low 128 bits
@@ -1266,31 +1244,31 @@ pub mod AtomicLock {
         // PRODUCTION: Compute -c mod n using modular arithmetic
         // Note: We use manual arithmetic here because Garaga's neg_mod_p works with u384/CircuitModulus,
         // but our scalars are u256. The manual approach is correct and matches Garaga's logic.
-        // AUDIT: Modular arithmetic is safe - Cairo prevents overflow, manual reduction ensures range [0, n)
+        // Modular arithmetic is safe - Cairo prevents overflow, manual reduction ensures range [0, n)
         let c_neg_scalar = (ED25519_ORDER - (c_scalar % ED25519_ORDER)) % ED25519_ORDER;
         
         // PRODUCTION: Use provided fake-GLV hints for MSM operations
-        // Pre-MSM validation (per auditor recommendation)
+        // Pre-MSM validation
         assert(!s_scalar.is_zero(), Errors::DLEQ_SCALAR_OUT_OF_RANGE);
         assert(!c_neg_scalar.is_zero(), Errors::DLEQ_SCALAR_OUT_OF_RANGE);
         assert(s_scalar < ED25519_ORDER, Errors::DLEQ_SCALAR_OUT_OF_RANGE);
         assert(c_neg_scalar < ED25519_ORDER, Errors::DLEQ_SCALAR_OUT_OF_RANGE);
         
-        // Verify points are not zero/infinity (per auditor recommendation)
+        // Verify points are not zero/infinity
         assert(!is_zero_point(@G), Errors::ZERO_ADAPTOR_POINT);
         assert(!is_zero_point(@Y), Errors::ZERO_ADAPTOR_POINT);
         assert(!is_zero_point(@T), Errors::ZERO_ADAPTOR_POINT);
         assert(!is_zero_point(@U), Errors::ZERO_ADAPTOR_POINT);
         
-        // Debug assertions to verify array lengths match (per auditor recommendation)
+        // Debug assertions to verify array lengths match
         let points_g = array![G].span();
         let scalars_s = array![s_scalar].span();
         assert(points_g.len() == scalars_s.len(), Errors::MSM_LEN_MISMATCH);
         assert(s_hint_for_g.len() == points_g.len() * 10, Errors::MSM_HINT_LEN_WRONG);
         
         // s_hint_for_g: hint for s·G (Q = s·G)
-        // AUDIT: First MSM call - if this fails, error is here
-        // Per auditor recommendation: add detailed validation before MSM call
+        // First MSM call - if this fails, error is here
+        // Detailed validation before MSM call
         // Verify hint format: [Q.x[4], Q.y[4], s1, s2] = 10 felts
         assert(s_hint_for_g.len() == 10, Errors::MSM_HINT_LEN_WRONG);
         // Verify scalar is non-zero and in range
@@ -1302,7 +1280,7 @@ pub mod AtomicLock {
         assert(s1_g != 0, Errors::ZERO_HINT_SCALARS);
         assert(s2_g != 0, Errors::ZERO_HINT_SCALARS);
         
-        // AUDIT: First MSM call - s·G
+        // First MSM call - s·G
         // If this fails, error will be "Option::unwrap failed" from Garaga
         // We validate result to ensure MSM succeeded
         let sG = msm_g1(
@@ -1320,8 +1298,8 @@ pub mod AtomicLock {
         assert(points_t.len() == scalars_c_neg.len(), Errors::MSM_LEN_MISMATCH);
         assert(c_neg_hint_for_t.len() == points_t.len() * 10, Errors::MSM_HINT_LEN_WRONG);
         
-        // AUDIT: Second MSM call - if first passed but this fails, error is here
-        // Per auditor recommendation: add detailed validation
+        // Second MSM call - if first passed but this fails, error is here
+        // Detailed validation
         assert(c_neg_hint_for_t.len() == 10, Errors::MSM_HINT_LEN_WRONG);
         assert(!c_neg_scalar.is_zero(), Errors::DLEQ_SCALAR_OUT_OF_RANGE);
         assert(c_neg_scalar < ED25519_ORDER, Errors::DLEQ_SCALAR_OUT_OF_RANGE);
@@ -1330,7 +1308,7 @@ pub mod AtomicLock {
         assert(s1_t != 0, Errors::ZERO_HINT_SCALARS);
         assert(s2_t != 0, Errors::ZERO_HINT_SCALARS);
         
-        // AUDIT: Second MSM call - (-c)·T
+        // Second MSM call - (-c)·T
         let neg_cT = msm_g1(
             points_t,
             scalars_c_neg,
@@ -1350,15 +1328,15 @@ pub mod AtomicLock {
         assert(points_y.len() == scalars_s2.len(), Errors::MSM_LEN_MISMATCH);
         assert(s_hint_for_y.len() == points_y.len() * 10, Errors::MSM_HINT_LEN_WRONG);
         
-        // AUDIT: Third MSM call - if previous passed but this fails, error is here
-        // Per auditor recommendation: add detailed validation
+        // Third MSM call - if previous passed but this fails, error is here
+        // Detailed validation
         assert(s_hint_for_y.len() == 10, Errors::MSM_HINT_LEN_WRONG);
         let s1_y = *s_hint_for_y.at(8);
         let s2_y = *s_hint_for_y.at(9);
         assert(s1_y != 0, Errors::ZERO_HINT_SCALARS);
         assert(s2_y != 0, Errors::ZERO_HINT_SCALARS);
         
-        // AUDIT: Third MSM call - s·Y
+        // Third MSM call - s·Y
         let sY = msm_g1(
             points_y,
             scalars_s2,
@@ -1374,15 +1352,15 @@ pub mod AtomicLock {
         assert(points_u.len() == scalars_c_neg2.len(), Errors::MSM_LEN_MISMATCH);
         assert(c_neg_hint_for_u.len() == points_u.len() * 10, Errors::MSM_HINT_LEN_WRONG);
         
-        // AUDIT: Fourth MSM call - if previous passed but this fails, error is here
-        // Per auditor recommendation: add detailed validation
+        // Fourth MSM call - if previous passed but this fails, error is here
+        // Detailed validation
         assert(c_neg_hint_for_u.len() == 10, Errors::MSM_HINT_LEN_WRONG);
         let s1_u = *c_neg_hint_for_u.at(8);
         let s2_u = *c_neg_hint_for_u.at(9);
         assert(s1_u != 0, Errors::ZERO_HINT_SCALARS);
         assert(s2_u != 0, Errors::ZERO_HINT_SCALARS);
         
-        // AUDIT: Fourth MSM call - (-c)·U
+        // Fourth MSM call - (-c)·U
         let neg_cU = msm_g1(
             points_u,
             scalars_c_neg2,
@@ -1421,7 +1399,7 @@ pub mod AtomicLock {
     /// @param c Challenge scalar to validate
     /// @param s Response scalar to validate
     /// @param curve_idx Curve index (ED25519 = 4)
-    /// @security Uses Garaga's audited validation functions
+    /// @security Uses Garaga's production-grade validation functions
     /// @invariant Points must be on-curve (enforced by assert_on_curve_excluding_infinity)
     /// @invariant Points must not have small order (8-torsion check)
     /// @invariant Scalars must be non-zero (enforced by != 0 and sign() checks)
@@ -1507,11 +1485,11 @@ pub mod AtomicLock {
     /// @param R2 Second commitment point
     /// @param hashlock SHA-256 hashlock (8×u32 words)
     /// @return felt252 Challenge scalar (reduced mod ED25519_ORDER)
-    /// @security Uses Cairo's Poseidon implementation (gas-efficient, audited)
+    /// @security Uses Cairo's Poseidon implementation (gas-efficient, production-grade)
     /// @invariant Challenge is deterministic given same inputs (Fiat-Shamir)
     // NOTE: BLAKE2s challenge computation and serialization functions have been moved to
     // the blake2s_challenge module for better organization and reusability.
-    // This module uses ONLY audited libraries: Cairo core BLAKE2s (Starkware).
+    // This module uses ONLY production-grade libraries: Cairo core BLAKE2s (Starkware).
     // See: blake2s_challenge::compute_dleq_challenge_blake2s()
     
     /// @notice Compute DLEQ challenge using BLAKE2s with compressed Edwards points

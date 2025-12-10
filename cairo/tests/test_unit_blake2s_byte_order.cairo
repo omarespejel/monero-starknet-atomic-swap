@@ -3,7 +3,7 @@
 /// Critical tests to verify that Cairo's BLAKE2s serialization matches Rust exactly.
 /// These tests catch byte-order/endianness bugs that would cause DLEQ verification failures.
 ///
-/// **Audit Priority**: CRITICAL - Must pass before production deployment
+/// **Priority**: CRITICAL - Must pass before production deployment
 
 #[cfg(test)]
 mod blake2s_byte_order_tests {
