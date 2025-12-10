@@ -48,7 +48,7 @@ Use BLAKE2s for challenge computation.
 - Significant gas savings (8x reduction)
 - Simpler implementation (standard library)
 - Better compatibility between Rust and Cairo
-- Easier to audit (standard hash function)
+- Easier to review (standard hash function)
 
 ### Negative
 

@@ -16,10 +16,10 @@ This document tracks the audit status of all cryptographic dependencies used in 
   - Source: [crates.io](https://crates.io/crates/monero-clsag-mirror) (unofficial mirror by sneurlax)
   - **Target**: Use git source when available: `monero-clsag = { git = "https://github.com/serai-dex/serai", package = "monero-clsag" }`
   - Original: [serai-dex/serai](https://github.com/serai-dex/serai) (develop branch) - **the actual code being audited**
-  - Audit: Cypher Stack (funded by Monero CCS, audit in progress)
-  - Status: Pre-1.0, audit ongoing
+  - Review: Cypher Stack (funded by Monero CCS, review in progress)
+  - Status: Pre-1.0, review ongoing
   - **Note**: Packages (`monero-clsag`, `monero-serai`, etc.) are reserved on crates.io but not yet in git workspace
-  - **Current**: Using mirror temporarily - contains same code being audited, just published by community member
+  - **Current**: Using mirror temporarily - contains same code being reviewed, just published by community member
   - **Action**: Monitor serai-dex/serai repository for when packages are added to workspace, then switch to git
 
 - [x] **monero-clsag-mirror 0.1** - Mirrored version of monero-serai CLSAG

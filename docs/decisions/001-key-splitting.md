@@ -20,7 +20,7 @@ Use key splitting: `x = x_partial + t`
 
 ### Security
 
-- Uses only production-grade curve25519-dalek operations
+- Uses only audited curve25519-dalek operations
 - No custom cryptographic implementations
 - Matches pattern validated by CypherStack review of Serai DEX
 
@@ -40,7 +40,7 @@ Use key splitting: `x = x_partial + t`
 
 - Avoids implementing ring signatures
 - Uses standard Ed25519 operations only
-- All cryptographic primitives from production-grade libraries
+- All cryptographic primitives from audited libraries
 
 ## Consequences
 

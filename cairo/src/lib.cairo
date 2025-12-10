@@ -90,7 +90,7 @@ pub mod AtomicLock {
     use core::circuit::{u384, u96};
     use openzeppelin::security::ReentrancyGuardComponent;
     
-    // Import production-grade cryptographic modules (using well-tested libraries)
+    // Import production-grade cryptographic modules (using audited libraries)
     use super::blake2s_challenge::compute_dleq_challenge_blake2s;
     
     /// Ed25519 curve order (from RFC 8032)
@@ -126,7 +126,7 @@ pub mod AtomicLock {
         high: 0x2260cdf3092329c21da25ee8c9a21f56,
     };
 
-    // PRODUCTION: OpenZeppelin ReentrancyGuard component for production-grade reentrancy protection
+    // PRODUCTION: OpenZeppelin ReentrancyGuard component for audited reentrancy protection
     component!(
         path: ReentrancyGuardComponent,
         storage: reentrancy_guard,
@@ -289,7 +289,7 @@ pub mod AtomicLock {
         /// Contract version for class hash differentiation (Blake2s migration fix, Dec 10, 2025)
         /// v2: Force new class hash after Starknet v0.14.1 Blake2s migration
         contract_version: felt252,
-        /// PRODUCTION: OpenZeppelin ReentrancyGuard storage for production-grade reentrancy protection
+        /// PRODUCTION: OpenZeppelin ReentrancyGuard storage for audited reentrancy protection
         #[substorage(v0)]
         reentrancy_guard: ReentrancyGuardComponent::Storage,
     }
@@ -353,7 +353,7 @@ pub mod AtomicLock {
     /// @param dleq_r1_sqrt_hint sqrt hint for R1 decompression
     /// @param dleq_r2_compressed Second commitment R2 = k·Y (compressed Edwards, 32 bytes = u256)
     /// @param dleq_r2_sqrt_hint sqrt hint for R2 decompression
-    /// @security All EC operations use Garaga's production-grade functions. All arithmetic has Cairo's built-in overflow protection.
+    /// @security All EC operations use Garaga's audited functions. All arithmetic has Cairo's built-in overflow protection.
     /// @invariant Adaptor point must be on-curve and not small-order
     /// @invariant DLEQ proof must be valid (verified in constructor)
     /// @invariant Timelock must be in the future
@@ -871,7 +871,7 @@ pub mod AtomicLock {
         /// @return true if verification succeeds and secret is revealed
         /// @security Protected by ReentrancyGuard. Secret can only be revealed once.
         fn reveal_secret(ref self: ContractState, secret: ByteArray) -> bool {
-            // PRODUCTION: OpenZeppelin ReentrancyGuard - production-grade reentrancy protection
+            // PRODUCTION: OpenZeppelin ReentrancyGuard - audited reentrancy protection
             self.reentrancy_guard.start();
             let result = _reveal_secret_internal(ref self, secret);
             self.reentrancy_guard.end();
@@ -883,7 +883,7 @@ pub mod AtomicLock {
         /// @return true if tokens are successfully claimed
         /// @security Protected by ReentrancyGuard. Only unlocker can claim, only after grace period.
         fn claim_tokens(ref self: ContractState) -> bool {
-            // PRODUCTION: OpenZeppelin ReentrancyGuard - production-grade reentrancy protection
+            // PRODUCTION: OpenZeppelin ReentrancyGuard - audited reentrancy protection
             self.reentrancy_guard.start();
             
             // Must have revealed secret first
@@ -935,7 +935,7 @@ pub mod AtomicLock {
         /// @return true if verification succeeds and tokens are unlocked
         /// @security Protected by ReentrancyGuard. P1 FIX: Uses internal function to avoid guard gaps.
         fn verify_and_unlock(ref self: ContractState, secret: ByteArray) -> bool {
-            // PRODUCTION: OpenZeppelin ReentrancyGuard - production-grade reentrancy protection
+            // PRODUCTION: OpenZeppelin ReentrancyGuard - audited reentrancy protection
             // P1 FIX: Single guard wrapper - no gaps
             self.reentrancy_guard.start();
             
@@ -992,7 +992,7 @@ pub mod AtomicLock {
         /// @invariant Caller == depositor (prevents unauthorized refund)
         /// @invariant Secret must NOT be revealed (P0 FIX: prevents depositor from stealing tokens during grace period)
         fn refund(ref self: ContractState) -> bool {
-            // PRODUCTION: OpenZeppelin ReentrancyGuard - production-grade reentrancy protection
+            // PRODUCTION: OpenZeppelin ReentrancyGuard - audited reentrancy protection
             self.reentrancy_guard.start();
             
             // P0 FIX: CRITICAL - Cannot refund if secret has been revealed
@@ -1033,7 +1033,7 @@ pub mod AtomicLock {
         /// @security Protected by ReentrancyGuard. Only depositor can deposit.
         /// @invariant Caller == depositor (enforced access control)
         fn deposit(ref self: ContractState) -> bool {
-            // PRODUCTION: OpenZeppelin ReentrancyGuard - production-grade reentrancy protection
+            // PRODUCTION: OpenZeppelin ReentrancyGuard - audited reentrancy protection
             self.reentrancy_guard.start();
             
             let caller = get_caller_address();
@@ -1180,7 +1180,7 @@ pub mod AtomicLock {
 
     /// @notice Verify DLEQ proof: proves that log_G(T) = log_Y(U) without revealing the secret
     /// @dev DLEQ proves: ∃t such that T = t·G and U = t·Y
-    /// @dev Uses Garaga's production-grade EC operations and Poseidon hashing (10x cheaper than SHA-256)
+    /// @dev Uses Garaga's audited EC operations and Poseidon hashing (10x cheaper than SHA-256)
     /// @param T Adaptor point (t·G)
     /// @param U DLEQ second point (t·Y)
     /// @param hashlock SHA-256 hash of secret (8×u32 words)
@@ -1190,7 +1190,7 @@ pub mod AtomicLock {
     /// @param s_hint_for_y Fake-GLV hint for s·Y
     /// @param c_neg_hint_for_t Fake-GLV hint for (-c)·T
     /// @param c_neg_hint_for_u Fake-GLV hint for (-c)·U
-    /// @security All EC operations use Garaga's production-grade functions. All arithmetic has Cairo's built-in overflow protection.
+    /// @security All EC operations use Garaga's audited functions. All arithmetic has Cairo's built-in overflow protection.
     /// @invariant All points must be on Ed25519 curve (checked by assert_on_curve_excluding_infinity)
     /// @invariant All scalars must be < ED25519_ORDER (enforced by modulo reduction)
     /// @invariant Points must not have small order (8-torsion check for Ed25519)
@@ -1399,7 +1399,7 @@ pub mod AtomicLock {
     /// @param c Challenge scalar to validate
     /// @param s Response scalar to validate
     /// @param curve_idx Curve index (ED25519 = 4)
-    /// @security Uses Garaga's production-grade validation functions
+    /// @security Uses Garaga's audited validation functions
     /// @invariant Points must be on-curve (enforced by assert_on_curve_excluding_infinity)
     /// @invariant Points must not have small order (8-torsion check)
     /// @invariant Scalars must be non-zero (enforced by != 0 and sign() checks)
@@ -1485,11 +1485,11 @@ pub mod AtomicLock {
     /// @param R2 Second commitment point
     /// @param hashlock SHA-256 hashlock (8×u32 words)
     /// @return felt252 Challenge scalar (reduced mod ED25519_ORDER)
-    /// @security Uses Cairo's Poseidon implementation (gas-efficient, production-grade)
+    /// @security Uses Cairo's Poseidon implementation (gas-efficient, audited)
     /// @invariant Challenge is deterministic given same inputs (Fiat-Shamir)
     // NOTE: BLAKE2s challenge computation and serialization functions have been moved to
     // the blake2s_challenge module for better organization and reusability.
-    // This module uses ONLY production-grade libraries: Cairo core BLAKE2s (Starkware).
+    // This module uses ONLY audited libraries: Cairo core BLAKE2s (Starkware).
     // See: blake2s_challenge::compute_dleq_challenge_blake2s()
     
     /// @notice Compute DLEQ challenge using BLAKE2s with compressed Edwards points

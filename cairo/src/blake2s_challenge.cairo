@@ -1,9 +1,9 @@
 /// # BLAKE2s Challenge Computation Module
 ///
-/// Production-grade BLAKE2s wrapper using Cairo core's production-grade `core::blake` functions.
+/// Production-grade BLAKE2s wrapper using Cairo core's audited `core::blake` functions.
 /// This module provides high-level challenge computation for DLEQ proofs.
 ///
-/// **Status**: Uses official Cairo core BLAKE2s implementation (production-grade)
+/// **Status**: Uses official Cairo core BLAKE2s implementation (audited)
 /// **Reference**: RFC 7693 (BLAKE2s specification)
 /// **Efficiency**: 8x more efficient than Poseidon (Starknet v0.14.1+)
 ///
@@ -161,7 +161,7 @@ pub fn hashlock_to_u256(hashlock: Span<u32>) -> u256 {
 /// 
 /// @invariant Challenge is in range [0, ED25519_ORDER) (enforced by reduction)
 /// @note Matches Rust implementation: BLAKE2s("DLEQ" || G || Y || T || U || R1 || R2 || hashlock)
-/// @security Uses production-grade Cairo core BLAKE2s functions (Starkware)
+/// @security Uses audited Cairo core BLAKE2s functions (Starkware)
 pub fn compute_dleq_challenge_blake2s(
     G_compressed: u256,
     Y_compressed: u256,

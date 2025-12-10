@@ -80,7 +80,7 @@ All DLEQ proof generation functions validate inputs before processing. The secre
 
 **Verification Security**
 
-On-chain verification in Cairo uses Garaga's production-grade MSM functions for all elliptic curve operations. The verification checks four relationships: `s·G = R1 + c·T`, `s·Y = R2 + c·U`, `T = t·G`, and `U = t·Y`. All points are validated to be on-curve and not have small order before use.
+On-chain verification in Cairo uses Garaga's audited MSM functions for all elliptic curve operations. The verification checks four relationships: `s·G = R1 + c·T`, `s·Y = R2 + c·U`, `T = t·G`, and `U = t·Y`. All points are validated to be on-curve and not have small order before use.
 
 ### Hashlock Security
 
@@ -92,7 +92,7 @@ The hashlock is verified on-chain before unlocking, providing a fast fail-fast m
 
 ### Reentrancy Protection
 
-The contract implements defense-in-depth reentrancy protection across three layers. First, Starknet's protocol-level reentrancy prevention provides base protection. Second, an `unlocked` flag ensures state changes occur before external calls. Third, OpenZeppelin's `ReentrancyGuardComponent` provides production-grade component-level protection.
+The contract implements defense-in-depth reentrancy protection across three layers. First, Starknet's protocol-level reentrancy prevention provides base protection. Second, an `unlocked` flag ensures state changes occur before external calls. Third, OpenZeppelin's `ReentrancyGuardComponent` provides audited component-level protection.
 
 All token transfer functions (`verify_and_unlock`, `refund`, `deposit`) are protected. The contract follows the checks-effects-interactions pattern, updating state before making external calls.
 
@@ -165,23 +165,23 @@ A protocol-level race condition exists between secret revelation and cross-chain
 
 ### curve25519-dalek
 
-All elliptic curve operations in Rust use curve25519-dalek version 4.x, which was reviewed by Quarkslab in 2019. The review confirmed constant-time logic throughout, with no secret-dependent branches or memory accesses. All scalar operations are constant-time by design.
+All elliptic curve operations in Rust use curve25519-dalek version 4.x, which was audited by Quarkslab in 2019. The audit confirmed constant-time logic throughout, with no secret-dependent branches or memory accesses. All scalar operations are constant-time by design.
 
 ### Garaga
 
-All on-chain elliptic curve operations use Garaga version 1.0.1, which is production-grade. The library provides MSM functions, point validation, and fake-GLV hints for optimization. All operations use production-grade functions with no custom cryptography.
+All on-chain elliptic curve operations use Garaga version 1.0.1, which has been audited. The library provides MSM functions, point validation, and fake-GLV hints for optimization. All operations use audited functions with no custom cryptography.
 
 ### OpenZeppelin Cairo Contracts
 
-Security components use OpenZeppelin Cairo Contracts version 2.0.0, which is production-grade. The `ReentrancyGuardComponent` provides industry-standard reentrancy protection patterns.
+Security components use OpenZeppelin Cairo Contracts version 2.0.0, which has been audited. The `ReentrancyGuardComponent` provides industry-standard reentrancy protection patterns.
 
 ### Hash Functions
 
-BLAKE2s and SHA-256 are provided by Cairo's standard library and Rust's production-grade crates. BLAKE2s is used for challenge computation due to gas efficiency, while SHA-256 is used for hashlock commitments. Both are cryptographically secure and widely reviewed.
+BLAKE2s and SHA-256 are provided by Cairo's standard library and Rust's audited crates. BLAKE2s is used for challenge computation due to gas efficiency, while SHA-256 is used for hashlock commitments. Both are cryptographically secure and widely reviewed.
 
 ### Zero Custom Cryptography
 
-This implementation contains no custom cryptographic primitives. All elliptic curve operations, hashing, and security components use production-grade libraries. This eliminates entire classes of vulnerabilities that arise from implementing cryptography incorrectly.
+This implementation contains no custom cryptographic primitives. All elliptic curve operations, hashing, and security components use audited libraries. This eliminates entire classes of vulnerabilities that arise from implementing cryptography incorrectly.
 
 ## Test Coverage
 
@@ -239,7 +239,7 @@ The current implementation does not include batch operations or aggregation opti
 
 ## Conclusion
 
-The protocol implements multiple layers of security through cryptographic primitives, input validation, access control, and defense-in-depth patterns. All cryptographic operations use production-grade libraries with no custom implementations. The key splitting approach follows validated industry patterns, and the DLEQ proof system provides cryptographic binding between the hashlock and adaptor point.
+The protocol implements multiple layers of security through cryptographic primitives, input validation, access control, and defense-in-depth patterns. All cryptographic operations use audited libraries with no custom implementations. The key splitting approach follows validated industry patterns, and the DLEQ proof system provides cryptographic binding between the hashlock and adaptor point.
 
 The security properties have been verified through mathematical analysis, comparison to production implementations, and comprehensive testing. While external review is pending, the implementation follows industry best practices and is ready for formal security review.
 

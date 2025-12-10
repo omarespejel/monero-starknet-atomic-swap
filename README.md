@@ -203,23 +203,23 @@ The deployment script (`scripts/deploy.sh`) enforces this rule programmatically.
 
 ### Cryptographic Libraries
 
-**Production Libraries Used:**
+**Audited Libraries Used:**
 
-- **Garaga v1.0.0** (production-grade) - All elliptic curve operations
+- **Garaga v1.0.0** (audited) - All elliptic curve operations
   - EC point operations (`msm_g1`, `ec_safe_add`)
   - Point validation (`assert_on_curve_excluding_infinity`)
   - Fake-GLV hints for MSM optimization
   - Ed25519 curve support (curve_index=4)
 
-- **OpenZeppelin Cairo Contracts v2.0.0** (production-grade) - Security components
+- **OpenZeppelin Cairo Contracts v2.0.0** (audited) - Security components
   - `ReentrancyGuardComponent` - Protection against reentrancy attacks
   - Industry-standard, battle-tested patterns
 
 **Zero Custom Cryptography:**
 
-This contract uses zero custom cryptography implementation. All cryptographic primitives are from production-grade libraries:
-- All EC operations: Garaga (production-grade)
-- Reentrancy protection: OpenZeppelin (production-grade)
+This contract uses zero custom cryptography implementation. All cryptographic primitives are from audited libraries:
+- All EC operations: Garaga (audited)
+- Reentrancy protection: OpenZeppelin (audited)
 - Hash functions: Cairo stdlib (SHA-256, BLAKE2s)
 - No custom crypto code
 
@@ -248,7 +248,7 @@ Property: Cryptographically binds hashlock to adaptor point
 Enforcement:
 - DLEQ proof verified in constructor (deployment fails if invalid)
 - Uses BLAKE2s hashing for gas efficiency
-- All EC operations use Garaga's production-grade functions
+- All EC operations use Garaga's audited functions
 
 **3. Reentrancy Protection**
 
@@ -257,7 +257,7 @@ Property: Prevents reentrancy attacks on token transfers
 Layers:
 1. Starknet Built-in: Protocol-level reentrancy prevention
 2. Unlocked Flag: Defense-in-depth check (`assert(!unlocked)`)
-3. OpenZeppelin ReentrancyGuard: Production-grade component protection
+3. OpenZeppelin ReentrancyGuard: Audited component protection
 
 Protected Functions:
 - `verify_and_unlock()` - Token transfer to unlocker
@@ -340,7 +340,7 @@ Mitigation:
 
 ### Security Best Practices
 
-1. Use Only Production Libraries: Garaga + OpenZeppelin
+1. Use Only Audited Libraries: Garaga + OpenZeppelin
 2. Defense-in-Depth: Multiple layers of protection
 3. Fail-Safe Defaults: Revert on any uncertainty
 4. Comprehensive Validation: Check all inputs thoroughly

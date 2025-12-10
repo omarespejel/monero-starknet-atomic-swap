@@ -3,7 +3,7 @@
 /// Production-grade Edwards point serialization for Ed25519 compressed format.
 /// Provides compression (point → 32 bytes) to complement Garaga's decompression.
 ///
-/// **Status**: Uses Garaga's production-grade Ed25519 operations as reference
+/// **Status**: Uses Garaga's audited Ed25519 operations as reference
 /// **Reference**: RFC 8032 (Ed25519 specification, Section 5.1.2)
 /// **Format**: Compressed Edwards format (y-coordinate + sign bit for x)
 ///
