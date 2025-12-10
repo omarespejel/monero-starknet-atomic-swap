@@ -1,9 +1,9 @@
 /// # BLAKE2s Challenge Computation Module
 ///
-/// Production-grade BLAKE2s wrapper using Cairo core's audited `core::blake` functions.
+/// Production-grade BLAKE2s wrapper using Cairo core's production-grade `core::blake` functions.
 /// This module provides high-level challenge computation for DLEQ proofs.
 ///
-/// **Audit Status**: Uses official Cairo core BLAKE2s implementation (audited by Starkware)
+/// **Status**: Uses official Cairo core BLAKE2s implementation (production-grade)
 /// **Reference**: RFC 7693 (BLAKE2s specification)
 /// **Efficiency**: 8x more efficient than Poseidon (Starknet v0.14.1+)
 ///
@@ -76,13 +76,13 @@ fn initial_blake2s_state() -> Blake2sState {
 /// This is needed because SHA-256 produces Big-Endian words,
 /// but BLAKE2s expects Little-Endian byte streams.
 /// 
-/// Implementation matches auditor's specification:
+/// Implementation matches specification:
 /// Extract bytes from least to most significant, then reconstruct in reverse order.
 /// 
 /// @param value u32 word in Big-Endian format
 /// @return u32 word in Little-Endian format
 fn byte_swap_u32(value: u32) -> u32 {
-    // Extract bytes from least to most significant (as auditor suggests)
+    // Extract bytes from least to most significant
     let b0 = value & 0xFF;                    // Least significant byte (bits 0-7)
     let b1 = (value / 0x100) & 0xFF;          // Byte 1 (bits 8-15)
     let b2 = (value / 0x10000) & 0xFF;        // Byte 2 (bits 16-23)
@@ -161,7 +161,7 @@ pub fn hashlock_to_u256(hashlock: Span<u32>) -> u256 {
 /// 
 /// @invariant Challenge is in range [0, ED25519_ORDER) (enforced by reduction)
 /// @note Matches Rust implementation: BLAKE2s("DLEQ" || G || Y || T || U || R1 || R2 || hashlock)
-/// @security Uses audited Cairo core BLAKE2s functions (Starkware)
+/// @security Uses production-grade Cairo core BLAKE2s functions (Starkware)
 pub fn compute_dleq_challenge_blake2s(
     G_compressed: u256,
     Y_compressed: u256,
