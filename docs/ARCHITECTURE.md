@@ -82,7 +82,7 @@ The Rust side generates secrets and proofs. The Cairo side verifies proofs and m
 
 ### Key Splitting
 
-Uses the Serai DEX pattern: `x = x_partial + t`. This avoids modifying Monero's CLSAG signature scheme while still enabling atomic swaps. The approach has been validated by CypherStack's audit of Serai.
+Uses the Serai DEX pattern: `x = x_partial + t`. This avoids modifying Monero's CLSAG signature scheme while still enabling atomic swaps. The approach has been validated by CypherStack's review of Serai.
 
 ### DLEQ Proofs
 
@@ -140,7 +140,7 @@ The current Monero integration is demo-level. A production implementation would 
 
 ### Testnet Only
 
-The protocol is designed for testnet use only. Mainnet deployment requires external audit and race condition mitigations.
+The protocol is designed for testnet use only. Mainnet deployment requires external review and race condition mitigations.
 
 ---
 

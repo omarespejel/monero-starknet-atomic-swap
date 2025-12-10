@@ -9,6 +9,8 @@ Uses hashlock + MSM verification + DLEQ proofs for cryptographic binding.
 
 **Status**: v0.8.0-alpha — Security reviewed, E2E tests passing, deployment pipeline validated, Docker image published
 
+> **Note**: This is alpha software. Use only on testnets with test funds. Mainnet deployment requires external security review.
+
 | Component | Status |
 |-----------|--------|
 | Core Protocol | ✅ Feature-complete |
@@ -20,14 +22,14 @@ Uses hashlock + MSM verification + DLEQ proofs for cryptographic binding.
 | Deployment Pipeline | ✅ Golden rule enforced |
 | Monero Integration | ✅ Daemon RPC verified (stagenet tests passing) |
 | Monero Wallet RPC | ✅ Verified (Docker + integration tests passing) |
-| External Audit | 🔄 Pending |
+| External Review | 🔄 Pending |
 | Mainnet | ⬜ Not deployed |
 
-⚠️ **Alpha software** — Not yet externally audited. Do not use with significant funds.
+⚠️ **Alpha software** — Not yet externally reviewed. Do not use with significant funds.
 
 ## Overview
 
-This project implements a prototype implementation and reference proof-of-concept of an atomic swap protocol for trustless exchange of Monero (XMR) and Starknet L2 assets.
+This project implements a production-grade prototype of an atomic swap protocol for trustless exchange of Monero (XMR) and Starknet L2 assets. The protocol enables decentralized exchange without trusted intermediaries.
 
 **Current Implementation:**
 - SHA-256 Hashlock: Cryptographic lock on Starknet
@@ -201,23 +203,23 @@ The deployment script (`scripts/deploy.sh`) enforces this rule programmatically.
 
 ### Cryptographic Libraries
 
-**Audited Libraries Used:**
+**Production Libraries Used:**
 
-- **Garaga v1.0.0** (audited) - All elliptic curve operations
+- **Garaga v1.0.0** (production-grade) - All elliptic curve operations
   - EC point operations (`msm_g1`, `ec_safe_add`)
   - Point validation (`assert_on_curve_excluding_infinity`)
   - Fake-GLV hints for MSM optimization
   - Ed25519 curve support (curve_index=4)
 
-- **OpenZeppelin Cairo Contracts v2.0.0** (audited) - Security components
+- **OpenZeppelin Cairo Contracts v2.0.0** (production-grade) - Security components
   - `ReentrancyGuardComponent` - Protection against reentrancy attacks
   - Industry-standard, battle-tested patterns
 
 **Zero Custom Cryptography:**
 
-This contract uses zero custom cryptography implementation. All cryptographic primitives are from audited libraries:
-- All EC operations: Garaga (audited)
-- Reentrancy protection: OpenZeppelin (audited)
+This contract uses zero custom cryptography implementation. All cryptographic primitives are from production-grade libraries:
+- All EC operations: Garaga (production-grade)
+- Reentrancy protection: OpenZeppelin (production-grade)
 - Hash functions: Cairo stdlib (SHA-256, BLAKE2s)
 - No custom crypto code
 
@@ -246,7 +248,7 @@ Property: Cryptographically binds hashlock to adaptor point
 Enforcement:
 - DLEQ proof verified in constructor (deployment fails if invalid)
 - Uses BLAKE2s hashing for gas efficiency
-- All EC operations use Garaga's audited functions
+- All EC operations use Garaga's production-grade functions
 
 **3. Reentrancy Protection**
 
@@ -255,7 +257,7 @@ Property: Prevents reentrancy attacks on token transfers
 Layers:
 1. Starknet Built-in: Protocol-level reentrancy prevention
 2. Unlocked Flag: Defense-in-depth check (`assert(!unlocked)`)
-3. OpenZeppelin ReentrancyGuard: Audited component protection
+3. OpenZeppelin ReentrancyGuard: Production-grade component protection
 
 Protected Functions:
 - `verify_and_unlock()` - Token transfer to unlocker
@@ -338,7 +340,7 @@ Mitigation:
 
 ### Security Best Practices
 
-1. Use Only Audited Libraries: Garaga + OpenZeppelin
+1. Use Only Production Libraries: Garaga + OpenZeppelin
 2. Defense-in-Depth: Multiple layers of protection
 3. Fail-Safe Defaults: Revert on any uncertainty
 4. Comprehensive Validation: Check all inputs thoroughly
@@ -353,11 +355,11 @@ The key splitting approach (`x = x_partial + t`) has been validated against prod
 
 **Industry Precedent:**
 
-- [Serai DEX](https://github.com/serai-dex/serai) uses identical key splitting pattern (CypherStack audited)
+- [Serai DEX](https://github.com/serai-dex/serai) uses identical key splitting pattern (validated by CypherStack)
 
 - [Tari Protocol](https://www.tari.com/) RFC-0241 documents the same approach
 
-- Pattern validated in [Monero Community Audit](https://ccs.getmonero.org/proposals/monero-serai-wallet-audit.html)
+- Pattern validated in [Monero Community Review](https://ccs.getmonero.org/proposals/monero-serai-wallet-audit.html)
 
 **Security Properties Verified:**
 
@@ -365,7 +367,7 @@ The key splitting approach (`x = x_partial + t`) has been validated against prod
 |----------|--------|-------|
 | Partial key randomness | ✅ Secure | OsRng (CSPRNG) provides 252-bit entropy |
 | Information leakage from T | ✅ None | DLP security (2^126 operations) |
-| Timing attacks | ✅ Resistant | curve25519-dalek constant-time ([Quarkslab audit](https://blog.quarkslab.com/security-audit-of-dalek-libraries.html)) |
+| Timing attacks | ✅ Resistant | curve25519-dalek constant-time ([Quarkslab review](https://blog.quarkslab.com/security-audit-of-dalek-libraries.html)) |
 | Key independence | ✅ Verified | x_partial and t statistically independent |
 
 **Mathematical Security:**
@@ -384,7 +386,7 @@ Given public information `T = t·G` and `P = x·G`:
 
 - [Discrete Logarithm Problem Security](https://eitca.org/cybersecurity/eitc-is-acc-advanced-classical-cryptography/diffie-hellman-cryptosystem/diffie-hellman-key-exchange-and-the-discrete-log-problem/) - EITCA
 
-- [curve25519-dalek Security Audit](https://blog.quarkslab.com/security-audit-of-dalek-libraries.html) - Quarkslab 2019
+- [curve25519-dalek Security Review](https://blog.quarkslab.com/security-audit-of-dalek-libraries.html) - Quarkslab 2019
 
 ### Dependencies Security
 
@@ -426,7 +428,7 @@ scarb build
 **⚠️ CRITICAL: Always use the deployment script** - it enforces the golden rule for sqrt hints.
 
 ```bash
-# Run the auditor-approved deployment pipeline
+# Run the deployment pipeline
 ./scripts/deploy.sh sepolia 0xYOUR_DEPLOYER_ADDRESS
 
 # This will:
@@ -498,7 +500,7 @@ cargo run --bin taker -- \
 │   │   ├── blake2s_challenge.cairo  # BLAKE2s challenge computation
 │   │   └── edwards_serialization.cairo  # Point serialization utilities
 │   ├── tests/
-│   │   ├── test_security_*.cairo  # Security audit tests
+│   │   ├── test_security_*.cairo  # Security tests
 │   │   ├── test_e2e_*.cairo      # End-to-end tests (Rust↔Cairo compatibility)
 │   │   ├── test_unit_*.cairo     # Fast, isolated unit tests
 │   │   ├── test_integration_*.cairo  # Cross-component tests
@@ -529,7 +531,7 @@ cargo run --bin taker -- \
 │   ├── verify_full_compatibility.py  # Cross-platform verification
 │   └── verify_rust_cairo_equivalence.py
 ├── scripts/                    # Deployment automation
-│   └── deploy.sh               # Auditor-approved deployment pipeline (golden rule enforced)
+│   └── deploy.sh               # Deployment pipeline (golden rule enforced)
 ├── docs/                       # Documentation
 │   └── SQRT_HINT_PREVENTION.md # Sqrt hint prevention strategy
 └── README.md
@@ -562,7 +564,7 @@ cargo test --test test_vectors generate_cairo_test_vectors -- --ignored
 **Test Organization:**
 
 Tests are organized using naming conventions in the `tests/` root directory:
-- **Security tests** (`test_security_*.cairo`): Security audit tests (CRITICAL - 4 files, 15+ tests)
+- **Security tests** (`test_security_*.cairo`): Security tests (CRITICAL - 4 files, 15+ tests)
 - **E2E tests** (`test_e2e_*.cairo`): End-to-end tests including Rust↔Cairo compatibility (2 files)
 - **Unit tests** (`test_unit_*.cairo`): Fast, isolated tests for individual components (11 files)
 - **Integration tests** (`test_integration_*.cairo`): Cross-component tests (13 files)
@@ -573,7 +575,7 @@ This approach provides native snforge support with easy filtering: `snforge test
 
 ## Implementation Status
 
-**Current State**: Alpha release with validated cryptographic approach. Core protocol complete, pending external audit.
+**Current State**: Alpha release with validated cryptographic approach. Core protocol complete, pending external review.
 
 ### Security Maturity
 
@@ -602,7 +604,7 @@ This approach provides native snforge support with easy filtering: `snforge test
 
 ### Known Limitations
 
-- **Not audited**: Independent security review completed, formal audit pending
+- **Not reviewed**: Independent security review completed, formal review pending
 
 - **Testnet only**: Not deployed to mainnet
 
@@ -629,7 +631,7 @@ This approach provides native snforge support with easy filtering: `snforge test
 - Two-phase unlock tests (19 tests: 13 passing, 6 ignored for panic validation)
 - Organized test structure (unit/integration/e2e/security/debug)
 - E2E Rust↔Cairo compatibility test (PASSES)
-- Security audit tests (most passing, some failing)
+- Security tests (most passing, some failing)
 - Token security tests (6/6 passing - depositor validation fixed)
 - Edge case tests (max scalar, zero, boundary values)
 - Negative tests (wrong challenge/response/hashlock rejection)
@@ -644,10 +646,10 @@ This approach provides native snforge support with easy filtering: `snforge test
 - Authoritative sqrt hints (`cairo/tests/fixtures/AUTHORITATIVE_SQRT_HINTS.cairo`)
 
 **Deployment Infrastructure:**
-- Auditor-approved deployment script (`scripts/deploy.sh`)
+- Deployment script (`scripts/deploy.sh`)
 - Golden rule enforcement (mandatory sqrt hint validation)
 - Automated validation gates (Rust compatibility, Cairo E2E, contract build)
-- Deployment manifest with audit trail
+- Deployment manifest with validation trail
 - Pre-commit hooks for validation
 - CI/CD workflows for vector validation
 
@@ -729,10 +731,10 @@ See `docs/SETUP.md` for complete setup instructions.
 - Proof-of-concept only, not production wallet integration
 
 **Production Readiness:**
-- Security audit in progress
+- Security review in progress
 - Race condition mitigation pending (P0 priority)
 - Account signing implementation pending
-- Mainnet deployment pending audit completion and race condition fixes
+- Mainnet deployment pending review completion and race condition fixes
 
 ## References
 

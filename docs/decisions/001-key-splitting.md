@@ -20,33 +20,33 @@ Use key splitting: `x = x_partial + t`
 
 ### Security
 
-- Uses only audited curve25519-dalek operations
+- Uses only production-grade curve25519-dalek operations
 - No custom cryptographic implementations
-- Matches pattern validated by CypherStack audit of Serai DEX
+- Matches pattern validated by CypherStack review of Serai DEX
 
 ### Simplicity
 
 - Approximately 50 lines of code vs 500+ lines for custom CLSAG
-- Easier to audit and verify
+- Easier to review and verify
 - Clear separation of concerns
 
 ### Precedent
 
-- Serai DEX uses identical pattern (CypherStack audited)
+- Serai DEX uses identical pattern (CypherStack validated)
 - Tari Protocol RFC-0241 documents same approach
-- Pattern validated in Monero community audit
+- Pattern validated in Monero community review
 
 ### No Custom Crypto
 
 - Avoids implementing ring signatures
 - Uses standard Ed25519 operations only
-- All cryptographic primitives from audited libraries
+- All cryptographic primitives from production-grade libraries
 
 ## Consequences
 
 ### Positive
 
-- Simpler codebase, easier to audit
+- Simpler codebase, easier to review
 - No CLSAG modification needed
 - Can use standard Monero wallet software after key recovery
 - Matches industry best practices
@@ -69,7 +69,7 @@ Use key splitting: `x = x_partial + t`
 **Rejected** because:
 - Requires implementing ring signatures (complex)
 - High risk of bugs (InvalidC1 error found in custom implementation)
-- No audited reference implementation
+- No production reference implementation
 - Violates "no custom crypto" principle
 
 ### Two-Party ECDSA
@@ -90,8 +90,8 @@ The key splitting is implemented in `rust/src/monero/key_splitting.rs`:
 
 - Serai DEX: https://github.com/serai-dex/serai
 - Tari RFC-0241: Key splitting pattern
-- Monero Community Audit: https://ccs.getmonero.org/proposals/monero-serai-wallet-audit.html
-- CypherStack Audit Report: Serai DEX security review
+- Monero Community Review: https://ccs.getmonero.org/proposals/monero-serai-wallet-audit.html
+- CypherStack Review Report: Serai DEX security review
 
 ---
 

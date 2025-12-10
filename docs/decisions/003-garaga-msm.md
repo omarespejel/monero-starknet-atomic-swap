@@ -9,7 +9,7 @@ Accepted (2025-12-04)
 On-chain verification of DLEQ proofs requires multiple scalar multiplications (MSM) on Ed25519. Options considered:
 
 1. **Custom MSM implementation**: Implement scalar multiplication from scratch
-2. **Garaga library**: Use audited MSM library for Starknet
+2. **Garaga library**: Use production-grade MSM library for Starknet
 3. **Manual point arithmetic**: Implement point operations manually
 
 ## Decision
@@ -20,7 +20,7 @@ Use Garaga version 1.0.1 for all MSM operations.
 
 ### Security
 
-- Garaga has been audited
+- Garaga is production-grade
 - No custom cryptographic implementations
 - Industry-standard library for Starknet
 
@@ -46,7 +46,7 @@ Use Garaga version 1.0.1 for all MSM operations.
 
 ### Positive
 
-- No custom crypto code to audit
+- No custom crypto code to review
 - Proven, tested implementation
 - Gas-efficient operations
 - Clear separation of concerns
@@ -68,7 +68,7 @@ Use Garaga version 1.0.1 for all MSM operations.
 
 **Rejected** because:
 - High risk of bugs
-- Requires extensive testing and audit
+- Requires extensive testing and review
 - Violates "no custom crypto" principle
 - Significant development time
 

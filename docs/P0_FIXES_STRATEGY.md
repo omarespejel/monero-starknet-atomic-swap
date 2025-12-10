@@ -174,7 +174,7 @@ snforge test test_refund_fails_with_insufficient_balance --exact || exit 1
 # Gate 2: No regressions in passing tests
 echo "✅ Gate 2: No regressions"
 snforge test test_e2e_dleq --exact || exit 1
-snforge test test_security_audit --exact || exit 1
+snforge test test_security --exact || exit 1
 
 # Gate 3: Contract still builds
 echo "✅ Gate 3: Contract builds"
