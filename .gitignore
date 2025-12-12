@@ -49,6 +49,15 @@ context.xml
 context-*.xml
 monero-swap-context-*.txt
 deployments/
+.deployer_key
+.deployerkey
+
+# Node/TypeScript
+node_modules/
+**/node_modules/
+scripts/ts/node_modules/
+scripts/.deployer-key.json
+cairo/.sncast/
 
 # Monero test artifacts
 *.wallet
