@@ -6,9 +6,11 @@ services:
   # Docker provides isolation to avoid antivirus false positives.
   monero-wallet-rpc:
     platform: linux/amd64  # Force x86_64 architecture for Monero binaries
-    build:
-      context: .
-      dockerfile: Dockerfile.wallet-rpc
+    image: espejelomar/monero-wallet-rpc:latest  # Use published Docker Hub image
+    # Alternative: build locally with:
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile.wallet-rpc
     container_name: monero-wallet-rpc
     command:
       - "--stagenet"
