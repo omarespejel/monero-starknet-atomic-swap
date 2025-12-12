@@ -427,6 +427,28 @@ scarb build
 
 **⚠️ CRITICAL: Always use the deployment script** - it enforces the golden rule for sqrt hints.
 
+### Deployment Scripts
+
+Multiple deployment options are available:
+
+```bash
+# Option 1: TypeScript/Bun (Recommended - uses starknet.js v8.9.1)
+cd scripts/ts
+npm install
+npm run deploy
+
+# Option 2: Shell script (with golden rule enforcement)
+./scripts/deploy.sh sepolia 0xYOUR_DEPLOYER_ADDRESS
+
+# Option 3: Python (starknet.py)
+python scripts/deploy_with_starknet_py.py
+
+# Option 4: sncast (Starknet Foundry)
+./scripts/deploy_with_sncast.sh
+```
+
+**Note**: The TypeScript deployment script (`scripts/ts/`) uses `starknet.js v8.9.1` which is compatible with Starknet v0.14.1+ (Blake hash default).
+
 ```bash
 # Run the deployment pipeline
 ./scripts/deploy.sh sepolia 0xYOUR_DEPLOYER_ADDRESS
