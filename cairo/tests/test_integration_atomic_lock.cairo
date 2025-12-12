@@ -361,15 +361,33 @@ mod tests {
         // For now, marked as ignore since deploy_with_full is being removed.
     }
 
-    // NOTE: These constructor validation tests verify correct behavior (constructor rejects invalid inputs),
-    // but snforge 0.53.0 marks them as "failed" due to how it handles constructor panics during deployment.
-    // The panics shown in the output confirm the constructor IS working correctly.
-    // This is a known limitation: #[should_panic] doesn't work for constructor panics in snforge.
+    // ============================================================================
+    // Constructor Validation Tests (snforge #[should_panic] Workaround)
+    // ============================================================================
     //
-    // These tests use `deploy_with_full` to test constructor validation (zero point, wrong hint length, etc.).
-    // These are NOT DLEQ verification tests - they test that the constructor properly rejects invalid inputs.
-    // `deploy_with_full` is kept for these tests as they need to deploy with invalid data to test validation paths.
+    // These tests verify that the constructor correctly rejects invalid inputs with proper
+    // error messages. They are functionally PASSING - the constructor correctly panics
+    // with the expected error messages.
+    //
+    // However, snforge 0.53.0 has a known limitation (issues #4006, #3974) where
+    // #[should_panic] doesn't work for constructor panics during deploy_syscall.
+    // This is aligned with real Starknet network behavior where constructor failures
+    // cannot be caught - the transaction fails immediately.
+    //
+    // Workaround: Mark these tests with #[ignore] and verify manually using grep.
+    // When snforge issue #3974 is resolved, these can be un-ignored.
+    //
+    // Manual validation commands (use --include-ignored to run ignored tests):
+    //   snforge test test_constructor_rejects_zero_point --include-ignored 2>&1 | grep "Zero adaptor point rejected"
+    //   snforge test test_constructor_rejects_wrong_hint_length --include-ignored 2>&1 | grep "Hint must be 10 felts"
+    //   snforge test test_constructor_rejects_mismatched_hint --include-ignored 2>&1 | grep "Hint Q mismatch adaptor"
+    //   snforge test test_constructor_rejects_small_order_point --include-ignored 2>&1 | grep "point not on curve"
+    //
+    // References:
+    //   https://github.com/foundry-rs/starknet-foundry/issues/4006
+    //   https://github.com/foundry-rs/starknet-foundry/issues/3974
 
+    /// Manual validation: `snforge test test_constructor_rejects_zero_point --include-ignored 2>&1 | grep "Zero adaptor point rejected"`
     #[test]
     #[ignore] // snforge 0.53.0 limitation: constructor panics reported as failures
     #[should_panic] // Test is actually passing (constructor rejects correctly)
@@ -377,9 +395,10 @@ mod tests {
         let expected_hash = array![1_u32, 2_u32, 3_u32, 4_u32, 5_u32, 6_u32, 7_u32, 8_u32].span();
         let zero_point = (0, 0, 0, 0);
         let hint = array![0, 0, 0, 0, 0, 0, 0, 0, 0, 0].span();
+        // Use FUTURE_TIMESTAMP to pass timelock validation, so we can test zero point rejection
         deploy_with_full(
             expected_hash,
-            0_u64,
+            FUTURE_TIMESTAMP,
             0.try_into().unwrap(),
             u256 { low: 0, high: 0 },
             zero_point,
@@ -389,6 +408,7 @@ mod tests {
         );
     }
 
+    /// Manual validation: `snforge test test_constructor_rejects_wrong_hint_length 2>&1 | grep "Hint must be 10 felts"`
     #[test]
     #[ignore] // snforge 0.53.0 limitation: constructor panics reported as failures
     #[should_panic] // Test is actually passing (constructor rejects correctly)
@@ -409,6 +429,7 @@ mod tests {
         );
     }
 
+    /// Manual validation: `snforge test test_constructor_rejects_mismatched_hint --include-ignored 2>&1 | grep "Hint Q mismatch adaptor"`
     #[test]
     #[ignore] // snforge 0.53.0 limitation: constructor panics reported as failures
     #[should_panic] // Test is actually passing (constructor rejects correctly)
@@ -424,7 +445,7 @@ mod tests {
         ].span();
         deploy_with_full(
             expected_hash,
-            0_u64,
+            FUTURE_TIMESTAMP,
             0.try_into().unwrap(),
             u256 { low: 0, high: 0 },
             x_limbs,
@@ -519,6 +540,7 @@ mod tests {
         );
     }
 
+    /// Manual validation: `snforge test test_constructor_rejects_small_order_point --include-ignored 2>&1 | grep "point not on curve"`
     #[test]
     #[ignore] // snforge 0.53.0 limitation: constructor panics reported as failures
     #[should_panic] // Test is actually passing (constructor rejects correctly)
@@ -529,7 +551,7 @@ mod tests {
         let hint = array![0, 0, 0, 0, 1, 0, 0, 0, 1, 1].span();
         deploy_with_full(
             expected_hash,
-            0_u64,
+            FUTURE_TIMESTAMP,
             0.try_into().unwrap(),
             u256 { low: 0, high: 0 },
             small_order_x,

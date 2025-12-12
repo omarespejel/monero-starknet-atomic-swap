@@ -1,8 +1,6 @@
-[snfoundry]
-project = "."
+[sncast]
+account = "deployer"
+url = "https://starknet-sepolia.g.alchemy.com/starknet/version/rpc/v0_10/cf52O0RwFy1mEB0uoYsel"
 
-[snforge]
-exit_first = false
-# Uncomment for verbose output
-# output = "detailed"
-
+[sncast.accounts.deployer]
+address = "0x0771d5e7e86ab8324bb10c46e2d0d5a4c1876fe5154b84d46bef3550a9eb8e95"

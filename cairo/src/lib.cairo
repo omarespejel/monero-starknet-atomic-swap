@@ -382,7 +382,7 @@ pub mod AtomicLock {
     ) {
         // Force new class hash via storage write (cannot be optimized away)
         // v3: Blake2s migration fix (Dec 10, 2025) - bumped to avoid CASM hash conflict
-        self.contract_version.write(3);
+        self.contract_version.write(4);
         
         // ========== INPUT VALIDATION ==========
         // INVARIANT: Hashlock must be exactly 8 u32 words (SHA-256 = 32 bytes = 8×u32)
