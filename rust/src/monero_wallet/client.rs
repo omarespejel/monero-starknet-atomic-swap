@@ -330,8 +330,20 @@ impl MoneroWallet {
         }
 
         #[derive(Deserialize)]
-        struct Response<R> {
-            result: R,
+        struct RpcError {
+            code: i32,
+            message: String,
+        }
+
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum JsonRpcResponse<R> {
+            Success {
+                result: R,
+            },
+            Error {
+                error: RpcError,
+            },
         }
 
         let req = Request {
@@ -341,7 +353,7 @@ impl MoneroWallet {
             params,
         };
 
-        let resp: Response<R> = self.http_client
+        let resp: JsonRpcResponse<R> = self.http_client
             .post(&self.wallet_rpc_url)
             .json(&req)
             .send()
@@ -351,7 +363,15 @@ impl MoneroWallet {
             .await
             .context(format!("Failed to parse {} response", method))?;
 
-        Ok(resp.result)
+        match resp {
+            JsonRpcResponse::Success { result } => Ok(result),
+            JsonRpcResponse::Error { error } => {
+                Err(MoneroWalletError::RpcCallFailed(format!(
+                    "RPC error {}: {}",
+                    error.code, error.message
+                )).into())
+            }
+        }
     }
 }
 

@@ -20,7 +20,7 @@ fn piconero_to_xmr(piconero: u64) -> f64 {
 #[tokio::test]
 #[ignore] // Run with: cargo test --test wallet_integration_test -- --ignored
 async fn test_wallet_connection_and_balance() -> Result<()> {
-    tracing_subscriber::fmt::init();
+    let _ = tracing_subscriber::fmt::try_init(); // Try init, ignore if already initialized
 
     println!("🔄 Testing Monero wallet-rpc connection...");
     println!("⚠️  Requirements:");
@@ -63,7 +63,7 @@ async fn test_wallet_connection_and_balance() -> Result<()> {
 #[tokio::test]
 #[ignore]
 async fn test_locked_transaction_creation() -> Result<()> {
-    tracing_subscriber::fmt::init();
+    let _ = tracing_subscriber::fmt::try_init(); // Try init, ignore if already initialized
 
     println!("🔐 Testing locked transaction creation...");
 
@@ -134,7 +134,7 @@ async fn test_locked_transaction_creation() -> Result<()> {
 #[tokio::test]
 #[ignore]
 async fn test_ten_confirmation_safety() -> Result<()> {
-    tracing_subscriber::fmt::init();
+    let _ = tracing_subscriber::fmt::try_init(); // Try init, ignore if already initialized
 
     println!("⏱️  Testing 10-confirmation safety (COMIT standard)...");
     println!("   This will take ~20 minutes (10 blocks × 2 min)");
@@ -147,9 +147,29 @@ async fn test_ten_confirmation_safety() -> Result<()> {
 
     wallet.open_wallet("test123").await?;
 
+    // Check balance first
+    let (balance, unlocked_balance) = wallet.get_balance().await?;
+    println!("💰 Wallet balance: {} XMR (unlocked: {} XMR)", 
+             piconero_to_xmr(balance), piconero_to_xmr(unlocked_balance));
+    
+    if balance == 0 {
+        println!("⚠️  Wallet has 0 balance. Skipping test.");
+        println!("💡 Fund wallet via: https://stagenet-faucet.xmr-tw.org/");
+        println!("   Address: {}", wallet.get_address().await?);
+        return Ok(()); // Skip test if unfunded
+    }
+
     // Create test transaction
     let destination = wallet.get_address().await?;
     let amount_piconero = xmr_to_piconero(0.01);
+    
+    // Ensure we have enough balance
+    if balance < amount_piconero {
+        println!("⚠️  Insufficient balance. Need {} XMR, have {} XMR", 
+                 piconero_to_xmr(amount_piconero), piconero_to_xmr(balance));
+        return Ok(()); // Skip test if insufficient balance
+    }
+    
     let current_height = wallet.get_height().await?;
 
     let result = wallet.transfer_locked(
