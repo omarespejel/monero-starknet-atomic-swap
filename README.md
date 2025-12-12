@@ -539,6 +539,26 @@ cargo run --bin taker -- \
 
 ## Testing
 
+### Quick Start (Recommended)
+
+```bash
+# Run all tests
+./scripts/test.sh
+
+# Run specific test suites
+./scripts/test.sh --security   # Critical security tests
+./scripts/test.sh --e2e        # End-to-end tests
+./scripts/test.sh --monero     # Monero integration tests
+./scripts/test.sh --rust --cairo  # Both Rust and Cairo
+
+# Or use Makefile
+make test              # Run all tests
+make test-security     # Run security tests
+make test-e2e         # Run E2E tests
+```
+
+### Manual Commands
+
 ```bash
 # Run all Cairo tests
 cd cairo
@@ -584,7 +604,7 @@ This approach provides native snforge support with easy filtering: `snforge test
 | Cryptographic soundness | ✅ Validated | Matches Serai DEX (CypherStack audited) |
 | Key splitting security | ✅ Validated | DLP security, independent research confirmed |
 | Timing attack resistance | ✅ Validated | curve25519-dalek (Quarkslab audited) |
-| Test coverage | ✅ Comprehensive | 139 tests (32 Rust + 107 Cairo) |
+| Test coverage | ✅ Comprehensive | 135 tests (22 Rust + 113 Cairo: 83 passing, 16 failing, 14 ignored) |
 | External audit | 🔄 Pending | — |
 | Production deployment | ⬜ Not started | — |
 
