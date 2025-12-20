@@ -12,7 +12,8 @@ pub struct TransferResult {
 /// Transfer information from blockchain
 #[derive(Debug, Clone)]
 pub struct TransferInfo {
-    pub amount: u64, // Amount in piconero
+    pub txid: String,        // Transaction ID
+    pub amount: u64,          // Amount in piconero
     pub confirmations: u64,
     pub height: u64,
     pub unlock_time: u64,

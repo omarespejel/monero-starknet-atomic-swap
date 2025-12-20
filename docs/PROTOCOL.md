@@ -163,11 +163,37 @@ Alice can now spend Monero with full key `x`.
 **Grace Period Purpose:**
 
 The 2-hour grace period allows time for:
-- Monero transaction confirmation (10 blocks ≈ 20 minutes)
+- **Monero transaction finality (10 confirmations ≈ 20 minutes)** - CRITICAL REQUIREMENT
 - Cross-chain verification
 - Watchtower monitoring and alerts
 
 This mitigates race conditions where tokens could be claimed before Monero confirms.
+
+**Monero Finality Requirement:**
+
+Before calling `claim_tokens()`, the Monero transaction MUST have reached **10 confirmations** (approximately 20 minutes at Monero's 2-minute block time). This is enforced by the `wait_for_finality()` helper function in the Rust implementation.
+
+**Why 10 Confirmations?**
+
+- Matches [Monerica recommendation](https://blog.monerica.com/articles/how-many-confirmations-for-monero) for high-value transactions
+- Provides strong reorg resistance (10-block reorg is extremely rare on Monero mainnet)
+- Industry standard used by COMIT Network and UnstoppableSwap for atomic swaps
+- Balances security (reorg resistance) with user experience (reasonable wait time)
+
+**Implementation:**
+
+The `wait_for_finality()` function polls the Monero wallet RPC until the transaction reaches the required confirmations:
+
+```rust
+use xmr_secret_gen::monero::wait_for_default_finality;
+
+// Wait for 10 confirmations (default)
+let transfer_info = wait_for_default_finality(&wallet_client, txid).await?;
+
+// Now safe to call claim_tokens()
+```
+
+**Security Note:** The grace period (2 hours) is longer than the typical confirmation time (20 minutes) to provide additional safety margin and allow for network delays or temporary RPC unavailability.
 
 ## Security Properties
 

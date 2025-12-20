@@ -30,7 +30,7 @@ zeroize = { version = "1.8", features = ["derive"] }
 
 # ===== SERIALIZATION & UTILITIES =====
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde_json = { version = "1", features = ["arbitrary_precision"] }
 hex = "0.4"
 bs58 = "0.5"  # For Monero address encoding
 
@@ -43,6 +43,7 @@ getrandom = "0.2"  # Ensure cryptographically secure randomness
 clap = { version = "4.5", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
 reqwest = { version = "0.12", features = ["json"] }
+async-trait = "0.1"
 
 # ===== ERROR HANDLING =====
 anyhow = "1"
@@ -103,6 +104,9 @@ testcontainers = "0.15"
 # Note: rand 0.8 is in main dependencies, don't duplicate here
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt", "ansi", "env-filter"] }
+# For mocking async traits in tests
+mockall = "0.12"
+tokio-test = "0.4"
 # Note: tarpaulin is installed via cargo, not as a dev-dependency
 # Install with: cargo install cargo-tarpaulin
 # Usage: cargo tarpaulin --out Html --output-dir coverage

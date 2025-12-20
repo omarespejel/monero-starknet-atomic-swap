@@ -10,6 +10,7 @@ pub mod dleq;
 pub mod monero;
 pub mod monero_wallet;
 pub mod starknet;
+pub mod swap;
 // TODO: Uncomment when Poseidon is fully implemented
 // pub mod poseidon;
 

@@ -10,6 +10,7 @@ use std::time::Duration;
 use tokio::time::sleep;
 use tracing::{debug, info};
 
+use crate::monero::finality::MoneroWalletClient;
 use crate::monero_wallet::error::MoneroWalletError;
 use crate::monero_wallet::types::{TransferInfo, TransferResult};
 
@@ -278,6 +279,7 @@ impl MoneroWallet {
         }).await?;
 
         Ok(TransferInfo {
+            txid: txid.to_string(),
             amount: resp.transfer.amount,
             confirmations: resp.transfer.confirmations,
             height: resp.transfer.height,
@@ -372,6 +374,14 @@ impl MoneroWallet {
                 )).into())
             }
         }
+    }
+}
+
+// Implement MoneroWalletClient trait for MoneroWallet
+#[async_trait::async_trait]
+impl MoneroWalletClient for MoneroWallet {
+    async fn get_transfer_by_txid(&self, txid: &str) -> Result<TransferInfo> {
+        self.get_transfer_by_txid(txid).await
     }
 }
 
