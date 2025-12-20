@@ -5,12 +5,14 @@ url = "https://starknet-sepolia.g.alchemy.com/starknet/version/rpc/v0_10/cf52O0R
 [sncast.accounts.deployer]
 address = "0x0771d5e7e86ab8324bb10c46e2d0d5a4c1876fe5154b84d46bef3550a9eb8e95"
 
-# Katana devnet configuration (for local testing with experimental libfuncs)
-[sncast.katana]
+# Devnet configuration (for local testing with experimental libfuncs)
+[sncast.devnet]
 url = "http://127.0.0.1:5050"
-account = "katana0"
+account = "devnet0"
 
-[sncast.accounts.katana0]
-address = "0x127fd5f1fe78a71f8bcd1fec63e3fe2f0486b6ecd5c86a0466c3a21fa5cfcec"
-private_key = "0xc5b2fcab997346f3ea1c00b002ecf6f382c5f9c9659a3894eb783c5320f912"
+[sncast.accounts.devnet0]
+address = "0x0457f25d3942c4caee29add35f30dfc0a8b45c823bf278b57dd0fd411af8d5b6"
+private_key = "0x68824b2eca5e576ae146439bc134c6c0"
 deployed = true
+class_hash = "0x05b4b537eaa2399e3aa99c4e2e0208ebd6c71bc1467938cd52c798c601e43564"
+legacy = false
