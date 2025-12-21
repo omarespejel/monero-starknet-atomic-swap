@@ -18,9 +18,16 @@ DEVNET_CONTAINER_NAME="starknet-devnet"
 DEVNET_URL="http://127.0.0.1:${DEVNET_PORT}"
 SEED="${DEVNET_SEED:-0}"  # Use --seed 0 for deterministic accounts
 
-# Account info for --seed 0 (documented in devnet output)
-DEVNET_ACCOUNT="0x64b48806902a367c8598f4f95c305e8c1a1acba5f082d294a43793113115691"
-DEVNET_PRIVATE_KEY="0x71d7bb07b9a64f6f78ac4c816aff4da9"
+# Account info for --seed 0 (from devnet output)
+# First account (Account 0)
+DEVNET_ACCOUNT_0="0x049a5a5c30836ff78b3f9a2c0868eaabeeb1ca8ea049d2ed435ad42fd6315fba"
+DEVNET_PRIVATE_KEY_0="0x000000000000000000000000000000001e010f076fad70290a3d89c1ec9dd269"
+# Second account (Account 1)
+DEVNET_ACCOUNT_1="0x02af4cdbeb67c938c5fcdb354c5708e7d7c87e6acc868859a011bcb38473fb9e"
+DEVNET_PRIVATE_KEY_1="0x00000000000000000000000000000000e132b5e8842126aa80a5943611177a1c"
+# Legacy variables (use Account 0)
+DEVNET_ACCOUNT="${DEVNET_ACCOUNT_0}"
+DEVNET_PRIVATE_KEY="${DEVNET_PRIVATE_KEY_0}"
 
 # Functions
 print_header() {
@@ -147,9 +154,15 @@ start_devnet() {
         wait_for_devnet
         
         echo ""
-        print_info "Devnet account (seed ${SEED}):"
-        echo "  Address: ${DEVNET_ACCOUNT}"
-        echo "  Private Key: ${DEVNET_PRIVATE_KEY}"
+        print_info "Pre-funded accounts (seed ${SEED}):"
+        echo "  Account 0:"
+        echo "    Address: ${DEVNET_ACCOUNT_0}"
+        echo "    Private Key: ${DEVNET_PRIVATE_KEY_0}"
+        echo "  Account 1:"
+        echo "    Address: ${DEVNET_ACCOUNT_1}"
+        echo "    Private Key: ${DEVNET_PRIVATE_KEY_1}"
+        echo ""
+        print_info "Initial Balance: 1000000000000000000000 WEI and FRI per account"
         echo ""
         print_info "RPC URL: ${DEVNET_URL}"
         print_info "View logs: docker logs -f ${DEVNET_CONTAINER_NAME}"
@@ -260,8 +273,14 @@ Examples:
   DEVNET_SEED=1 $0 start # Start with different seed
 
 Account Info (seed 0):
-  Address: ${DEVNET_ACCOUNT}
-  Private Key: ${DEVNET_PRIVATE_KEY}
+  Account 0:
+    Address: ${DEVNET_ACCOUNT_0}
+    Private Key: ${DEVNET_PRIVATE_KEY_0}
+  Account 1:
+    Address: ${DEVNET_ACCOUNT_1}
+    Private Key: ${DEVNET_PRIVATE_KEY_1}
+  
+  Initial Balance: 1000000000000000000000 WEI and FRI per account
 
 EOF
 }
