@@ -139,9 +139,15 @@ async fn test_address_derivation_integration() -> Result<()> {
     let keys = SwapKeyPair::generate();
     let full_key = keys.partial_key + keys.adaptor_scalar;
     
-    // Derive view key
-    use xmr_secret_gen::monero::transaction::derive_view_key;
-    let view_key = derive_view_key(&full_key);
+    // Derive view key using the same method as claim_monero_after_reveal
+    // We'll use a test view key for this integration test
+    use tiny_keccak::{Hasher, Keccak};
+    let mut keccak = Keccak::v256();
+    keccak.update(&full_key.to_bytes());
+    let mut hash = [0u8; 32];
+    keccak.finalize(&mut hash);
+    use curve25519_dalek::scalar::Scalar;
+    let view_key = Scalar::from_bytes_mod_order(hash);
     
     // Derive address
     let address = derive_stagenet_address(&full_key, &view_key)?;
