@@ -6,9 +6,7 @@
 use proptest::prelude::*;
 use curve25519_dalek::scalar::Scalar;
 use xmr_secret_gen::monero::address::derive_stagenet_address;
-
-// Import derive_view_key from transaction module
-use xmr_secret_gen::monero::transaction;
+use xmr_secret_gen::monero::transaction::derive_view_key;
 
 proptest! {
     /// Property: View key derivation is deterministic

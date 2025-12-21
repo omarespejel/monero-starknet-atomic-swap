@@ -195,7 +195,15 @@ async fn test_step_xmr_confirmed_to_secret_revealed() {
     let result = step(&state, &db, &monero, &starknet, &secret).await.unwrap();
     
     assert!(result.is_some());
-    assert!(matches!(result.unwrap(), SwapState::SecretRevealed { .. }));
+    match result.unwrap() {
+        SwapState::SecretRevealed { 
+            monero_restore_height: _,
+            partial_spend_key: _,
+            claim_destination: _,
+            .. 
+        } => {},
+        _ => panic!("Expected SecretRevealed state"),
+    }
 }
 
 #[tokio::test]

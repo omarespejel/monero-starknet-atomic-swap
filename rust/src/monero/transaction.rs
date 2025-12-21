@@ -27,7 +27,14 @@ use crate::monero_wallet::client::MoneroWallet;
 /// 
 /// This is the standard Monero view key derivation: `view_key = keccak256(spend_key)`
 /// The view key is required by wallet-rpc for wallet operations.
-fn derive_view_key(spend_key: &Scalar) -> Scalar {
+/// Derive Monero view key from spend key (public for testing)
+#[cfg(test)]
+pub fn derive_view_key(spend_key: &Scalar) -> Scalar {
+    derive_view_key_impl(spend_key)
+}
+
+/// Internal implementation
+fn derive_view_key_impl(spend_key: &Scalar) -> Scalar {
     let mut keccak = Keccak::v256();
     keccak.update(&spend_key.to_bytes());
     let mut hash = [0u8; 32];
@@ -80,7 +87,7 @@ pub async fn claim_monero_after_reveal(
     let mut full_key = Zeroizing::new(*x_partial + t);
     
     // Step 2: Derive view key (REQUIRED by wallet-rpc)
-    let mut view_key = derive_view_key(&full_key);
+    let mut view_key = derive_view_key_impl(&full_key);
     
     // Step 3: Derive address from keys (using monero-rs - AUDITOR APPROVED)
     let address = crate::monero::address::derive_stagenet_address(&full_key, &view_key)
