@@ -1,17 +1,19 @@
 //! Monero adaptor signature module for atomic swaps.
 //!
-//! This module implements key splitting and adaptor signature generation
-//! for XMR↔Starknet atomic swaps. The adaptor scalar `t` is the same
-//! scalar used in Cairo's MSM verification (t·G == adaptor_point).
+//! **⚠️ NOTE**: This module contains demo/POC code. For production:
+//! - Use `monero::SwapKeyPair` (key splitting approach) - production ready
+//! - Use `monero-serai` for CLSAG transaction signing - production ready
+//!
+//! The `adaptor_sig` module is kept for backward compatibility with demo code
+//! but should be replaced with `monero-serai` for production transactions.
 
 pub mod adaptor_sig;
-pub mod key_splitting;
 
-// Re-export from monero module (key splitting approach)
+// Re-export from monero module (production key splitting approach)
 pub use crate::monero::SwapKeyPair;
 
-// Legacy exports for backward compatibility (deprecated)
+// Legacy exports for backward compatibility (deprecated - demo only)
+// TODO: Replace with monero-serai for production
 pub use adaptor_sig::{
     create_adaptor_signature, finalize_signature, verify_signature, AdaptorSignature,
 };
-pub use key_splitting::{split_monero_key, KeyPair};

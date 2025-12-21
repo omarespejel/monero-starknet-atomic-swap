@@ -59,7 +59,7 @@ where
     }
 
     let new_state = match state {
-        SwapState::Created { swap_id, lock_duration_secs, amount, hashlock } => {
+        SwapState::Created { swap_id, lock_duration_secs, amount, expected_monero_amount, hashlock } => {
             tracing::info!("[{}] Deploying Starknet contract...", swap_id);
             
             let (contract_address, lock_until) = starknet
@@ -71,6 +71,7 @@ where
                 swap_id: swap_id.clone(),
                 contract_address,
                 lock_until,
+                expected_monero_amount: *expected_monero_amount,
                 hashlock: *hashlock,
             }
         }
@@ -154,13 +155,33 @@ where
 }
 
 /// Resume a swap by providing the XMR transaction ID.
+///
+/// # Security
+/// Validates that the received Monero amount meets or exceeds the expected amount.
+/// This prevents fund loss attacks where an attacker sends less XMR than agreed.
+/// The expected amount is read from the state, ensuring consistency.
+///
+/// # Arguments
+/// * `current` - Current swap state (must be `StarknetLocked`)
+/// * `monero_txid` - Transaction ID of the Monero transfer
+/// * `monero_amount` - Actual amount received (in piconero)
 pub fn resume_with_xmr_txid(
     current: &SwapState,
     monero_txid: String,
     monero_amount: u64,
 ) -> Result<SwapState> {
     match current {
-        SwapState::StarknetLocked { swap_id, contract_address, lock_until, hashlock: _ } => {
+        SwapState::StarknetLocked { swap_id, contract_address, lock_until, expected_monero_amount, hashlock: _ } => {
+            // SECURITY: Validate amount matches expected (from state)
+            if monero_amount < *expected_monero_amount {
+                return Err(anyhow!(
+                    "XMR amount {} piconero is less than expected {} piconero (difference: {} piconero)",
+                    monero_amount,
+                    expected_monero_amount,
+                    expected_monero_amount - monero_amount
+                ));
+            }
+
             Ok(SwapState::XmrSent {
                 swap_id: swap_id.clone(),
                 contract_address: contract_address.clone(),

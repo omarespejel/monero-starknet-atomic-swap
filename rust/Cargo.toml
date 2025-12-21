@@ -7,6 +7,9 @@ description = "Monero key splitting for Starknet atomic swaps"
 [dependencies]
 # ===== MONERO INTEGRATION (COMIT-compatible) =====
 monero = "0.12"
+# TODO: Add monero-serai for production CLSAG transactions (CypherStack audited)
+# Note: Check if available on crates.io or use GitHub dependency
+# monero-serai = "0.1"  # CypherStack audited CLSAG implementation for production transactions
 jsonrpc_client = { version = "0.7", features = ["reqwest"] }
 monero-epee-bin-serde = "1"
 rust_decimal = { version = "1", features = ["serde-float"] }
@@ -48,7 +51,17 @@ async-trait = "0.1"
 # ===== ERROR HANDLING =====
 anyhow = "1"
 thiserror = "1"
-url = "2"
+url = "2.5"
+
+# ===== STARKNET INTEGRATION =====
+# For production (Linux): use official starknet-rs
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+starknet = "0.15"
+
+# For macOS dev: use minimal starknet-ff (no size-of dependency)
+[target.'cfg(target_os = "macos")'.dependencies]
+starknet-ff = "0.3"
+sha3 = "0.10"      # For starknet_keccak selector computation
 
 [features]
 default = []

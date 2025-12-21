@@ -4,6 +4,10 @@
 //! Monero wallet integration. It does not implement full CLSAG (Compact Linkable
 //! Spontaneous Anonymous Group signatures).
 //!
+//! **DEPRECATED**: For production, use:
+//! - `monero::SwapKeyPair` for key splitting (production-ready)
+//! - `monero-serai` crate for CLSAG transaction signing (CypherStack audited)
+//!
 //! This simplified version demonstrates the core concept:
 //! - Create an adaptor signature using base_key + adaptor_point
 //! - When adaptor_scalar `t` is revealed, finalize the signature

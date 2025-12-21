@@ -6,13 +6,14 @@ url = "https://starknet-sepolia.g.alchemy.com/starknet/version/rpc/v0_10/cf52O0R
 address = "0x0771d5e7e86ab8324bb10c46e2d0d5a4c1876fe5154b84d46bef3550a9eb8e95"
 
 # Devnet configuration (for local testing with experimental libfuncs)
+# Uses starknet-devnet-rs which emulates SN_SEPOLIA chain
 [sncast.devnet]
 url = "http://127.0.0.1:5050"
 account = "devnet0"
 
 [sncast.accounts.devnet0]
-address = "0x0457f25d3942c4caee29add35f30dfc0a8b45c823bf278b57dd0fd411af8d5b6"
-private_key = "0x68824b2eca5e576ae146439bc134c6c0"
+address = "0x049a5a5c30836ff78b3f9a2c0868eaabeeb1ca8ea049d2ed435ad42fd6315fba"
+private_key = "0x000000000000000000000000000000001e010f076fad70290a3d89c1ec9dd269"
 deployed = true
 class_hash = "0x05b4b537eaa2399e3aa99c4e2e0208ebd6c71bc1467938cd52c798c601e43564"
 legacy = false

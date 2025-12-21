@@ -6,6 +6,7 @@ fn test_swap_state_serialization() {
         swap_id: "test-123".to_string(),
         lock_duration_secs: 10800,
         amount: 1000000000000000000,
+        expected_monero_amount: 1_000_000_000,
         hashlock: [1, 2, 3, 4, 5, 6, 7, 8],
     };
     let json = serde_json::to_string(&state).unwrap();
@@ -37,6 +38,7 @@ fn test_swap_id_accessor() {
         swap_id: "test-789".to_string(),
         lock_duration_secs: 10800,
         amount: 1000000000000000000,
+        expected_monero_amount: 1_000_000_000,
         hashlock: [1, 2, 3, 4, 5, 6, 7, 8],
     };
     assert_eq!(state.swap_id(), "test-789");
@@ -62,6 +64,7 @@ fn test_is_terminal() {
         swap_id: "test-created".to_string(),
         lock_duration_secs: 10800,
         amount: 1000000000000000000,
+        expected_monero_amount: 1_000_000_000,
         hashlock: [1, 2, 3, 4, 5, 6, 7, 8],
     };
     assert!(!created.is_terminal());
@@ -74,12 +77,14 @@ fn test_all_state_variants_serialize() {
             swap_id: "test1".to_string(),
             lock_duration_secs: 10800,
             amount: 1000,
+            expected_monero_amount: 1_000_000_000,
             hashlock: [1, 2, 3, 4, 5, 6, 7, 8],
         },
         SwapState::StarknetLocked {
             swap_id: "test2".to_string(),
             contract_address: "0xabc".to_string(),
             lock_until: 9999999999,
+            expected_monero_amount: 1_000_000_000,
             hashlock: [1, 2, 3, 4, 5, 6, 7, 8],
         },
         SwapState::XmrSent {

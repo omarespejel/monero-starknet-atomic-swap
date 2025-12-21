@@ -105,6 +105,7 @@ async fn test_step_created_to_starknet_locked() {
         swap_id: "test-1".to_string(),
         lock_duration_secs: 10800,
         amount: 1000000000000000000,
+        expected_monero_amount: 1_000_000_000, // 1 XMR in piconero
         hashlock: [1, 2, 3, 4, 5, 6, 7, 8],
     };
 
@@ -130,6 +131,7 @@ async fn test_step_starknet_locked_returns_none() {
         swap_id: "test-2".to_string(),
         contract_address: "0xabc".to_string(),
         lock_until: 1010800,
+        expected_monero_amount: 1_000_000_000, // 1 XMR in piconero
         hashlock: [1, 2, 3, 4, 5, 6, 7, 8],
     };
 
@@ -144,6 +146,7 @@ async fn test_resume_with_xmr_txid() {
         swap_id: "test-3".to_string(),
         contract_address: "0xabc".to_string(),
         lock_until: 1010800,
+        expected_monero_amount: 1_000_000_000, // 1 XMR in piconero
         hashlock: [1, 2, 3, 4, 5, 6, 7, 8],
     };
 

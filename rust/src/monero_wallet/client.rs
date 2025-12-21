@@ -381,7 +381,8 @@ impl MoneroWallet {
 #[async_trait::async_trait]
 impl MoneroWalletClient for MoneroWallet {
     async fn get_transfer_by_txid(&self, txid: &str) -> Result<TransferInfo> {
-        self.get_transfer_by_txid(txid).await
+        // Use fully qualified syntax to call the inherent method, not the trait method
+        MoneroWallet::get_transfer_by_txid(self, txid).await
     }
 }
 

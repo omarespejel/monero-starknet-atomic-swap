@@ -24,12 +24,14 @@ pub enum SwapState {
         lock_duration_secs: u64,
         #[serde(serialize_with = "serialize_u128_as_string", deserialize_with = "deserialize_u128_from_string")]
         amount: u128,
+        expected_monero_amount: u64, // Expected XMR amount in piconero (for validation)
         hashlock: [u32; 8],
     },
     StarknetLocked {
         swap_id: String,
         contract_address: String,
         lock_until: u64,
+        expected_monero_amount: u64, // Expected XMR amount in piconero (for validation)
         hashlock: [u32; 8],
     },
     XmrSent {
