@@ -6,6 +6,7 @@
 use anyhow::{Context, Result};
 use reqwest::Client as HttpClient;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::time::Duration;
 use tokio::time::sleep;
 use tracing::{debug, info};
@@ -27,6 +28,8 @@ pub struct MoneroWallet {
     daemon_rpc_url: String,
     /// Wallet name (for multi-wallet support)
     wallet_name: String,
+    /// Wallet directory path for file operations
+    wallet_dir: String,
 }
 
 impl MoneroWallet {
@@ -40,6 +43,7 @@ impl MoneroWallet {
         wallet_rpc_url: String,
         daemon_rpc_url: String,
         wallet_name: String,
+        wallet_dir: String,
     ) -> Result<Self> {
         let http_client = HttpClient::builder()
             .timeout(Duration::from_secs(30))
@@ -51,6 +55,7 @@ impl MoneroWallet {
             wallet_rpc_url,
             daemon_rpc_url,
             wallet_name,
+            wallet_dir,
         };
 
         // Verify wallet-rpc is reachable
@@ -315,6 +320,226 @@ impl MoneroWallet {
 
             sleep(Duration::from_secs(120)).await; // ~2 min per block
         }
+    }
+
+    /// Get random outputs for decoy selection (ring members)
+    /// 
+    /// This is used for building ring signatures in Monero transactions.
+    /// The wallet-rpc node must be synced to provide valid outputs.
+    /// 
+    /// # Arguments
+    /// * `amounts` - List of amounts to match (in piconero)
+    /// * `count` - Number of outputs to return per amount (usually 16 for ring size)
+    /// 
+    /// # Returns
+    /// Vector of output information: (amount, global_index, tx_pub_key)
+    pub async fn get_outputs(
+        &self,
+        amounts: Vec<u64>,
+        count: u64,
+    ) -> Result<Vec<serde_json::Value>> {
+        #[derive(Serialize)]
+        struct Params {
+            amounts: Vec<u64>,
+            count: u64,
+        }
+
+        #[derive(Deserialize)]
+        struct Response {
+            #[serde(rename = "outs")]
+            outputs: Vec<serde_json::Value>,
+        }
+
+        let resp: Response = self.call_wallet_rpc("get_outs", Params {
+            amounts,
+            count,
+        }).await?;
+
+        Ok(resp.outputs)
+    }
+
+    /// Generate wallet from spend key (import recovered key)
+    /// 
+    /// This creates a new wallet using the recovered full spend key.
+    /// Used after secret revelation to claim Monero funds.
+    /// 
+    /// # Arguments
+    /// * `spend_key_hex` - Full spend key as hex string (32 bytes)
+    /// * `view_key_hex` - View key as hex string (REQUIRED - derived via keccak256)
+    /// * `address` - Monero address (can be empty, wallet-rpc will generate)
+    /// * `restore_height` - Block height to restore from (optimized, not 0!)
+    /// 
+    /// # Security
+    /// CRITICAL: Both spend key AND view key are REQUIRED by wallet-rpc.
+    /// The spend key must be zeroized after use. This function does NOT handle zeroization.
+    pub async fn generate_from_keys(
+        &self,
+        spend_key_hex: &str,
+        view_key_hex: &str,
+        address: &str,
+        restore_height: u64,
+    ) -> Result<String> {
+        use uuid::Uuid;
+        
+        let wallet_name = format!("swap_{}", Uuid::new_v4());
+        
+        #[derive(Deserialize)]
+        struct Response {
+            address: String,
+        }
+
+        let _resp: Response = self.call_wallet_rpc("generate_from_keys", json!({
+            "filename": wallet_name.clone(),
+            "address": address,
+            "spendkey": spend_key_hex,
+            "viewkey": view_key_hex,    // ✅ REQUIRED - not optional!
+            "password": Uuid::new_v4().to_string(),  // Random password for security
+            "restore_height": restore_height,
+            "autosave_current": false,
+        })).await
+        .context("Failed to generate wallet from keys")?;
+
+        info!(
+            "Generated wallet from keys (restore_height: {}, wallet: {})",
+            restore_height,
+            wallet_name
+        );
+
+        Ok(wallet_name)
+    }
+
+    /// Refresh wallet (sync with blockchain)
+    /// 
+    /// Scans the blockchain for outputs belonging to this wallet.
+    /// Must be called after generating wallet from keys to detect received funds.
+    pub async fn refresh(&self) -> Result<()> {
+        #[derive(Serialize)]
+        struct Params {
+            start_height: u64,
+        }
+
+        #[derive(Deserialize)]
+        struct Response {
+            blocks_fetched: u64,
+            received_money: bool,
+        }
+
+        let resp: Response = self.call_wallet_rpc("refresh", Params {
+            start_height: 0, // Scan from beginning
+        }).await
+        .context("Failed to refresh wallet")?;
+
+        info!(
+            "Wallet refreshed: {} blocks fetched, received_money: {}",
+            resp.blocks_fetched,
+            resp.received_money
+        );
+
+        Ok(())
+    }
+
+    /// Sweep all funds to destination (send entire balance)
+    /// 
+    /// This is the standard way to claim funds after key recovery in atomic swaps.
+    /// Sends all available balance to the destination address.
+    /// 
+    /// # Arguments
+    /// * `destination` - Monero address to send funds to
+    /// 
+    /// # Returns
+    /// Transaction hash of the sweep transaction
+    pub async fn sweep_all(&self, destination: &str) -> Result<String> {
+        #[derive(Serialize)]
+        struct Params {
+            address: String,
+            account_index: u32,
+            subaddr_indices: Vec<u32>,
+            priority: u32,
+            ring_size: u32,
+            get_tx_keys: bool,
+            get_tx_hex: bool,
+        }
+
+        #[derive(Deserialize)]
+        struct Response {
+            tx_hash_list: Vec<String>,
+            tx_key_list: Vec<String>,
+            fee_list: Vec<u64>,
+        }
+
+        let resp: Response = self.call_wallet_rpc("sweep_all", Params {
+            address: destination.to_string(),
+            account_index: 0,
+            subaddr_indices: vec![], // Empty = all subaddresses
+            priority: 1, // Normal priority
+            ring_size: 16, // Standard ring size
+            get_tx_keys: true,
+            get_tx_hex: true,
+        }).await
+        .context("Failed to sweep all funds")?;
+
+        if resp.tx_hash_list.is_empty() {
+            anyhow::bail!("Sweep returned no transactions (no funds to sweep?)");
+        }
+
+        let tx_hash = resp.tx_hash_list[0].clone();
+        info!(
+            "Swept all funds to {}: tx_hash={}, fee={} piconero",
+            destination,
+            tx_hash,
+            resp.fee_list.get(0).copied().unwrap_or(0)
+        );
+
+        Ok(tx_hash)
+    }
+
+    /// Close wallet (cleanup after operations)
+    /// 
+    /// Closes the currently opened wallet. Useful for cleanup after
+    /// temporary wallet operations like claiming funds after key recovery.
+    pub async fn close_wallet(&self) -> Result<()> {
+        let _: serde_json::Value = self.call_wallet_rpc("close_wallet", json!({})).await
+            .context("Failed to close wallet")?;
+
+        info!("Wallet closed successfully");
+        Ok(())
+    }
+
+    /// Securely delete wallet files from disk
+    /// 
+    /// Overwrites wallet files with zeros before deletion to prevent
+    /// recovery of sensitive key material from disk.
+    /// 
+    /// # Arguments
+    /// * `wallet_name` - Name of the wallet to delete
+    pub async fn secure_delete_wallet(&self, wallet_name: &str) -> Result<()> {
+        use std::fs;
+        use std::path::Path;
+        
+        let files = vec![
+            format!("{}/{}", self.wallet_dir, wallet_name),
+            format!("{}/{}.keys", self.wallet_dir, wallet_name),
+            format!("{}/{}.address.txt", self.wallet_dir, wallet_name),
+        ];
+        
+        for path in files {
+            let path_obj = Path::new(&path);
+            if path_obj.exists() {
+                // Overwrite before delete (security)
+                if let Ok(metadata) = fs::metadata(&path) {
+                    let file_size = metadata.len() as usize;
+                    if file_size > 0 {
+                        let zeros = vec![0u8; file_size];
+                        let _ = fs::write(&path, &zeros);
+                    }
+                }
+                let _ = fs::remove_file(&path);
+                debug!("Securely deleted wallet file: {}", path);
+            }
+        }
+        
+        info!("Securely deleted wallet: {}", wallet_name);
+        Ok(())
     }
 
     /// Generic JSON-RPC call helper

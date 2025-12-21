@@ -5,11 +5,12 @@ edition = "2021"
 description = "Monero key splitting for Starknet atomic swaps"
 
 [dependencies]
-# ===== MONERO INTEGRATION (COMIT-compatible) =====
-monero = "0.12"
-# TODO: Add monero-serai for production CLSAG transactions (CypherStack audited)
-# Note: Check if available on crates.io or use GitHub dependency
-# monero-serai = "0.1"  # CypherStack audited CLSAG implementation for production transactions
+# ===== MONERO INTEGRATION =====
+# Note: monero-oxide is for parsing/verification, not signing.
+# We use wallet-rpc's battle-tested operations instead (auditor-approved approach).
+
+# For wallet RPC communication (monitoring, decoy selection)
+monero = "0.12"  # Types only
 jsonrpc_client = { version = "0.7", features = ["reqwest"] }
 monero-epee-bin-serde = "1"
 rust_decimal = { version = "1", features = ["serde-float"] }
@@ -29,6 +30,8 @@ curve25519-dalek = { version = "4.1", features = ["serde"] }
 blake2 = "0.10"
 sha2 = "0.10"
 keccak = "0.1"    # For Monero's Keccak256 (NOT SHA3!)
+tiny-keccak = { version = "2.0", features = ["keccak"] }  # For view key derivation
+uuid = { version = "1.0", features = ["v4"] }  # For wallet name generation
 zeroize = { version = "1.8", features = ["derive"] }
 
 # ===== SERIALIZATION & UTILITIES =====

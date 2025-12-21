@@ -9,6 +9,7 @@ async fn test_wait_for_finality_live_stagenet() {
         "http://localhost:38088/json_rpc".to_string(),
         "http://localhost:38081/json_rpc".to_string(),
         "test_wallet".to_string(),
+        "./wallets".to_string(),
     )
     .await
     .expect("Failed to create Monero wallet client");

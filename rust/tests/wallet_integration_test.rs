@@ -32,6 +32,7 @@ async fn test_wallet_connection_and_balance() -> Result<()> {
         "http://localhost:38088/json_rpc".to_string(),
         "http://stagenet.xmr-tw.org:38081".to_string(),
         "atomic-swap-test".to_string(),
+        "./wallets".to_string(),
     ).await?;
 
     // Create or open wallet
@@ -71,6 +72,7 @@ async fn test_locked_transaction_creation() -> Result<()> {
         "http://localhost:38088/json_rpc".to_string(),
         "http://stagenet.xmr-tw.org:38081".to_string(),
         "atomic-swap-test".to_string(),
+        "./wallets".to_string(),
     ).await?;
 
     wallet.open_wallet("test123").await?;
@@ -143,6 +145,7 @@ async fn test_ten_confirmation_safety() -> Result<()> {
         "http://localhost:38088/json_rpc".to_string(),
         "http://stagenet.xmr-tw.org:38081".to_string(),
         "atomic-swap-test".to_string(),
+        "./wallets".to_string(),
     ).await?;
 
     wallet.open_wallet("test123").await?;
