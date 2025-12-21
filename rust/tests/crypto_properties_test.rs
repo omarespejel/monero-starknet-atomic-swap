@@ -6,7 +6,17 @@
 use proptest::prelude::*;
 use curve25519_dalek::scalar::Scalar;
 use xmr_secret_gen::monero::address::derive_stagenet_address;
-use xmr_secret_gen::monero::transaction::derive_view_key;
+
+// Use direct implementation for property tests (derive_view_key is test-only)
+use tiny_keccak::{Hasher, Keccak};
+
+fn derive_view_key_for_test(spend_key: &Scalar) -> Scalar {
+    let mut keccak = Keccak::v256();
+    keccak.update(&spend_key.to_bytes());
+    let mut hash = [0u8; 32];
+    keccak.finalize(&mut hash);
+    Scalar::from_bytes_mod_order(hash)
+}
 
 proptest! {
     /// Property: View key derivation is deterministic
@@ -19,8 +29,8 @@ proptest! {
     ) {
         let spend_key = Scalar::from_bytes_mod_order(spend_key_bytes);
         
-        let view1 = transaction::derive_view_key(&spend_key);
-        let view2 = transaction::derive_view_key(&spend_key);
+        let view1 = derive_view_key_for_test(&spend_key);
+        let view2 = derive_view_key_for_test(&spend_key);
         
         prop_assert_eq!(view1.to_bytes(), view2.to_bytes(), 
             "View key derivation must be deterministic");
@@ -80,7 +90,7 @@ proptest! {
         spend_key_bytes in prop::array::uniform32(any::<u8>())
     ) {
         let spend_key = Scalar::from_bytes_mod_order(spend_key_bytes);
-        let view_key = transaction::derive_view_key(&spend_key);
+        let view_key = derive_view_key_for_test(&spend_key);
         
         // Verify it's a valid scalar (can be used in operations)
         let _ = Scalar::from_bytes_mod_order(view_key.to_bytes());

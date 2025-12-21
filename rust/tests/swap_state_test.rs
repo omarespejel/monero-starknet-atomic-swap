@@ -41,6 +41,7 @@ fn test_swap_id_accessor() {
         amount: 1000000000000000000,
         expected_monero_amount: 1_000_000_000,
         hashlock: [1, 2, 3, 4, 5, 6, 7, 8],
+        monero_restore_height: Some(1000),
     };
     assert_eq!(state.swap_id(), "test-789");
 }
@@ -67,6 +68,7 @@ fn test_is_terminal() {
         amount: 1000000000000000000,
         expected_monero_amount: 1_000_000_000,
         hashlock: [1, 2, 3, 4, 5, 6, 7, 8],
+        monero_restore_height: Some(1000),
     };
     assert!(!created.is_terminal());
 }
@@ -80,6 +82,7 @@ fn test_all_state_variants_serialize() {
             amount: 1000,
             expected_monero_amount: 1_000_000_000,
             hashlock: [1, 2, 3, 4, 5, 6, 7, 8],
+            monero_restore_height: Some(1000),
         },
         SwapState::StarknetLocked {
             swap_id: "test2".to_string(),
