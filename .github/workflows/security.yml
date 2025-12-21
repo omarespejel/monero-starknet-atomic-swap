@@ -1,0 +1,36 @@
+name: Security Audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '0 0 * * *'  # Daily at midnight UTC
+
+jobs:
+  audit:
+    name: Cargo Security Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Install cargo-audit
+        run: |
+          cargo install cargo-audit --version 0.19.0
+      
+      - name: Run cargo audit
+        working-directory: rust
+        run: |
+          cargo audit --deny warnings
+      
+      - name: Check for known vulnerabilities
+        working-directory: rust
+        run: |
+          cargo audit --version || echo "cargo-audit installed"
+          cargo audit || echo "Audit completed (may have found issues)"
+
