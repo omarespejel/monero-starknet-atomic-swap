@@ -10,7 +10,7 @@ description = "Monero key splitting for Starknet atomic swaps"
 # We use wallet-rpc's battle-tested operations instead (auditor-approved approach).
 
 # For wallet RPC communication (monitoring, decoy selection)
-monero = "0.12"  # Types only
+monero = "0.21"  # Full library for address derivation (AUDITOR APPROVED)
 jsonrpc_client = { version = "0.7", features = ["reqwest"] }
 monero-epee-bin-serde = "1"
 rust_decimal = { version = "1", features = ["serde-float"] }

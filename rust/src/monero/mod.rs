@@ -10,6 +10,7 @@ pub mod key_splitting;
 pub mod transaction;
 pub mod decoy_selection;
 pub mod finality;
+pub mod address;
 
 // Re-export main types
 pub use key_splitting::SwapKeyPair;
@@ -22,3 +23,4 @@ pub use finality::{
 };
 pub use transaction::claim_monero_after_reveal;
 pub use decoy_selection::{fetch_decoys, fetch_decoys_batch};
+pub use address::{derive_stagenet_address, derive_mainnet_address};

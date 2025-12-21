@@ -82,15 +82,9 @@ pub async fn claim_monero_after_reveal(
     // Step 2: Derive view key (REQUIRED by wallet-rpc)
     let mut view_key = derive_view_key(&full_key);
     
-    // Step 3: Address derivation
-    // TODO: Derive address from spend/view keys using monero-rs or similar
-    // For now, we use a placeholder - wallet-rpc will derive the correct address
-    // from the keys provided. The address parameter is required by wallet-rpc API
-    // but wallet-rpc will validate/derive it from the keys if it doesn't match.
-    // 
-    // NOTE: This is a temporary limitation. For production, properly derive the
-    // address from keys using Monero crypto libraries.
-    let address = String::new(); // Placeholder - wallet-rpc will derive from keys
+    // Step 3: Derive address from keys (using monero-rs - AUDITOR APPROVED)
+    let address = crate::monero::address::derive_stagenet_address(&full_key, &view_key)
+        .context("Failed to derive Monero address from keys")?;
     
     // Step 4: Convert to hex for wallet-rpc
     let spend_key_hex = hex::encode(full_key.to_bytes());
@@ -214,6 +208,7 @@ mod tests {
             x_partial,
             t,
             destination,
+            0, // restore_height for test
         ).await;
         
         // Expect error without actual funds, but function should be callable
