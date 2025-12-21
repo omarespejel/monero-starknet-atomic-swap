@@ -9,14 +9,11 @@
 //! Run with: cargo test --test e2e_full_swap_test -- --ignored --nocapture
 
 use anyhow::Result;
-use curve25519_dalek::scalar::Scalar;
 use sha2::{Digest, Sha256};
-use zeroize::Zeroizing;
 use xmr_secret_gen::monero::SwapKeyPair;
 use xmr_secret_gen::monero::address::derive_stagenet_address;
 use xmr_secret_gen::swap::{
     SwapState,
-    handle_secret_revealed,
     get_current_monero_height,
 };
 use xmr_secret_gen::monero_wallet::client::MoneroWallet;

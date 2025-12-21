@@ -150,6 +150,7 @@ async fn test_resume_with_xmr_txid() {
         lock_until: 1010800,
         expected_monero_amount: 1_000_000_000, // 1 XMR in piconero
         hashlock: [1, 2, 3, 4, 5, 6, 7, 8],
+        monero_restore_height: Some(1000),
     };
 
     let new_state = resume_with_xmr_txid(&state, "monero_txid_123".to_string(), 1_000_000_000).unwrap();
