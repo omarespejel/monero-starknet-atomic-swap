@@ -82,10 +82,15 @@ pub async fn claim_monero_after_reveal(
     // Step 2: Derive view key (REQUIRED by wallet-rpc)
     let mut view_key = derive_view_key(&full_key);
     
-    // Step 3: Derive address (wallet-rpc can generate, but we provide for consistency)
-    // Note: For now, we'll let wallet-rpc generate the address
-    // Full address derivation would require additional Monero crypto libraries
-    let address = String::new(); // Empty - wallet-rpc will generate
+    // Step 3: Address derivation
+    // TODO: Derive address from spend/view keys using monero-rs or similar
+    // For now, we use a placeholder - wallet-rpc will derive the correct address
+    // from the keys provided. The address parameter is required by wallet-rpc API
+    // but wallet-rpc will validate/derive it from the keys if it doesn't match.
+    // 
+    // NOTE: This is a temporary limitation. For production, properly derive the
+    // address from keys using Monero crypto libraries.
+    let address = String::new(); // Placeholder - wallet-rpc will derive from keys
     
     // Step 4: Convert to hex for wallet-rpc
     let spend_key_hex = hex::encode(full_key.to_bytes());

@@ -7,7 +7,7 @@ async fn test_wait_for_finality_live_stagenet() {
     // Requires wallet-rpc running on stagenet with a known confirmed tx
     let client = MoneroWallet::new(
         "http://localhost:38088/json_rpc".to_string(),
-        "http://localhost:38081/json_rpc".to_string(),
+        "http://stagenet.xmr-tw.org:38081/json_rpc".to_string(),
         "test_wallet".to_string(),
         "./wallets".to_string(),
     )

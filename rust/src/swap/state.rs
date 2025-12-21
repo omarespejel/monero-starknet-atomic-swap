@@ -26,6 +26,7 @@ pub enum SwapState {
         amount: u128,
         expected_monero_amount: u64, // Expected XMR amount in piconero (for validation)
         hashlock: [u32; 8],
+        monero_restore_height: Option<u64>, // Monero block height when swap was initiated (for optimized sync)
     },
     StarknetLocked {
         swap_id: String,
@@ -33,6 +34,7 @@ pub enum SwapState {
         lock_until: u64,
         expected_monero_amount: u64, // Expected XMR amount in piconero (for validation)
         hashlock: [u32; 8],
+        monero_restore_height: Option<u64>, // Monero block height when swap was initiated (for optimized sync)
     },
     XmrSent {
         swap_id: String,
@@ -51,6 +53,9 @@ pub enum SwapState {
         swap_id: String,
         contract_address: String,
         reveal_timestamp: u64,
+        monero_restore_height: Option<u64>, // Monero block height when swap was initiated (for optimized sync)
+        partial_spend_key: Option<[u8; 32]>, // Partial spend key (x_partial) for claiming Monero
+        claim_destination: Option<String>, // Monero address to claim funds to
     },
     Completed {
         swap_id: String,

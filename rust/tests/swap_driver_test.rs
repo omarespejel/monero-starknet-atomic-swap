@@ -107,6 +107,7 @@ async fn test_step_created_to_starknet_locked() {
         amount: 1000000000000000000,
         expected_monero_amount: 1_000_000_000, // 1 XMR in piconero
         hashlock: [1, 2, 3, 4, 5, 6, 7, 8],
+        monero_restore_height: Some(1000),
     };
 
     let result = step(&initial, &db, &monero, &starknet, &secret).await.unwrap();
@@ -133,6 +134,7 @@ async fn test_step_starknet_locked_returns_none() {
         lock_until: 1010800,
         expected_monero_amount: 1_000_000_000, // 1 XMR in piconero
         hashlock: [1, 2, 3, 4, 5, 6, 7, 8],
+        monero_restore_height: Some(1000),
     };
 
     // Should return None (waiting for XMR txid)
@@ -207,6 +209,9 @@ async fn test_step_secret_revealed_waits_for_grace_period() {
         swap_id: "test-6".to_string(),
         contract_address: "0xabc".to_string(),
         reveal_timestamp: 1000000, // Same as current time
+        monero_restore_height: Some(1000),
+        partial_spend_key: None,
+        claim_destination: None,
     };
 
     // Should return None (still in grace period)
@@ -225,6 +230,9 @@ async fn test_step_secret_revealed_to_completed() {
         swap_id: "test-7".to_string(),
         contract_address: "0xabc".to_string(),
         reveal_timestamp: 1000000,
+        monero_restore_height: Some(1000),
+        partial_spend_key: None,
+        claim_destination: None,
     };
 
     let result = step(&state, &db, &monero, &starknet, &secret).await.unwrap();

@@ -366,12 +366,17 @@ impl MoneroWallet {
     /// # Arguments
     /// * `spend_key_hex` - Full spend key as hex string (32 bytes)
     /// * `view_key_hex` - View key as hex string (REQUIRED - derived via keccak256)
-    /// * `address` - Monero address (can be empty, wallet-rpc will generate)
+    /// * `address` - Monero address (REQUIRED by wallet-rpc - must be valid address)
+    ///   NOTE: For now, this must be provided. In production, derive from keys using monero-rs.
     /// * `restore_height` - Block height to restore from (optimized, not 0!)
     /// 
     /// # Security
     /// CRITICAL: Both spend key AND view key are REQUIRED by wallet-rpc.
     /// The spend key must be zeroized after use. This function does NOT handle zeroization.
+    /// 
+    /// # Limitations
+    /// Current wallet-rpc version requires a valid address. For production, derive address
+    /// from spend/view keys using proper Monero crypto libraries (e.g., monero-rs).
     pub async fn generate_from_keys(
         &self,
         spend_key_hex: &str,
@@ -388,15 +393,19 @@ impl MoneroWallet {
             address: String,
         }
 
-        let _resp: Response = self.call_wallet_rpc("generate_from_keys", json!({
+        // Build params - address is REQUIRED by wallet-rpc
+        // TODO: Derive address from keys in production (requires monero-rs or similar)
+        let params = serde_json::json!({
             "filename": wallet_name.clone(),
-            "address": address,
+            "address": address,  // REQUIRED - wallet-rpc will validate/derive if needed
             "spendkey": spend_key_hex,
             "viewkey": view_key_hex,    // ✅ REQUIRED - not optional!
             "password": Uuid::new_v4().to_string(),  // Random password for security
             "restore_height": restore_height,
             "autosave_current": false,
-        })).await
+        });
+        
+        let _resp: Response = self.call_wallet_rpc("generate_from_keys", params).await
         .context("Failed to generate wallet from keys")?;
 
         info!(

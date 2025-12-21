@@ -2,11 +2,13 @@
 
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
-use std::time::Duration;
 
 use super::state::SwapState;
 use super::db::SwapDb;
-use crate::monero::{wait_for_finality, MoneroWalletClient, DEFAULT_CONFIRMATIONS, DEFAULT_POLL_INTERVAL_SECS};
+use crate::monero::{wait_for_finality, MoneroWalletClient, DEFAULT_CONFIRMATIONS, DEFAULT_POLL_INTERVAL_SECS, claim_monero_after_reveal};
+use crate::monero_wallet::MoneroWallet;
+use curve25519_dalek::scalar::Scalar;
+use zeroize::Zeroizing;
 
 /// Trait for Starknet operations (enables mocking).
 #[async_trait]
@@ -59,7 +61,7 @@ where
     }
 
     let new_state = match state {
-        SwapState::Created { swap_id, lock_duration_secs, amount, expected_monero_amount, hashlock } => {
+        SwapState::Created { swap_id, lock_duration_secs, amount, expected_monero_amount, hashlock, monero_restore_height } => {
             tracing::info!("[{}] Deploying Starknet contract...", swap_id);
             
             let (contract_address, lock_until) = starknet
@@ -73,6 +75,7 @@ where
                 lock_until,
                 expected_monero_amount: *expected_monero_amount,
                 hashlock: *hashlock,
+                monero_restore_height: *monero_restore_height,
             }
         }
 
@@ -113,14 +116,20 @@ where
 
             let reveal_timestamp = starknet.get_block_timestamp().await?;
 
+            // Note: partial_spend_key and claim_destination should be set by caller
+            // when creating the swap. For now, we'll use None and require them to be set
+            // before claiming Monero.
             SwapState::SecretRevealed {
                 swap_id: swap_id.clone(),
                 contract_address: contract_address.clone(),
                 reveal_timestamp,
+                monero_restore_height: None, // Should be preserved from earlier states
+                partial_spend_key: None, // Must be set before claiming
+                claim_destination: None, // Must be set before claiming
             }
         }
 
-        SwapState::SecretRevealed { swap_id, contract_address, reveal_timestamp } => {
+        SwapState::SecretRevealed { swap_id, contract_address, reveal_timestamp, .. } => {
             let now = starknet.get_block_timestamp().await?;
             
             if now < reveal_timestamp + GRACE_PERIOD_SECS {
@@ -171,7 +180,7 @@ pub fn resume_with_xmr_txid(
     monero_amount: u64,
 ) -> Result<SwapState> {
     match current {
-        SwapState::StarknetLocked { swap_id, contract_address, lock_until, expected_monero_amount, hashlock: _ } => {
+        SwapState::StarknetLocked { swap_id, contract_address, lock_until, expected_monero_amount, hashlock: _, .. } => {
             // SECURITY: Validate amount matches expected (from state)
             if monero_amount < *expected_monero_amount {
                 return Err(anyhow!(
@@ -231,5 +240,113 @@ async fn handle_refund<S: StarknetClient>(state: &SwapState, starknet: &S) -> Re
         reason: "Timeout exceeded".to_string(),
         refund_tx: Some(refund_tx),
     })
+}
+
+/// Handle secret revealed and claim Monero funds.
+///
+/// This function should be called when the secret `t` is revealed on Starknet.
+/// It recovers the full Monero spend key and claims the funds.
+///
+/// # Arguments
+/// * `state` - Current swap state (must be `SecretRevealed`)
+/// * `revealed_t_bytes` - The revealed secret `t` as bytes (from Starknet)
+/// * `wallet_rpc_url` - Monero wallet-rpc URL
+/// * `daemon_rpc_url` - Monero daemon RPC URL
+/// * `wallet_dir` - Directory for temporary wallet files
+///
+/// # Returns
+/// Transaction hash of the Monero claim transaction
+pub async fn handle_secret_revealed(
+    state: &SwapState,
+    revealed_t_bytes: [u8; 32],
+    wallet_rpc_url: &str,
+    daemon_rpc_url: &str,
+    wallet_dir: &str,
+) -> Result<String> {
+    let (swap_id, partial_spend_key, claim_destination, restore_height) = match state {
+        SwapState::SecretRevealed {
+            swap_id,
+            partial_spend_key: Some(key),
+            claim_destination: Some(dest),
+            monero_restore_height,
+            ..
+        } => (
+            swap_id.clone(),
+            *key,
+            dest.clone(),
+            monero_restore_height.unwrap_or(0),
+        ),
+        SwapState::SecretRevealed { swap_id, .. } => {
+            return Err(anyhow!(
+                "[{}] Cannot claim Monero: missing partial_spend_key or claim_destination",
+                swap_id
+            ));
+        }
+        _ => {
+            return Err(anyhow!(
+                "Can only claim Monero from SecretRevealed state, got {:?}",
+                state
+            ));
+        }
+    };
+
+    // 1. Convert revealed bytes to Scalar
+    let t = Scalar::from_bytes_mod_order(revealed_t_bytes);
+
+    // 2. Get partial key from swap state
+    let x_partial = Zeroizing::new(Scalar::from_bytes_mod_order(partial_spend_key));
+
+    // 3. Create wallet client
+    let wallet = MoneroWallet::new(
+        wallet_rpc_url.to_string(),
+        daemon_rpc_url.to_string(),
+        format!("swap_{}", swap_id),
+        wallet_dir.to_string(),
+    )
+    .await
+    .context("Failed to create Monero wallet client")?;
+
+    // 4. Claim Monero funds
+    let tx_hash = claim_monero_after_reveal(
+        &wallet,
+        x_partial,
+        t,
+        &claim_destination,
+        restore_height,
+    )
+    .await
+    .context("Failed to claim Monero funds")?;
+
+    tracing::info!("[{}] Monero funds claimed: tx_hash={}", swap_id, tx_hash);
+
+    Ok(tx_hash)
+}
+
+/// Get current Monero block height from daemon.
+///
+/// Returns the current block height minus a safety margin (10 blocks ≈ 20 minutes).
+/// This is used as the restore_height for optimized wallet sync.
+pub async fn get_current_monero_height(daemon_url: &str) -> Result<u64> {
+    let client = reqwest::Client::new();
+    let resp: serde_json::Value = client
+        .post(daemon_url)
+        .json(&serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": "0",
+            "method": "get_block_count"
+        }))
+        .send()
+        .await
+        .context("Failed to query Monero daemon")?
+        .json()
+        .await
+        .context("Failed to parse daemon response")?;
+
+    let height = resp["result"]["count"]
+        .as_u64()
+        .context("Failed to get block count from daemon response")?;
+
+    // Subtract safety margin (10 blocks ≈ 20 minutes)
+    Ok(height.saturating_sub(10))
 }
 

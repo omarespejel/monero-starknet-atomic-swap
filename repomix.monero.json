@@ -60,6 +60,7 @@
     "rust/tests/swap_security_test.rs",
     "rust/tests/devnet_e2e_test.rs",
     "rust/tests/edge_cases_test.rs",
+    "rust/tests/wallet_rpc_manual_test.rs",
     "rust/tests/helpers/monero_wallet.rs",
     "rust/tests/wallet_integration_test.rs",
     "rust/test_vectors.json",

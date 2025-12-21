@@ -95,6 +95,7 @@ async fn test_timeout_triggers_refund_from_starknet_locked() {
         lock_until: 1000, // Expired!
         expected_monero_amount: 1_000_000_000,
         hashlock: [0u32; 8],
+        monero_restore_height: Some(1000),
     };
 
     let mut mock_monero = MockMonero::new();
@@ -176,6 +177,9 @@ async fn test_claim_before_grace_period_fails() {
         swap_id: "test".to_string(),
         contract_address: "0x123".to_string(),
         reveal_timestamp,
+        monero_restore_height: Some(1000),
+        partial_spend_key: None,
+        claim_destination: None,
     };
 
     let mut mock_monero = MockMonero::new();
@@ -214,6 +218,9 @@ async fn test_claim_after_grace_period_succeeds() {
         swap_id: "test".to_string(),
         contract_address: "0x123".to_string(),
         reveal_timestamp,
+        monero_restore_height: Some(1000),
+        partial_spend_key: None,
+        claim_destination: None,
     };
 
     let mut mock_monero = MockMonero::new();
@@ -254,6 +261,7 @@ async fn test_refund_before_timeout_fails() {
         lock_until,
         expected_monero_amount: 1_000_000_000,
         hashlock: [0u32; 8],
+        monero_restore_height: Some(1000),
     };
 
     let mut mock_monero = MockMonero::new();
@@ -339,6 +347,7 @@ async fn test_state_machine_cannot_skip_states() {
         amount: 1000,
         expected_monero_amount: 1_000_000_000,
         hashlock: [0u32; 8],
+        monero_restore_height: Some(1000),
     };
 
     let secret = [0u8; 32];
@@ -369,6 +378,7 @@ fn test_resume_rejects_insufficient_amount() {
         lock_until: 9999999,
         expected_monero_amount: 10_000_000_000, // 10 XMR in piconero
         hashlock: [0u32; 8],
+        monero_restore_height: Some(1000),
     };
 
     let actual_amount = 1_000_000; // 0.001 XMR (insufficient!)
@@ -390,6 +400,7 @@ fn test_resume_accepts_sufficient_amount() {
         lock_until: 9999999,
         expected_monero_amount: 10_000_000_000, // 10 XMR in piconero
         hashlock: [0u32; 8],
+        monero_restore_height: Some(1000),
     };
 
     let actual_amount = 10_000_000_000; // Exactly 10 XMR (sufficient)
