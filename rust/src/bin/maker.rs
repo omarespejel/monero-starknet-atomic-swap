@@ -13,7 +13,8 @@ use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::scalar::Scalar;
 use serde_json::json;
 use std::path::PathBuf;
-use xmr_secret_gen::adaptor::{create_adaptor_signature, split_monero_key};
+use xmr_secret_gen::adaptor::create_adaptor_signature;
+use xmr_secret_gen::monero::SwapKeyPair;
 use xmr_secret_gen::{
     generate_swap_secret,
     starknet::StarknetClient,

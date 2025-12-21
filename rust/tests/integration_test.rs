@@ -8,7 +8,7 @@ use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::scalar::Scalar;
 use sha2::{Digest, Sha256};
 use xmr_secret_gen::adaptor::{
-    create_adaptor_signature, finalize_signature, split_monero_key, verify_signature,
+    create_adaptor_signature, finalize_signature, verify_signature,
 };
 use xmr_secret_gen::generate_swap_secret;
 
@@ -29,11 +29,13 @@ fn test_full_swap_round() {
     let full_monero_key = Scalar::from_bytes_mod_order([0x42u8; 32]);
 
     // Create key pair with the same adaptor_scalar that Cairo will use
+    // Use SwapKeyPair from monero module (production approach)
+    use xmr_secret_gen::monero::SwapKeyPair;
     let base_key = full_monero_key - adaptor_scalar;
-    let key_pair = xmr_secret_gen::adaptor::KeyPair {
-        base_key,
-        adaptor_scalar,
-    };
+    // Note: SwapKeyPair::generate() creates a new pair, so we construct manually for this test
+    let partial_key = base_key;
+    let adaptor_point = &adaptor_scalar * &ED25519_BASEPOINT_POINT;
+    let public_key = &full_monero_key * &ED25519_BASEPOINT_POINT;
 
     // ========== STEP 2: Create adaptor point (goes to Cairo) ==========
     let adaptor_point = &adaptor_scalar * &ED25519_BASEPOINT_POINT;
@@ -45,7 +47,7 @@ fn test_full_swap_round() {
 
     // ========== STEP 3: Create adaptor signature (Monero side) ==========
     let message = b"Monero transaction to be signed";
-    let adaptor_sig = create_adaptor_signature(&key_pair.base_key, &adaptor_point, message);
+    let adaptor_sig = create_adaptor_signature(&partial_key, &adaptor_point, message);
 
     // ========== STEP 4: Simulate Starknet unlock ==========
     // On Starknet, Alice calls verify_and_unlock(secret)

@@ -105,6 +105,24 @@ test-e2e:
 	@echo "Running end-to-end tests..."
 	cd cairo && snforge test e2e -v
 
+# Devnet management
+devnet-start:
+	@echo "Starting Starknet devnet..."
+	./scripts/devnet.sh start
+
+devnet-stop:
+	@echo "Stopping Starknet devnet..."
+	./scripts/devnet.sh stop
+
+devnet-status:
+	@./scripts/devnet.sh status
+
+devnet-logs:
+	@./scripts/devnet.sh logs
+
+devnet-test:
+	@./scripts/devnet.sh test
+
 # Linting
 lint:
 	@echo "Running linters..."

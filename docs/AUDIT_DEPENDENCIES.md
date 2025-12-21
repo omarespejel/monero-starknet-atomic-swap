@@ -62,11 +62,11 @@ This codebase uses **audited cryptographic libraries** for all critical operatio
 ### `rust/src/adaptor/adaptor_sig.rs`
 - **Status**: Demo/POC only
 - **Warning**: Does not implement full CLSAG
-- **Production replacement**: Use `monero-serai` (when available) or `monero::SwapKeyPair` (key splitting approach)
+- **Production replacement**: Use `monero-oxide` or `monero::SwapKeyPair` (key splitting approach)
 
 ### `rust/src/bin/maker.rs`
 - Uses demo `adaptor_sig` module
-- **TODO**: Update to use `monero::SwapKeyPair` + `monero-serai` for production
+- **TODO**: Update to use `monero::SwapKeyPair` + `monero-oxide` for production
 
 ---
 
@@ -94,19 +94,43 @@ sha3 = "0.10"
 
 ---
 
-## Missing Production Dependencies
+## Monero Transaction Signing
 
-### Monero Transaction Signing
-- **Status**: TODO
-- **Recommended**: `monero-serai` (CypherStack audited CLSAG implementation)
-- **Current**: Stub implementation in `monero/transaction.rs`
-- **Impact**: Cannot create production Monero transactions without this
+### Library: monero-oxide
 
-**Action Required**: Add `monero-serai` when available, or use GitHub dependency:
-```toml
-# TODO: Add when available
-# monero-serai = { git = "https://github.com/serai-dex/monero-serai" }
+- **Source**: `https://github.com/monero-oxide/monero-oxide`
+- **Crate**: `monero-oxide` (renamed from monero-serai, Sept 2025)
+- **Audit**: CypherStack (May 2025)
+- **Audit Report**: `monero-oxide/audits/Cypher Stack May 2025/Audit.pdf`
+- **Bug Bounty**: $100k active
+
+### Verification
+
+```bash
+git clone https://github.com/monero-oxide/monero-oxide
+cat monero-oxide/audits/Cypher\ Stack\ May\ 2025/Audit.pdf
 ```
+
+### Why monero-oxide (not monero-serai)
+
+- **monero-oxide** is the CANONICAL source as of September 2025
+- Renamed from `monero-serai` when transferred to neutral org (monero-oxide)
+- Same code, same audit, neutral governance
+- Active maintenance and bug bounty program
+
+### Implementation Status
+
+- **Dependency**: Added to `Cargo.toml` (GitHub dependency)
+- **Transaction Creation**: `monero/transaction.rs` - Structure ready, API verification needed
+- **Decoy Selection**: `monero/decoy_selection.rs` - Wallet-RPC integration needed
+- **Status**: ⚠️ **In Progress** - API verification required after `cargo doc --package monero-oxide`
+
+### Next Steps
+
+1. Verify API: `cargo doc --open --package monero-oxide`
+2. Implement `create_transaction_after_reveal()` with verified API
+3. Implement `fetch_decoys()` via wallet-rpc
+4. Add integration tests with stagenet
 
 ---
 
@@ -132,10 +156,10 @@ The following duplicate files were removed per audit recommendations:
 ### ⚠️ Needs Attention
 - [ ] Custom DLEQ implementation - Auditor should review `dleq.rs` (~200 lines)
 - [ ] Starknet client - Simple JSON-RPC, low risk
-- [ ] Monero transaction signing - Add `monero-serai` for production
+- [ ] Monero transaction signing - Implement with `monero-oxide` (dependency added)
 
 ### 🔴 Critical Addition
-- [ ] Add `monero-serai` for CLSAG - **Without this, no production Monero transactions**
+- [ ] Implement transaction creation with `monero-oxide` - **Dependency added, implementation pending**
 
 ---
 
@@ -146,7 +170,7 @@ The following duplicate files were removed per audit recommendations:
 **Status**: **Auditor-friendly** - Clear separation between audited libraries and custom code
 
 **Next Steps**:
-1. Add `monero-serai` for production Monero transactions
+1. Implement transaction creation with `monero-oxide` (dependency already added)
 2. Update `maker.rs` to use production key splitting approach
 3. Run production builds on Linux (not macOS)
 

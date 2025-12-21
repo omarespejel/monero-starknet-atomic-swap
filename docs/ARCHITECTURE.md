@@ -132,7 +132,7 @@ All cryptographic operations are verifiable on-chain. The DLEQ proof can be inde
 
 ### Race Condition
 
-A protocol-level race condition exists between secret revelation and cross-chain confirmation. If a Monero transaction fails or experiences a reorganization after the secret is revealed, funds may be at risk. Mitigations are planned for version 0.8.0.
+A protocol-level race condition exists between secret revelation and cross-chain confirmation. If a Monero transaction fails or experiences a reorganization after the secret is revealed, funds may be at risk. Mitigations are planned for future versions.
 
 ### Monero Integration
 
@@ -142,8 +142,40 @@ The current Monero integration is demo-level. A production implementation would 
 
 The protocol is designed for testnet use only. Mainnet deployment requires external review and race condition mitigations.
 
+## Technical Implementation Details
+
+### Sqrt Hint Prevention
+
+**Golden Rule**: Never generate sqrt hints from Python/Rust mathematical computation. Always validate sqrt hints through Cairo/Garaga decompression tests.
+
+**Protection Layers**:
+- Pre-commit hook validates sqrt hints
+- GitHub Actions validates on every PR
+- Authoritative hints documented in `cairo/tests/fixtures/AUTHORITATIVE_SQRT_HINTS.cairo`
+- Validation scripts: `tools/validate_sqrt_hints.py`
+
+**How to Update Sqrt Hints**:
+1. Generate candidates (optional): `python tools/discover_sqrt_hints.py <compressed_point_hex>`
+2. Test in Cairo: Update `test_unit_point_decompression.cairo` and run `snforge test`
+3. If test passes: Copy working hint to `AUTHORITATIVE_SQRT_HINTS.cairo`
+4. Validate: `python tools/validate_sqrt_hints.py rust/test_vectors.json`
+
+**Root Cause**: Sqrt hints generated with Python's `fix_hints.py` use a different algorithm than Garaga expects. Solution: Use empirically-validated hints from passing Cairo tests.
+
+### Development Best Practices
+
+**Branch Strategy**: Create dedicated branches for critical fixes (e.g., `fix/p0-critical-fixes`)
+
+**Incremental Fixes**: Fix issues separately, one commit per fix. Test after each change.
+
+**Test-First Approach**: Write failing tests that demonstrate bugs before fixing.
+
+**Validation Gates**: Run validation scripts after each fix to ensure no regressions.
+
+**Rollback Plan**: Create checkpoint tags before dangerous changes. Know how to revert individual commits.
+
 ---
 
-**Version**: 0.8.0-alpha  
-**Last Updated**: 2025-12-07
+**Version**: 0.1.0  
+**Last Updated**: 2025-12-20
 

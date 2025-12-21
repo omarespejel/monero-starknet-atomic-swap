@@ -1,4 +1,28 @@
 services:
+  # Starknet Devnet (for local contract testing)
+  # Uses deterministic seed for pre-funded accounts
+  starknet-devnet:
+    image: shardlabs/starknet-devnet-rs:latest
+    container_name: starknet-devnet
+    ports:
+      - "5050:5050"
+    command:
+      - "--seed"
+      - "${DEVNET_SEED:-0}"
+      - "--port"
+      - "5050"
+      - "--host"
+      - "0.0.0.0"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5050/is_alive || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - swap-network
+
   # Monero wallet-rpc (CRITICAL FOR ATOMIC SWAPS)
   # Uses public stagenet daemon for simplicity
   #
@@ -38,6 +62,12 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+    networks:
+      - swap-network
+
+networks:
+  swap-network:
+    driver: bridge
 
 volumes:
   wallet-data:

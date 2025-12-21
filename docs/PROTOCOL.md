@@ -244,7 +244,7 @@ Total unlock cost: ~370k-610k gas (depending on MSM complexity).
 
 ### Two-Phase Unlock ✅
 
-**Status:** Implemented in v0.8.0-alpha
+**Status:** Implemented
 
 Separates secret revelation from token transfer with 2-hour grace period to mitigate race conditions. See Step 5 above for details.
 
@@ -263,6 +263,6 @@ Future enhancement. Aggregate multiple swaps into single transaction for gas eff
 
 ---
 
-**Version**: 0.8.0-alpha  
+**Version**: 0.1.0  
 **Last Updated**: 2025-12-09
 

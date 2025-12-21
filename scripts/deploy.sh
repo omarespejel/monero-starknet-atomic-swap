@@ -77,7 +77,7 @@ if ! snforge test test_e2e_dleq --exact 2>&1 | tee "${ROOT_DIR}/${DEPLOY_DIR}/ga
   echo -e "${RED}║  Solution:                                                     ║${NC}"
   echo -e "${RED}║  1. Use sqrt hints from AUTHORITATIVE_SQRT_HINTS.cairo        ║${NC}"
   echo -e "${RED}║  2. Never regenerate sqrt hints from Python/Rust              ║${NC}"
-  echo -e "${RED}║  3. See docs/SQRT_HINT_PREVENTION.md                          ║${NC}"
+  echo -e "${RED}║  3. See docs/ARCHITECTURE.md (Sqrt Hint Prevention section)    ║${NC}"
   echo -e "${RED}╚════════════════════════════════════════════════════════════════╝${NC}"
   exit 1
 fi

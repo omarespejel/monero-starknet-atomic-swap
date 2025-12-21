@@ -6,7 +6,7 @@
 //!
 //! **DEPRECATED**: For production, use:
 //! - `monero::SwapKeyPair` for key splitting (production-ready)
-//! - `monero-serai` crate for CLSAG transaction signing (CypherStack audited)
+//! - `monero-oxide` crate for CLSAG transaction signing (CypherStack audited)
 //!
 //! This simplified version demonstrates the core concept:
 //! - Create an adaptor signature using base_key + adaptor_point
