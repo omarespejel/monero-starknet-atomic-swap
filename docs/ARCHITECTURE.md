@@ -136,7 +136,14 @@ A protocol-level race condition exists between secret revelation and cross-chain
 
 ### Monero Integration
 
-The current Monero integration is demo-level. A production implementation would require full CLSAG signing, key image handling, change outputs, and multi-output transactions.
+**Production-ready** - Uses `monero-wallet-rpc` (auditor-approved approach):
+
+- ✅ **CLSAG signing** - Handled by wallet-rpc (Monero's own code)
+- ✅ **Key image handling** - Handled by wallet-rpc
+- ✅ **Change outputs** - Handled by wallet-rpc
+- ✅ **Multi-output transactions** - Supported via wallet-rpc
+
+This is intentionally conservative - we use Monero's audited code rather than implementing custom crypto. The same approach has been used successfully by COMIT/UnstoppableSwap for 3+ years on mainnet.
 
 ### Testnet Only
 

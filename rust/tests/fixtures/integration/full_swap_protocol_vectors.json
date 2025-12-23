@@ -1,0 +1,43 @@
+{
+  "description": "Full swap protocol end-to-end test vectors",
+  "generated_at": "2025-12-23T06:59:31.807709+00:00",
+  "scenarios": [
+    {
+      "phases": {
+        "1_key_exchange": {
+          "alice_public": {
+            "S_a": "783194911307bfc24e3be64be1b058ab95d879d83156e2548895d94cf15e9f2c",
+            "V_a": "b486e21fa4d8a81e6f133fe8c943e91619869725a2d031c961d6db3903fac8d5",
+            "v_a": "e9c868993c89aac6e5c5d0a5aeef1abdbef7c139741bd863c20bcbd720512001"
+          },
+          "bob_public": {
+            "S_b": "546b10a06e3b7ef3935adc0b3e722fe798e62a624820b14e0259f18664f15500",
+            "V_b": "fd33b461ec9455204bb904a299508946b1404efefeec4845f46c127c06dbd64a",
+            "hashlock": "8d3e6c292442b4da1d52eb492f105c7605652fd24573bd32d891e881ead0f3e8",
+            "v_b": "a14a2c7cd257a5a094ebc4fd6990193502fbd1353227da74a733ff4b6865aa02"
+          },
+          "shared_address": "22b269d6a63800b600e312d2e962f22fca44e4d7d4cabe436117e90e9485648d"
+        },
+        "2_contract_deploy": {
+          "adaptor_point": "546b10a06e3b7ef3935adc0b3e722fe798e62a624820b14e0259f18664f15500",
+          "dleq_challenge": "1abe0183a7bb21022d59036dedcb9a881b9dafe6b7ad23cd95637fe0e584d807",
+          "dleq_response": "dceacd8e656bed476c928b50d074b557ced6d468ab105b6e92d08c92dcb7f603",
+          "hashlock": "8d3e6c292442b4da1d52eb492f105c7605652fd24573bd32d891e881ead0f3e8"
+        },
+        "3_xmr_lock": {
+          "recipient_address": "22b269d6a63800b600e312d2e962f22fca44e4d7d4cabe436117e90e9485648d",
+          "view_key": "8a1395150fe14f677ab195a3188034f2c0f2936fa642b2d8693fca2389b6ca03"
+        },
+        "4_secret_reveal": {
+          "hashlock_preimage": "8dfe36f993ea6c97896a451e006dd8b5c03bf6284a7b6d19e62b0398d354bbf2",
+          "s_b": "aa93cf86081c596efa39c391f4c8c77cbf3bf6284a7b6d19e62b0398d354bb02"
+        },
+        "5_xmr_claim": {
+          "recovered_key": "026f1c191f27595a5c44cc98301b8e118126a63a4dff17e263e25d9b1859dd07"
+        }
+      },
+      "scenario": "happy_path_swap"
+    }
+  ],
+  "version": "1.0.0"
+}

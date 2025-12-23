@@ -1,0 +1,14 @@
+{
+  "description": "DLEQ proof unit test vectors - DO NOT DELETE",
+  "version": "1.0.0",
+  "vectors": [
+    {
+      "test_id": "canonical_0x12",
+      "secret": "1212121212121212121212121212121212121212121212121212121212121212",
+      "hashlock": "b6acca81a0939a856c35e4c4188e95b91731aab1d4629a4cee79dd09ded4fc94",
+      "adaptor_point_compressed": "54e86953e7cc99b545cfef03f63cce85427dde0adb325f957d29ad71e4643882",
+      "notes": "Used for Cairo contract testing"
+    }
+  ]
+}
+

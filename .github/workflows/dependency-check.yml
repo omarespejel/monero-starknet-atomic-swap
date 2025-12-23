@@ -1,0 +1,69 @@
+name: Dependency Security Check
+
+on:
+  push:
+    branches: [main, develop]
+    paths: ['**/Cargo.toml', '**/Cargo.lock', '**/Scarb.toml', '**/Scarb.lock']
+  pull_request:
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly audit
+
+jobs:
+  verify-dependencies:
+    name: Verify Critical Dependencies
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Verify curve25519-dalek = 4.1.3 (CVE-2024-48896)
+        run: |
+          VERSION=$(grep 'curve25519-dalek' rust/Cargo.toml | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+          if [[ "$VERSION" == "4.1.3" ]]; then
+            echo "✅ curve25519-dalek 4.1.3 (CVE patched)"
+          else
+            echo "❌ CRITICAL: curve25519-dalek must be 4.1.3"
+            exit 1
+          fi
+      
+      - name: Verify Garaga = 1.0.1 (CryptoExperts audited)
+        run: |
+          if grep -q 'tag = "v1.0.1"' cairo/Scarb.toml; then
+            echo "✅ Garaga 1.0.1 verified"
+          else
+            echo "❌ Garaga must be exactly 1.0.1"
+            exit 1
+          fi
+      
+      - name: Check monero-oxide status
+        run: |
+          if grep -q 'monero-oxide' rust/Cargo.toml; then
+            echo "✅ monero-oxide dependency found"
+          else
+            echo "⚠️ monero-oxide not yet added (waiting for 0.1.0 release)"
+          fi
+
+  cargo-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
+      
+      - name: Run cargo audit
+        working-directory: rust
+        run: cargo audit --deny warnings
+      
+      - name: Compute Crypto File Hashes
+        run: |
+          echo "📋 Cryptographic File Integrity"
+          sha256sum rust/src/monero/two_party_keys.rs || true
+          sha256sum rust/src/dleq.rs || true
+          sha256sum cairo/src/lib.cairo || true
+
