@@ -2,7 +2,10 @@
 
 ## Overview
 
-This document specifies the atomic swap protocol between Monero and Starknet tokens. The protocol uses key splitting, DLEQ proofs, and hashlocks to ensure trustless execution.
+This document specifies the atomic swap protocol between Monero and Starknet tokens. The protocol uses **two-party key generation** (Serai DEX pattern, CypherStack audited), DLEQ proofs, and hashlocks to ensure trustless execution.
+
+**Production Protocol**: Two-party key generation (`x = s_a + s_b`)  
+**Legacy Protocol**: Single-party key splitting (`x = x_partial + t`) - deprecated but supported
 
 ## Protocol Parameters
 
@@ -87,17 +90,42 @@ Stored in contract as compressed Edwards point (32 bytes) with sqrt hint for dec
 
 ## Protocol Steps
 
-### Step 1: Key Generation
+### Step 1: Two-Party Key Generation (Production)
 
-Alice generates:
-- `x_partial`: Random scalar (252 bits entropy)
-- `t`: Random scalar (252 bits entropy)
-- `x = x_partial + t`: Full spend key
+**Alice generates**:
+- `s_a`: Spend key share (random scalar, 252 bits entropy)
+- `v_a`: View key share (random scalar, 252 bits entropy)
+- `S_a = s_a·G`: Public spend key share
+- `V_a = v_a·G`: Public view key share
 
-### Step 2: Proof Generation
+**Bob generates**:
+- `s_b`: Spend key share (random scalar, 252 bits entropy)
+- `v_b`: View key share (derived deterministically: `SHA-256("VIEW_KEY_V1" || s_b_bytes)`)
+- `S_b = s_b·G`: Public spend key share (adaptor point)
+- `V_b = v_b·G`: Public view key share
+- `H = SHA-256(s_b_raw_bytes)`: Hashlock
 
-Alice computes:
-- `T = t·G`: Adaptor point
+**Combined keys**:
+- `S = (s_a + s_b)·G`: Combined spend public key
+- `V = (v_a + v_b)·G`: Combined view public key
+- `x = s_a + s_b`: Full spend key (recovered after `s_b` revealed)
+
+**Security Properties**:
+- Neither party can spend alone (requires both shares)
+- Zero-scalar rejection (P0 audit fix)
+- BN254 compatibility checks (prevents Light Protocol #237 vulnerability)
+
+### Step 2: DLEQ Proof Generation
+
+Bob computes DLEQ proof for `s_b`:
+- `S_b = s_b·G`: Adaptor point (same as public spend key share)
+- `U = s_b·Y`: Second point (where `Y` is second generator)
+- `H = SHA-256(s_b_raw_bytes)`: Hashlock
+- DLEQ proof: Proves `∃s_b: SHA-256(s_b) = H ∧ s_b·G = S_b`
+
+**Legacy Protocol** (deprecated):
+- Alice generates: `x_partial`, `t`, `x = x_partial + t`
+- Alice computes: `T = t·G` (adaptor point)
 - `H = SHA-256(secret_raw_bytes)`: Hashlock (see Serialization Formats section)
 - `U = t·Y`: Second point for DLEQ
 - `k`: Deterministic nonce (domain-separated SHA-256)
@@ -199,7 +227,9 @@ let transfer_info = wait_for_default_finality(&wallet_client, txid).await?;
 
 ### Atomicity
 
-The DLEQ proof ensures that the scalar `t` unlocking Starknet is identical to the scalar needed for Monero. If Bob reveals `t` on Starknet, Alice can recover `x` and spend Monero. If Bob does not reveal `t`, Alice can refund after timelock.
+The DLEQ proof ensures that the scalar `s_b` unlocking Starknet is identical to the scalar needed for Monero. If Bob reveals `s_b` on Starknet, Alice can recover `x = s_a + s_b` and spend Monero. If Bob does not reveal `s_b`, Alice can refund after timelock.
+
+**Two-Party Security**: Neither Alice nor Bob can spend alone. Both shares (`s_a` and `s_b`) are required to recover the full spend key `x`.
 
 ### Trustlessness
 
@@ -263,6 +293,6 @@ Future enhancement. Aggregate multiple swaps into single transaction for gas eff
 
 ---
 
-**Version**: 0.1.0  
-**Last Updated**: 2025-12-09
+**Version**: 0.7.1 (Two-Party Key Generation)  
+**Last Updated**: 2025-12-23
 
