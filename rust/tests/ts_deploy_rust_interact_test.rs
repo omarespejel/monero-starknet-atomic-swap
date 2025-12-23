@@ -36,7 +36,8 @@ async fn deploy_via_typescript() -> Result<String> {
     println!("📦 Deploying contract via TypeScript...");
     
     // Get project root (assuming we're in rust/tests/)
-    let project_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let project_root = manifest_dir
         .parent()
         .unwrap()
         .parent()
