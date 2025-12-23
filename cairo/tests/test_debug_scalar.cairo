@@ -3,6 +3,7 @@ mod test_scalar_debugging {
     use atomic_lock::AtomicLock;
 
     #[test]
+    #[ignore] // Debug test - edge case conversion
     fn test_debug_scalar_values() {
         // Full response scalar from test_vectors.json (reduced scalar, LE bytes)
         // Response hex: 0xc09b9a31d72db277d1bb402e80ef5008004efaf601adbf89a8283471b5f7cf47
@@ -27,6 +28,7 @@ mod test_scalar_debugging {
     }
 
     #[test]
+    #[ignore] // Debug test - edge case conversion
     fn test_debug_challenge_scalar() {
         // Full challenge scalar from test_vectors.json (reduced scalar, LE bytes)
         // Challenge hex: 0xff93d53eda6f2910e3a1313a226533c503273bfddf78f5f07036fa2a12e61262

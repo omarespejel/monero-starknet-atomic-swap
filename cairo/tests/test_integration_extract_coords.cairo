@@ -9,23 +9,28 @@ mod extract_coordinates_tests {
 
     const ED25519_CURVE_INDEX: u32 = 4;
 
-    // Test vector constants (from test_e2e_dleq.cairo)
+    // ✅ VALIDATED sqrt hints from test_e2e_dleq.cairo (single source of truth)
+
+    // Adaptor Point T (compressed)
     const TEST_ADAPTOR_POINT_COMPRESSED: u256 = u256 {
-        low: 0x47cff7b5713428a889bfad01f6fa4e00,
-        high: 0x0850ef802e40bbd177b22dd7319a9bc0,
-    };
-    const TEST_ADAPTOR_POINT_SQRT_HINT: u256 = u256 {
-        low: 0x9f3ee81fe68dcbcf9de661eedd114a9e,
-        high: 0x397c8b3280ddfb2ffe72518d79cc504c,
+        low: 0x54e86953e7cc99b545cfef03f63cce85,
+        high: 0x427dde0adb325f957d29ad71e4643882,
     };
 
-    const TEST_SECOND_POINT_COMPRESSED: u256 = u256 {
-        low: 0x47cff7b5713428a889bfad01f6fa4e00,
-        high: 0x0850ef802e40bbd177b22dd7319a9bc0,
+    const TEST_ADAPTOR_POINT_SQRT_HINT: u256 = u256 {
+        low: 0x448c18dcf34127e112ff945a65defbfc,
+        high: 0x17611da35f39a2a5e3a9fddb8d978e4f,
     };
+
+    // Second Point U (compressed) - DIFFERENT point, DIFFERENT hint
+    const TEST_SECOND_POINT_COMPRESSED: u256 = u256 {
+        low: 0xd893b3476bdf09770b7616f84c5c7bbe,
+        high: 0x5c79d0fa84d6440908e2e2065e60d1cd,
+    };
+
     const TEST_SECOND_POINT_SQRT_HINT: u256 = u256 {
-        low: 0x9f3ee81fe68dcbcf9de661eedd114a9e,
-        high: 0x397c8b3280ddfb2ffe72518d79cc504c,
+        low: 0xdcad2173817c163b5405cec7698eb4b8,
+        high: 0x742bb3c44b13553c8ddff66565b44cac,
     };
 
     #[test]

@@ -11,6 +11,7 @@ mod types;
 use starknet::listener::{StarknetListener, SwapEvent};
 use alerts::notifier::Notifier;
 use types::{Alert, AlertLevel, SwapState};
+use monero::watcher::monitor_monero_tx;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -28,6 +29,10 @@ async fn main() -> Result<()> {
     let discord_webhook = std::env::var("DISCORD_WEBHOOK").ok();
     let telegram_token = std::env::var("TELEGRAM_BOT_TOKEN").ok();
     let telegram_chat = std::env::var("TELEGRAM_CHAT_ID").ok();
+    
+    // Monero daemon URL for reorg detection
+    let monero_daemon_url = std::env::var("MONERO_DAEMON_URL")
+        .unwrap_or_else(|_| "http://localhost:18081".to_string());
 
     // Initialize notifier
     let notifier = Notifier::new(discord_webhook, telegram_token, telegram_chat);
@@ -133,7 +138,41 @@ async fn main() -> Result<()> {
                     });
                 }
 
-                // TODO: Start monitoring Monero confirmations
+                // Start monitoring Monero transaction for reorgs
+                // Note: monero_txid and original_height should be provided via:
+                // - Environment variable MONERO_TXID_{contract_address}
+                // - Or added to SecretRevealedEvent structure
+                // For now, we check if MONERO_TXID env var is set (format: "txid:height")
+                let contract_hex = format!("{:x}", e.contract_address);
+                if let Ok(monero_info) = std::env::var(format!("MONERO_TXID_{}", contract_hex)) {
+                    let parts: Vec<&str> = monero_info.split(':').collect();
+                    if parts.len() == 2 {
+                        if let Ok(original_height) = parts[1].parse::<u64>() {
+                            let txid = parts[0].to_string();
+                            let swap_id = format!("swap_{:x}", e.contract_address);
+                            let daemon_url = monero_daemon_url.clone();
+                            
+                            tokio::spawn(async move {
+                                if let Err(e) = monitor_monero_tx(
+                                    &swap_id,
+                                    &txid,
+                                    original_height,
+                                    &daemon_url,
+                                ).await {
+                                    tracing::error!(
+                                        "[{}] Monero reorg monitoring failed: {}",
+                                        swap_id, e
+                                    );
+                                }
+                            });
+                            
+                            info!(
+                                "[{}] Started Monero reorg monitoring for TX {}",
+                                swap_id, txid
+                            );
+                        }
+                    }
+                }
             }
             SwapEvent::TokensClaimed(e) => {
                 info!(

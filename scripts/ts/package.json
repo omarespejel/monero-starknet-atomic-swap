@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "deploy": "ts-node src/index.ts"
+    "deploy": "ts-node src/index.ts",
+    "deploy:devnet": "ts-node src/devnet.ts"
   },
   "keywords": [],
   "author": "",

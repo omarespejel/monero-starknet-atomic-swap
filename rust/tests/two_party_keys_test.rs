@@ -202,6 +202,53 @@ fn test_bob_public_data_validation() {
     assert!(zero_hashlock.validate().is_err(), "Zero hashlock should fail validation");
 }
 
+/// Test security property: Zero scalar rejection (P0 audit fix)
+/// 
+/// Verifies that BobKeys::generate() never produces zero scalars.
+#[test]
+fn test_bob_zero_scalar_rejection() {
+    // Generate many keys to ensure zero scalar is rejected
+    for _ in 0..1000 {
+        let bob = BobKeys::generate();
+        assert_ne!(bob.spend_share(), curve25519_dalek::scalar::Scalar::ZERO, "Bob's spend share must never be zero");
+        assert_ne!(bob.hashlock(), [0u8; 32], "Hashlock must never be zero");
+    }
+}
+
+/// Test security property: Malicious Alice attack prevention (P0 audit fix)
+/// 
+/// Verifies that Alice cannot send wrong S_a to steal Bob's funds.
+#[test]
+fn test_malicious_alice_attack_prevention() {
+    let alice = AliceKeys::generate();
+    let bob = BobKeys::generate();
+    
+    // Create legitimate shared output
+    let legitimate_shared = SharedOutput::new(&alice, &bob);
+    
+    // Attacker (malicious Alice) creates fake S_a
+    let fake_s_a_scalar = curve25519_dalek::scalar::Scalar::from(999u64);
+    let fake_s_a_point = fake_s_a_scalar * G;
+    
+    // Create fake Alice public data with wrong S_a
+    let mut fake_alice_data = alice.public_data();
+    fake_alice_data.S_a = fake_s_a_point.compress().to_bytes();
+    
+    // Try to create shared output with fake data
+    let fake_shared = SharedOutput::from_public(&fake_alice_data, &bob.public_data()).unwrap();
+    
+    // Fake shared output should produce DIFFERENT address
+    assert_ne!(legitimate_shared.S, fake_shared.S, "Fake S_a must produce different address");
+    
+    // Even if Bob reveals s_b, attacker cannot recover correct key
+    let legitimate_recovered = recover_spend_key(alice.spend_share(), bob.spend_share());
+    let fake_recovered = recover_spend_key(fake_s_a_scalar, bob.spend_share());
+    
+    assert_eq!(legitimate_recovered * G, legitimate_shared.S, "Legitimate recovery works");
+    assert_ne!(fake_recovered * G, legitimate_shared.S, "Fake S_a cannot steal funds");
+    assert_eq!(fake_recovered * G, fake_shared.S, "Fake recovery matches fake address");
+}
+
 /// Test security property: Secret reuse attack prevention
 /// 
 /// This test ensures that reusing Bob's secret across different swaps

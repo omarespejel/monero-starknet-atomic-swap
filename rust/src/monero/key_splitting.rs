@@ -48,10 +48,12 @@ impl SwapKeyPair {
         let mut partial_bytes = [0u8; 32];
         rng.fill_bytes(&mut partial_bytes);
         let partial_key = Scalar::from_bytes_mod_order(partial_bytes);
+        partial_bytes.zeroize();
         
         let mut adaptor_bytes = [0u8; 32];
         rng.fill_bytes(&mut adaptor_bytes);
         let adaptor_scalar = Scalar::from_bytes_mod_order(adaptor_bytes);
+        adaptor_bytes.zeroize();
         
         let full_spend_key = partial_key + adaptor_scalar;
 

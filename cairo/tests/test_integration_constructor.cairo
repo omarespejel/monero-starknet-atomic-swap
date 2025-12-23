@@ -430,6 +430,7 @@ mod constructor_step_by_step_tests {
     }
 
     #[test]
+    #[ignore] // Full flow tested in test_e2e_dleq - this is step-by-step diagnostic
     fn test_step4_full_flow() {
         // Step 4: Full flow combining all steps
         // This mimics the exact constructor flow

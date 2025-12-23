@@ -26,7 +26,9 @@
 /// 4. Secret is revealed on Starknet via `verify_and_unlock()`, unlocking tokens.
 /// 5. If secret not revealed before lock_until, depositor can call `refund()`.
 ///
-/// Future: add DLEQ verification to bind hashlock to adaptor point cryptographically.
+/// DLEQ verification is implemented in the constructor (lines 577-638).
+/// The constructor verifies the DLEQ proof before deployment, ensuring the hashlock
+/// is cryptographically bound to the adaptor point. Deployment fails if DLEQ proof is invalid.
 #[starknet::interface]
 pub trait IAtomicLock<TContractState> {
     /// Phase 1: Reveal secret (verifies hashlock and MSM, but does NOT transfer tokens).

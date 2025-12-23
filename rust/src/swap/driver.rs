@@ -8,7 +8,7 @@ use super::db::SwapDb;
 use crate::monero::{wait_for_finality, MoneroWalletClient, DEFAULT_CONFIRMATIONS, DEFAULT_POLL_INTERVAL_SECS, claim_monero_after_reveal};
 use crate::monero_wallet::MoneroWallet;
 use curve25519_dalek::scalar::Scalar;
-use zeroize::Zeroizing;
+use zeroize::{Zeroize, Zeroizing};
 
 /// Trait for Starknet operations (enables mocking).
 #[async_trait]
@@ -258,7 +258,7 @@ async fn handle_refund<S: StarknetClient>(state: &SwapState, starknet: &S) -> Re
 /// Transaction hash of the Monero claim transaction
 pub async fn handle_secret_revealed(
     state: &SwapState,
-    revealed_t_bytes: [u8; 32],
+    mut revealed_t_bytes: [u8; 32],
     wallet_rpc_url: &str,
     daemon_rpc_url: &str,
     wallet_dir: &str,
@@ -291,7 +291,8 @@ pub async fn handle_secret_revealed(
     };
 
     // 1. Convert revealed bytes to Scalar
-    let t = Scalar::from_bytes_mod_order(revealed_t_bytes);
+    let t = Zeroizing::new(Scalar::from_bytes_mod_order(revealed_t_bytes));
+    revealed_t_bytes.zeroize();
 
     // 2. Get partial key from swap state
     let x_partial = Zeroizing::new(Scalar::from_bytes_mod_order(partial_spend_key));
@@ -310,7 +311,7 @@ pub async fn handle_secret_revealed(
     let tx_hash = claim_monero_after_reveal(
         &wallet,
         x_partial,
-        t,
+        *t,
         &claim_destination,
         restore_height,
     )

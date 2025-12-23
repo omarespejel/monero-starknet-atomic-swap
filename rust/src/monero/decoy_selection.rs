@@ -1,7 +1,7 @@
 //! Decoy selection for ring signatures via wallet-rpc.
 //!
-//! monero-oxide handles transaction construction, but YOU must provide decoys.
 //! Decoys are fetched from a synced Monero node via wallet-rpc.
+//! wallet-rpc handles all transaction construction including decoy selection.
 //!
 //! # Decoy Selection Algorithm
 //!
@@ -64,10 +64,10 @@ pub async fn fetch_decoys(
         let output_key = parse_hex_to_32_bytes(tx_pub_key_hex)
             .context("Invalid tx_pub_key format")?;
 
-        // Parse key_image (commitment) - note: wallet-rpc may return this differently
-        // For now, we'll use a placeholder that monero-oxide will handle
+        // Parse key_image (commitment) - note: wallet-rpc handles this automatically
         // The actual commitment is computed from the amount and blinding factor
-        let commitment = [0u8; 32]; // Placeholder - monero-oxide will compute this
+        // wallet-rpc computes this when constructing transactions
+        let commitment = [0u8; 32]; // Placeholder - wallet-rpc handles this in transaction construction
 
         ring_members.push(RingMember {
             output_key,

@@ -29,117 +29,97 @@ mod gas_benchmark_tests {
     /// - DLEQ proof verification
     ///
     /// Expected: ~200k-400k gas (depending on MSM complexity)
+    /// Benchmark DLEQ verification gas usage with real test vectors
     #[test]
     fn benchmark_dleq_verification_gas() {
-        // Use test vectors for consistent benchmarking
+        // Use EXACT validated vectors from test_e2e_dleq.cairo
         let hashlock = array![
-            0xd78e3502_u32, 0x108c5b5a_u32, 0x5c902f24_u32, 0x725ce15e_u32,
-            0x14ab8e41_u32, 0x1b93285f_u32, 0x9c5b1405_u32, 0xf11dca4d_u32
+            0xb6acca81_u32, 0xa0939a85_u32, 0x6c35e4c4_u32, 0x188e95b9_u32,
+            0x1731aab1_u32, 0xd4629a4c_u32, 0xee79dd09_u32, 0xded4fc94_u32
         ].span();
 
-        // Real test vector values
-        let adaptor_point_compressed = u256 {
-            low: 0x45cfef03f63cce8554e86953e7cc99b5,
-            high: 0x7d29ad71e4643882427dde0adb325f95,
+        let adaptor_point_compressed: u256 = u256 {
+            low: 0x54e86953e7cc99b545cfef03f63cce85,
+            high: 0x427dde0adb325f957d29ad71e4643882,
         };
-        let adaptor_point_sqrt_hint = u256 {
-            low: 0xe2a230bd7b352952e060b8e02062c970,
-            high: 0xc73f9428ae5a145d107170f6564a9d32,
+        let adaptor_point_sqrt_hint: u256 = u256 {
+            low: 0x448c18dcf34127e112ff945a65defbfc,
+            high: 0x17611da35f39a2a5e3a9fddb8d978e4f,
         };
-        let second_point_compressed = u256 {
-            low: 0x0b7616f84c5c7bbed893b3476bdf0977,
-            high: 0x08e2e2065e60d1cd5c79d0fa84d64409,
-        };
-        let second_point_sqrt_hint = u256 {
-            low: 0x3ce1b4c42b94eb8d579c34966ca8c781,
-            high: 0x39d44d17c4d0c210617cc305f9884514,
-        };
-        // Note: These are 256-bit values that exceed felt252 range
-        // For testing, we use truncated values. Real values are validated in end-to-end tests.
-        // Full challenge: 0xdb8e86169afd3293b58260ada05e90bb436a67e38f1aac7799f8581342a7c204
-        // Full response: 0x89273470d10829ecc995eea2946384008bb92095214db046c99840f6909e5602
-        let dleq_challenge: felt252 = 0xdb8e86169afd3293b58260ada05e90bb436a67e38f1aac7799f8581342a7c2;
-        let dleq_response: felt252 = 0x89273470d10829ecc995eea2946384008bb92095214db046c99840f6909e5;
 
-        // Real MSM hints from test_hints.json
+        let second_point_compressed: u256 = u256 {
+            low: 0xd893b3476bdf09770b7616f84c5c7bbe,
+            high: 0x5c79d0fa84d6440908e2e2065e60d1cd,
+        };
+        let second_point_sqrt_hint: u256 = u256 {
+            low: 0xdcad2173817c163b5405cec7698eb4b8,
+            high: 0x742bb3c44b13553c8ddff66565b44cac,
+        };
+
+        let r1_compressed: u256 = u256 {
+            low: 0x90b1ab352981d43ec51fba0af7ab51c7,
+            high: 0xc21ebc88e5e59867b280909168338026,
+        };
+        let r1_sqrt_hint: u256 = u256 {
+            low: 0x72a9698d3171817c239f4009cc36fc97,
+            high: 0x3f2b84592a9ee701d24651e3aa3c837d,
+        };
+
+        let r2_compressed: u256 = u256 {
+            low: 0x02d386e8fd6bd85a339171211735bcba,
+            high: 0x10defc0130a9f3055798b1f5a99aeb67,
+        };
+        let r2_sqrt_hint: u256 = u256 {
+            low: 0x043f2c451f9ca69ff1577d77d646a50e,
+            high: 0x4ee64b0e07d89e906f9e8b7bea09283e,
+        };
+
+        let challenge: felt252 = 0xff93d53eda6f2910e3a1313a226533c5;
+        let response: felt252 = 0xc09b9a31d72db277d1bb402e80ef5008;
+
+        let fake_glv_hint = array![
+            0x4af5bf430174455ca59934c5, 0x748d85ad870959a54bca47ba,
+            0x6decdae5e1b9b254, 0x0,
+            0xaa008e6009b43d5c309fa848, 0x5b26ec9e21237560e1866183,
+            0x7191bfaa5a23d0cb, 0x0,
+            0x1569bc348ca5e9beecb728fdbfea1cd6, 0x28e2d5faa7b8c3b25a1678149337cad3
+        ].span();
+
         let s_hint_for_g = array![
-            0xf2bf288299cf161546f6c654,
-            0x7c63f2d98a988397b0168652,
-            0x3bd4e0f4e630bc6c,
-            0x0,
-            0xf96c40d29cdbdaa3bdfc5efa,
-            0xfba56d020186cff3d55806f9,
-            0x2dd15eeb55fa6ee8,
-            0x0,
-            0xbaac684d5613ef1ef37ed994ab7486f,
-            0xa92654992fbc0127c6f6daeb6b41d48
+            0xa82b6800cf6fafb9e422ff00, 0xa9d32170fa1d6e70ce9f5875,
+            0x38d522e54f3cc905, 0x0,
+            0x6632b6936c8a0092f2fa8193, 0x48849326ffd29b0fd452c82e,
+            0x1cb22722b8aeac6d, 0x0,
+            0x3ce8213ee078382bd7862b141d23a01e, 0x12a88328ee6fe07c656e9f1f11921d2ff
         ].span();
 
         let s_hint_for_y = array![
-            0xe305f9761837c8281d11b55e,
-            0xc89d984f4d474ecd6b37b38a,
-            0x2482b5c9c4cde335,
-            0x0,
-            0x4122db657d63fa5aa49c02ad,
-            0xdaa1eaae23b359a56c266ce7,
-            0x6169123b3d5fa28b,
-            0x0,
-            0xbaac684d5613ef1ef37ed994ab7486f,
-            0xa92654992fbc0127c6f6daeb6b41d48
+            0x5f8703b67e528a68c666436f, 0x4319c91a2264dceb203b3c7,
+            0x131bcf26d61c6749, 0x0,
+            0x2b9edf9810114e3f99120ee8, 0x23ac0997ff9d26665393f4f1,
+            0xa2adc2ad21db8d1, 0x0,
+            0x3ce8213ee078382bd7862b141d23a01e, 0x12a88328ee6fe07c656e9f1f11921d2ff
         ].span();
 
         let c_neg_hint_for_t = array![
-            0xd655a4892b61b2a69f6185bd,
-            0xe32deb5ab239bb18e89c8fb4,
-            0x1ad5223f82e2e033,
-            0x0,
-            0x1c71fddfe542c48a2d2ac046,
-            0x91066f1ab9d049c93afc20a4,
-            0x13f5ed4eb8d5a9fb,
-            0x0,
-            0x3851bd11b6864deaf04e1e37c22b0b47,
-            0x17558a4907bde82782fba4521c21139f
+            0xcc7bbab2a86720f06fa72b5a, 0x27ebc6cd7c83bd71f4819168,
+            0x2b4af1beb7dc4112, 0x0,
+            0xd0ac52873f110a396803c36c, 0xc23304c89672797661dbefa3,
+            0x547b7c3862004a5a, 0x0,
+            0xba5f45d69eaafbaaa06091a65e2873d, 0x1301450999c6615fa5bded0ada7e22902
         ].span();
 
         let c_neg_hint_for_u = array![
-            0x82f49995a6fdd7dd2e8badfb,
-            0xc892bbba84c5089ac13d80f6,
-            0x555c9178d48b3a2c,
-            0x0,
-            0xfdc6138b0895845f7ff260b7,
-            0xb282d7f660d43176c9a07148,
-            0x1ed016cb5b5c0da4,
-            0x0,
-            0x3851bd11b6864deaf04e1e37c22b0b47,
-            0x17558a4907bde82782fba4521c21139f
+            0x3aa67aef7c64a7b253e4a0fc, 0x2799eb3ed1784408cb1f6360,
+            0x6d7fa630d5721877, 0x0,
+            0x9fed6006f4d300b627b45f, 0xf8f69fd5bc96748bf6e2541b,
+            0x56b40a0879ad40ae, 0x0,
+            0xba5f45d69eaafbaaa06091a65e2873d, 0x1301450999c6615fa5bded0ada7e22902
         ].span();
 
-        let fake_glv_hint = array![
-            0x460f72719199c63ec398673f,
-            0xf27a4af146a52a7dbdeb4cfb,
-            0x5f9c70ec759789a0,
-            0x0,
-            0x6b43e318a2a02d8241549109,
-            0x40e30afa4cce98c21e473980,
-            0x5e243e1eed1aa575,
-            0x0,
-            0x10b51d41eab43e36d3ac30cda9707f92,
-            0x110538332d2eae09bf756dfd87431ded7
-        ].span();
-
-        let r1_compressed = u256 {
-            low: 0x691d32a931f4d23909c289904f3df85b,
-            high: 0xd6c54224331717aef7926242a14aef11,
-        };
-        let r2_compressed = u256 {
-            low: 0x40805970f83a35772a8dcb3f7f2fdfac,
-            high: 0x70b15ecdc1a8d4040de953c10ba21a69,
-        };
-
-        // Deploy contract - gas cost will be measured by snforge
-        // Note: Actual gas measurement requires running on a node or using gas profiling tools
+        // Deploy contract - gas will be measured by snforge
         let declare_res = declare("AtomicLock");
-        let contract = declare_res.unwrap().contract_class();
+        let contract_class = declare_res.unwrap().contract_class();
 
         let mut calldata = ArrayTrait::new();
         hashlock.serialize(ref calldata);
@@ -151,39 +131,23 @@ mod gas_benchmark_tests {
         Serde::serialize(@adaptor_point_sqrt_hint, ref calldata);
         Serde::serialize(@second_point_compressed, ref calldata);
         Serde::serialize(@second_point_sqrt_hint, ref calldata);
-        Serde::serialize(@dleq_challenge, ref calldata);
-        Serde::serialize(@dleq_response, ref calldata);
+        Serde::serialize(@challenge, ref calldata);
+        Serde::serialize(@response, ref calldata);
         Serde::serialize(@fake_glv_hint, ref calldata);
         Serde::serialize(@s_hint_for_g, ref calldata);
         Serde::serialize(@s_hint_for_y, ref calldata);
         Serde::serialize(@c_neg_hint_for_t, ref calldata);
         Serde::serialize(@c_neg_hint_for_u, ref calldata);
         Serde::serialize(@r1_compressed, ref calldata);
-        Serde::serialize(@0_u256, ref calldata);
+        Serde::serialize(@r1_sqrt_hint, ref calldata);
         Serde::serialize(@r2_compressed, ref calldata);
-        Serde::serialize(@0_u256, ref calldata);
+        Serde::serialize(@r2_sqrt_hint, ref calldata);
 
-        let (addr, _) = contract.deploy(@calldata).unwrap();
-        let dispatcher = IAtomicLockDispatcher { contract_address: addr };
+        let (addr, _) = contract_class.deploy(@calldata).unwrap();
+        let contract = IAtomicLockDispatcher { contract_address: addr };
 
         // Verify deployment succeeded
-        let zero_address: ContractAddress = 0.try_into().unwrap();
-        assert(dispatcher.contract_address != zero_address, 'Deployment failed');
-
-        // Note: Actual gas measurement requires:
-        // 1. Running on Starknet testnet/mainnet
-        // 2. Using gas profiling tools (e.g., Voyager, Starknet CLI)
-        // 3. Comparing with Poseidon baseline
-        //
-        // Expected gas breakdown:
-        // - BLAKE2s challenge: ~50k-80k gas (8x cheaper than Poseidon)
-        // - MSM operations (4×): ~40k-60k each = ~160k-240k gas
-        // - Point decompression (4×): ~10k-20k each = ~40k-80k gas
-        // - Other operations: ~20k-40k gas
-        // Total: ~270k-440k gas
-        //
-        // Compared to Poseidon baseline (~400k-600k):
-        // Savings: ~130k-160k gas (20-30% reduction)
+        assert(contract.contract_address != zero_address, 'Gas benchmark deployed');
     }
 }
 

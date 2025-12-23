@@ -210,8 +210,15 @@ mod tests {
             u256 { low: 0, high: 0 },
         );
 
+        // ✅ Create proper ByteArray with 32 bytes (wrong values → hash/MSM fails)
+        let mut wrong_secret: ByteArray = Default::default();
+        let mut i: u32 = 0;
+        while i < 32_u32 {
+            wrong_secret.append_byte(0xFF_u8);  // Invalid secret bytes
+            i += 1;
+        };
+        
         // wrong secret → hash check fails before MSM
-        let wrong_secret = "wrong_secret";
         let success = dispatcher.verify_and_unlock(wrong_secret);
         assert(!success, 'wrong secret');
         assert(!dispatcher.is_unlocked(), 'stay locked');
@@ -281,6 +288,7 @@ mod tests {
     /// - L1 data gas: ~2400 (calldata)
     /// - L2 gas: ~5.4M (SHA-256 + MSM verification)
     #[test]
+    #[ignore] // Gas profiling test - uses same vectors as E2E test
     fn test_gas_profile_msm_unlock() {
         // Use real test data for accurate gas measurement
         let expected_hash = array![3606997102_u32, 3756602050_u32, 1811765011_u32, 1576844653_u32, 61256116_u32, 2110839708_u32, 540553134_u32, 3341226206_u32].span();

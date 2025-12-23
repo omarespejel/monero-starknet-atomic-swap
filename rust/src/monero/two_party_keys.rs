@@ -137,19 +137,29 @@ pub struct BobKeys {
 
 impl BobKeys {
     /// Generate new Bob keys.
+    /// 
+    /// SECURITY: Rejects zero scalars (astronomically unlikely but possible).
+    /// Retries generation if zero scalar is produced.
     pub fn generate() -> Self {
-        let mut rng = OsRng;
-        
-        // Generate spend share
-        let mut s_b_bytes = [0u8; 32];
-        rng.fill_bytes(&mut s_b_bytes);
-        let s_b = Scalar::from_bytes_mod_order(s_b_bytes);
-        
-        // SECURITY: Verify BN254 compatibility
-        debug_assert!(
-            verify_scalar_bn254_compatible(&s_b),
-            "Bob's spend share must be BN254 compatible"
-        );
+        loop {
+            let mut rng = OsRng;
+            
+            // Generate spend share
+            let mut s_b_bytes = [0u8; 32];
+            rng.fill_bytes(&mut s_b_bytes);
+            let s_b = Scalar::from_bytes_mod_order(s_b_bytes);
+            
+            // SECURITY: Explicitly reject zero scalar (P0 audit fix)
+            // Probability is ~2^-252, but we must handle it for production safety
+            if s_b == Scalar::ZERO {
+                continue; // Retry on zero (astronomically unlikely)
+            }
+            
+            // SECURITY: Verify BN254 compatibility
+            debug_assert!(
+                verify_scalar_bn254_compatible(&s_b),
+                "Bob's spend share must be BN254 compatible"
+            );
         
         // Derive view share deterministically from spend share
         // Using SHA-256 for domain separation
@@ -175,7 +185,13 @@ impl BobKeys {
         let V_b = v_b * G;
         let adaptor_point = S_b; // T = s_b·G
         
-        Self {
+        // SECURITY: Verify hashlock is non-zero (should never happen if s_b != 0)
+        debug_assert!(
+            hashlock != [0u8; 32],
+            "Hashlock cannot be zero if scalar is non-zero"
+        );
+        
+        return Self {
             spend_share: s_b,
             raw_secret_bytes,
             S_b,
@@ -183,6 +199,7 @@ impl BobKeys {
             V_b,
             hashlock,
             adaptor_point,
+        };
         }
     }
     
@@ -240,7 +257,7 @@ impl BobPublicData {
     /// Verifies:
     /// - S_b is a valid curve point (on-curve, not infinity)
     /// - V_b is a valid curve point (on-curve, not infinity)
-    /// - Hashlock is non-zero
+    /// - Hashlock is non-zero and exactly 32 bytes (P0 audit fix)
     /// 
     /// Returns `Ok(())` if valid, `Err` otherwise.
     pub fn validate(&self) -> Result<()> {
@@ -254,9 +271,15 @@ impl BobPublicData {
             .decompress()
             .ok_or_else(|| anyhow::anyhow!("Invalid view point V_b"))?;
         
-        // Verify hashlock is non-zero
+        // Verify hashlock is non-zero (P0 audit fix)
         if self.hashlock == [0u8; 32] {
             anyhow::bail!("Hashlock cannot be zero");
+        }
+        
+        // Verify hashlock length is exactly 32 bytes (P0 audit fix)
+        // Cairo expects exactly 32 bytes for SHA-256 hashlock
+        if self.hashlock.len() != 32 {
+            anyhow::bail!("Hashlock must be exactly 32 bytes (SHA-256 output)");
         }
         
         Ok(())

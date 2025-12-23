@@ -146,7 +146,6 @@ start_devnet() {
         "${DEVNET_IMAGE}" \
         --seed "${SEED}" \
         --port 5050 \
-        --host 0.0.0.0 \
         > /dev/null
     
     if [ $? -eq 0 ]; then
