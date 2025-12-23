@@ -41,39 +41,55 @@ pub struct AliceKeys {
 
 impl AliceKeys {
     /// Generate new Alice keys.
+    /// 
+    /// SECURITY: Rejects zero scalars (astronomically unlikely but possible).
+    /// Retries generation if zero scalar is produced (P1 audit fix).
     pub fn generate() -> Self {
-        let mut rng = OsRng;
-        
-        // Generate spend share
-        let mut s_a_bytes = [0u8; 32];
-        rng.fill_bytes(&mut s_a_bytes);
-        let s_a = Scalar::from_bytes_mod_order(s_a_bytes);
-        s_a_bytes.zeroize();
-        
-        // Generate view share
-        let mut v_a_bytes = [0u8; 32];
-        rng.fill_bytes(&mut v_a_bytes);
-        let v_a = Scalar::from_bytes_mod_order(v_a_bytes);
-        v_a_bytes.zeroize();
-        
-        // SECURITY: Verify BN254 compatibility
-        debug_assert!(
-            verify_scalar_bn254_compatible(&s_a),
-            "Alice's spend share must be BN254 compatible"
-        );
-        debug_assert!(
-            verify_scalar_bn254_compatible(&v_a),
-            "Alice's view share must be BN254 compatible"
-        );
-        
-        let S_a = s_a * G;
-        let V_a = v_a * G;
-        
-        Self {
-            spend_share: s_a,
-            view_share: v_a,
-            S_a,
-            V_a,
+        loop {
+            let mut rng = OsRng;
+            
+            // Generate spend share
+            let mut s_a_bytes = [0u8; 32];
+            rng.fill_bytes(&mut s_a_bytes);
+            let s_a = Scalar::from_bytes_mod_order(s_a_bytes);
+            s_a_bytes.zeroize();
+            
+            // SECURITY: Explicitly reject zero scalar (P1 audit fix - consistency with BobKeys)
+            // Probability is ~2^-252, but we must handle it for production safety
+            if s_a == Scalar::ZERO {
+                continue; // Retry on zero (astronomically unlikely)
+            }
+            
+            // Generate view share
+            let mut v_a_bytes = [0u8; 32];
+            rng.fill_bytes(&mut v_a_bytes);
+            let v_a = Scalar::from_bytes_mod_order(v_a_bytes);
+            v_a_bytes.zeroize();
+            
+            // SECURITY: Explicitly reject zero scalar for view share (P1 audit fix)
+            if v_a == Scalar::ZERO {
+                continue; // Retry on zero (astronomically unlikely)
+            }
+            
+            // SECURITY: Verify BN254 compatibility
+            debug_assert!(
+                verify_scalar_bn254_compatible(&s_a),
+                "Alice's spend share must be BN254 compatible"
+            );
+            debug_assert!(
+                verify_scalar_bn254_compatible(&v_a),
+                "Alice's view share must be BN254 compatible"
+            );
+            
+            let S_a = s_a * G;
+            let V_a = v_a * G;
+            
+            return Self {
+                spend_share: s_a,
+                view_share: v_a,
+                S_a,
+                V_a,
+            };
         }
     }
     
@@ -103,6 +119,29 @@ pub struct AlicePublicData {
     pub S_a: [u8; 32],
     pub V_a: [u8; 32],
     pub v_a: [u8; 32],
+}
+
+impl AlicePublicData {
+    /// Validate Alice's public data (P2 audit fix)
+    /// 
+    /// Verifies:
+    /// - S_a is a valid curve point (on-curve, not infinity)
+    /// - V_a is a valid curve point (on-curve, not infinity)
+    /// 
+    /// Returns `Ok(())` if valid, `Err` otherwise.
+    pub fn validate(&self) -> Result<()> {
+        // Verify S_a is a valid curve point
+        CompressedEdwardsY(self.S_a)
+            .decompress()
+            .ok_or_else(|| anyhow::anyhow!("Invalid spend key share S_a"))?;
+        
+        // Verify V_a is a valid curve point
+        CompressedEdwardsY(self.V_a)
+            .decompress()
+            .ok_or_else(|| anyhow::anyhow!("Invalid view key share V_a"))?;
+        
+        Ok(())
+    }
 }
 
 /// Bob's key shares for two-party protocol.

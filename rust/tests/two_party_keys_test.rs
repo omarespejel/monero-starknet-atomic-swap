@@ -176,6 +176,23 @@ fn test_shared_from_public() {
     assert_eq!(direct.V, from_public.V);
 }
 
+/// Test AlicePublicData validation (P2 audit fix)
+#[test]
+fn test_alice_public_data_validation() {
+    let alice = AliceKeys::generate();
+    let public_data = alice.public_data();
+    
+    // Valid data should pass
+    assert!(public_data.validate().is_ok(), "Valid AlicePublicData should pass validation");
+    
+    // Invalid point should fail
+    let mut invalid = public_data.clone();
+    let mut invalid_bytes = [0xFFu8; 32];
+    invalid_bytes[31] = 0x00; // Invalid compressed point format
+    invalid.S_a = invalid_bytes;
+    assert!(invalid.validate().is_err(), "Invalid point should fail validation");
+}
+
 /// Test BobPublicData validation
 #[test]
 fn test_bob_public_data_validation() {
@@ -200,6 +217,19 @@ fn test_bob_public_data_validation() {
     let mut zero_hashlock = public_data.clone();
     zero_hashlock.hashlock = [0u8; 32];
     assert!(zero_hashlock.validate().is_err(), "Zero hashlock should fail validation");
+}
+
+/// Test security property: Zero scalar rejection (P0/P1 audit fix)
+/// 
+/// Verifies that both AliceKeys and BobKeys never produce zero scalars.
+#[test]
+fn test_alice_zero_scalar_rejection() {
+    // Generate many keys to ensure zero scalar is rejected
+    for _ in 0..1000 {
+        let alice = AliceKeys::generate();
+        assert_ne!(alice.spend_share(), curve25519_dalek::scalar::Scalar::ZERO, "Alice's spend share must never be zero");
+        assert_ne!(alice.view_share(), curve25519_dalek::scalar::Scalar::ZERO, "Alice's view share must never be zero");
+    }
 }
 
 /// Test security property: Zero scalar rejection (P0 audit fix)
