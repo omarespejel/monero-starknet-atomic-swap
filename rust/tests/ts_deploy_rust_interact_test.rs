@@ -120,7 +120,7 @@ async fn test_ts_deploy_rust_interact() -> Result<()> {
     println!("\n📝 Step 1: Generate Two-Party Keys");
     let alice = AliceKeys::generate();
     let bob = BobKeys::generate();
-    let shared = SharedOutput::new(&alice, &bob);
+    let _shared = SharedOutput::new(&alice, &bob);
     
     println!("   ✅ Alice keys generated");
     println!("   ✅ Bob keys generated");
@@ -128,7 +128,7 @@ async fn test_ts_deploy_rust_interact() -> Result<()> {
     
     // Step 2: Generate DLEQ proof
     println!("\n📝 Step 2: Generate DLEQ Proof");
-    let dleq_proof = generate_dleq_proof_for_bob(&bob)
+    let _dleq_proof = generate_dleq_proof_for_bob(&bob)
         .context("Failed to generate DLEQ proof")?;
     
     println!("   ✅ DLEQ proof generated");
@@ -143,11 +143,13 @@ async fn test_ts_deploy_rust_interact() -> Result<()> {
     // Using a placeholder - in production this would be the actual AtomicLock class hash
     let class_hash = "0x0"; // Placeholder - not used for invoke operations
     
-    let client = StarknetManualClient::devnet(
-        DEVNET_ACCOUNT,
-        DEVNET_PRIVATE_KEY,
-        class_hash,
-    )?;
+    let client: Box<dyn StarknetClient> = Box::new(
+        StarknetManualClient::devnet(
+            DEVNET_ACCOUNT,
+            DEVNET_PRIVATE_KEY,
+            class_hash,
+        )?
+    );
     
     println!("   ✅ Rust client created");
     
