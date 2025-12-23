@@ -23,27 +23,45 @@
 
 ## Protocol Flow
 
-### Phase 1: Setup
+### Phase 1: Setup (Two-Party Key Generation)
 
-Alice generates a swap key pair using key splitting:
+**Production Protocol**: Uses two-party key generation (Serai DEX pattern, CypherStack audited):
+
+**Alice generates**:
+- `s_a`: Spend key share (kept secret)
+- `v_a`: View key share (kept secret)
+- `S_a = s_a·G`: Public spend key share
+- `V_a = v_a·G`: Public view key share
+
+**Bob generates**:
+- `s_b`: Spend key share (kept secret)
+- `v_b`: View key share (derived deterministically from `s_b`)
+- `S_b = s_b·G`: Public spend key share (adaptor point)
+- `V_b = v_b·G`: Public view key share
+- `H = SHA-256(s_b_raw_bytes)`: Hashlock (published to Starknet)
+
+**Combined keys**:
+- `S = (s_a + s_b)·G`: Combined spend public key
+- `V = (v_a + v_b)·G`: Combined view public key
+- `x = s_a + s_b`: Full spend key (recovered after `s_b` revealed)
+
+**Bob computes DLEQ proof**:
+- DLEQ proof: Proves `∃s_b: SHA-256(s_b) = H ∧ s_b·G = S_b`
+
+**Legacy Protocol** (deprecated): Single-party key splitting:
 - `x_partial`: Partial spend key (kept secret)
 - `t`: Adaptor scalar (will be revealed)
 - `x = x_partial + t`: Full spend key
 
-Alice computes:
-- `T = t·G`: Adaptor point (published to Starknet)
-- `H = SHA-256(t)`: Hashlock (published to Starknet)
-- DLEQ proof: Proves `∃t: SHA-256(t) = H ∧ t·G = T`
-
 ### Phase 2: Contract Deployment
 
-Alice deploys AtomicLock contract on Starknet with:
-- Hashlock `H` (8 u32 words)
-- Adaptor point `T` (compressed Edwards, 32 bytes)
-- DLEQ proof (challenge, response, commitments)
+Bob deploys AtomicLock contract on Starknet with:
+- Hashlock `H` (8 u32 words, SHA-256 of `s_b` raw bytes)
+- Adaptor point `S_b` (compressed Edwards, 32 bytes)
+- DLEQ proof (challenge, response, commitments) proving hashlock binds to adaptor point
 - Timelock (minimum 3 hours)
 
-Contract constructor verifies DLEQ proof. If invalid, deployment fails.
+**Security**: Contract constructor verifies DLEQ proof. If invalid, deployment fails. This cryptographically binds the hashlock to the adaptor point, preventing hashlock substitution attacks.
 
 ### Phase 3: Token Deposit
 
@@ -51,18 +69,22 @@ Alice calls `deposit()` to transfer tokens into the contract. Only Alice (deposi
 
 ### Phase 4: Secret Revelation
 
-Bob reveals secret `t` by calling `verify_and_unlock(t)`. Contract verifies:
-- `SHA-256(t) == H` (hashlock check)
-- `t·G == T` (MSM verification via Garaga)
+Bob reveals secret `s_b` by calling `verify_and_unlock(s_b)`. Contract verifies:
+- `SHA-256(s_b_raw_bytes) == H` (hashlock check)
+- `s_b·G == S_b` (MSM verification via Garaga)
 
 If verification succeeds, tokens transfer to Bob and contract emits `Unlocked` event.
 
+**Security**: Two-phase unlock with grace period (2 hours) mitigates race conditions between secret revelation and cross-chain confirmation.
+
 ### Phase 5: Key Recovery
 
-Alice monitors Starknet for `Unlocked` event, extracts revealed `t`, and recovers full key:
-- `x = x_partial + t`
+Alice monitors Starknet for `Unlocked` event, extracts revealed `s_b`, and recovers full key:
+- `x = s_a + s_b` (using `recover_spend_key(s_a, s_b)`)
 
 Alice can now spend Monero using the full key `x` with standard Monero wallet software.
+
+**Security Property**: Neither Alice nor Bob can spend alone. Both shares are required to recover the full spend key.
 
 ## Trust Boundaries
 
@@ -80,9 +102,21 @@ The Rust side generates secrets and proofs. The Cairo side verifies proofs and m
 
 ## Cryptographic Primitives
 
-### Key Splitting
+### Two-Party Key Generation (Production)
 
-Uses the Serai DEX pattern: `x = x_partial + t`. This avoids modifying Monero's CLSAG signature scheme while still enabling atomic swaps. The approach has been validated by CypherStack's review of Serai.
+Uses the Serai DEX pattern (CypherStack audited): `x = s_a + s_b` where:
+- Alice generates `s_a` (spend share) and `v_a` (view share)
+- Bob generates `s_b` (spend share) and `v_b` (view share, derived deterministically)
+- Combined keys: `S = (s_a + s_b)·G`, `V = (v_a + v_b)·G`
+- Full spend key: `x = s_a + s_b` (recovered after `s_b` revealed)
+
+**Security Properties**:
+- Neither party can spend alone (requires both shares)
+- Zero-scalar rejection (P0 audit fix)
+- BN254 compatibility checks (prevents Light Protocol #237 vulnerability)
+- Malicious Alice attack prevention (fake `S_a` cannot steal funds)
+
+**Legacy**: Single-party key splitting (`x = x_partial + t`) is deprecated but still supported for backward compatibility.
 
 ### DLEQ Proofs
 
@@ -96,10 +130,13 @@ SHA-256 commitments provide 256 bits of security. The hashlock is verified on-ch
 
 ### Rust Library
 
-- Key splitting: Generate and recover swap keys
-- DLEQ proof generation: Create proofs binding hashlock to adaptor point
-- Serialization: Convert between Rust and Cairo formats
-- Test utilities: Generate test vectors and verify compatibility
+- **Two-party key generation**: `monero/two_party_keys.rs` - AliceKeys, BobKeys, SharedOutput
+- **Key splitting** (legacy): `monero/key_splitting.rs` - Single-party approach
+- **DLEQ proof generation**: `dleq.rs` - Create proofs binding hashlock to adaptor point
+- **Scalar compatibility**: `crypto/scalar_compat.rs` - Ed25519→BN254 safety checks
+- **Race condition monitoring**: `swap/race_monitor.rs` - Detect protocol-level race conditions
+- **Serialization**: Convert between Rust and Cairo formats
+- **Test utilities**: Generate test vectors and verify compatibility
 
 ### Cairo Contract
 
@@ -130,9 +167,18 @@ All cryptographic operations are verifiable on-chain. The DLEQ proof can be inde
 
 ## Known Limitations
 
-### Race Condition
+### Race Condition Monitoring
 
-A protocol-level race condition exists between secret revelation and cross-chain confirmation. If a Monero transaction fails or experiences a reorganization after the secret is revealed, funds may be at risk. Mitigations are planned for future versions.
+A protocol-level race condition exists between secret revelation and cross-chain confirmation. The `RaceConditionMonitor` detects if:
+- Secret is revealed on Starknet before Monero transaction has sufficient confirmations
+- Timelock expires before cross-chain confirmation completes
+
+**Mitigations**:
+- Two-phase unlock with grace period (2 hours)
+- Race condition monitoring module (`swap/race_monitor.rs`)
+- Minimum timelock enforcement (3 hours)
+
+**Status**: Monitoring implemented, automatic mitigation planned for future versions.
 
 ### Monero Integration
 
@@ -183,6 +229,6 @@ The protocol is designed for testnet use only. Mainnet deployment requires exter
 
 ---
 
-**Version**: 0.1.0  
-**Last Updated**: 2025-12-20
+**Version**: 0.7.1 (Two-Party Key Generation)  
+**Last Updated**: 2025-12-23
 
