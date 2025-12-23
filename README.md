@@ -28,6 +28,7 @@ Uses hashlock + MSM verification + DLEQ proofs for cryptographic binding.
 | **Address Derivation** | ✅ **IMPLEMENTED** (monero-rs v0.21) |
 | **Cross-Chain E2E Test** | ✅ **IMPLEMENTED** (Rust→Cairo round-trip) |
 | **Live Stagenet Claim** | ✅ **IMPLEMENTED** (with address derivation) |
+| **Starknet Signing** | ✅ **IMPLEMENTED** (invoke transactions) |
 | State Machine | ✅ Complete with persistence |
 | Starknet Client | ✅ Devnet-compatible implementation |
 | External Review | 🔄 Pending |
@@ -52,7 +53,9 @@ Uses hashlock + MSM verification + DLEQ proofs for cryptographic binding.
 - ✅ **Live Stagenet Claim**: Enhanced `test_claim_flow_live` with proper address derivation
 
 **📋 REMAINING WORK** (Before Mainnet):
-- ⬜ Devnet deployment integration (requires StarknetClient signing)
+- ✅ **Starknet Transaction Signing**: IMPLEMENTED (invoke transactions)
+- ⬜ Contract deployment (`deploy_and_deposit` - needs deployment hash format)
+- ⬜ Live devnet E2E test (requires devnet + deployment)
 - ⬜ Live stagenet claim with funded wallet (manual test)
 - ⬜ External security audit
 
