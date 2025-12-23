@@ -67,9 +67,10 @@ thiserror = "1"
 url = "2.5"
 
 # ===== STARKNET INTEGRATION =====
-# For production (Linux): use official starknet-rs
+# For production (Linux): use official starknet-rs + signing
 [target.'cfg(not(target_os = "macos"))'.dependencies]
 starknet = "0.15"
+starknet-crypto = "0.7"  # For STARK curve transaction signing
 
 # For macOS dev: use minimal starknet-ff (no size-of dependency)
 [target.'cfg(target_os = "macos")'.dependencies]

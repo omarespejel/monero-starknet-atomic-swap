@@ -4492,6 +4492,7 @@ dependencies = [
  "sha2",
  "sha3",
  "starknet",
+ "starknet-crypto 0.7.4",
  "starknet-ff",
  "tempfile",
  "testcontainers",
