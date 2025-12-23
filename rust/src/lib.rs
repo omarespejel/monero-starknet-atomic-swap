@@ -6,6 +6,7 @@
 //! Also includes adaptor signature support for Monero atomic swaps.
 
 pub mod adaptor;
+pub mod crypto;
 pub mod dleq;
 pub mod monero;
 pub mod monero_wallet;

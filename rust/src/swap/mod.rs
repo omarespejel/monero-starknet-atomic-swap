@@ -1,6 +1,7 @@
 pub mod state;
 pub mod db;
 pub mod driver;
+pub mod race_monitor;
 pub mod starknet_manual;      // Cross-platform Starknet client (macOS compatible)
 
 pub use state::SwapState;

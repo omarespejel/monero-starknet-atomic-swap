@@ -11,6 +11,13 @@ description = "Monero key splitting for Starknet atomic swaps"
 
 # For wallet RPC communication (monitoring, decoy selection)
 monero = "=0.21.0"  # Full library for address derivation (AUDITOR APPROVED)
+
+# Cypher Stack audited (Aug 2025) - FROSTLASS security proofs
+# P1.2: Auditor requirement for production hardening
+# NOTE: monero-oxide 0.1.0 not yet published on crates.io
+# Using monero crate for now (auditor-approved wallet-rpc approach)
+# TODO: Add monero-oxide when 0.1.0 is published
+# monero-oxide = "0.1.0"
 jsonrpc_client = { version = "0.7", features = ["reqwest"] }
 monero-epee-bin-serde = "1"
 rust_decimal = { version = "1", features = ["serde-float"] }
@@ -39,6 +46,9 @@ serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["arbitrary_precision"] }
 hex = "0.4"
 bs58 = "0.5"  # For Monero address encoding
+num-bigint = "0.4"
+num-traits = "0.2"
+chrono = { version = "0.4", features = ["serde"] }
 
 # ===== RANDOM NUMBER GENERATION =====
 rand = "0.8"

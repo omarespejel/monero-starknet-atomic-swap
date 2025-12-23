@@ -9,11 +9,24 @@
 //! - G is the standard Ed25519 generator
 //! - Y is the second generator point (derived deterministically)
 //!
-//! **Hash Function Compatibility:**
-//! - Uses BLAKE2s for challenge computation (matches Cairo)
+//! **Hash Function Compatibility (CRITICAL):**
+//! 
+//! **Hashlock**: SHA-256 (matches Cairo's `compute_sha256_byte_array`)
+//! - Hashlock H = SHA-256(raw_secret_bytes) → 32 bytes
+//! - Cairo verification: `compute_sha256_byte_array(@secret)` (line 777)
+//! - Used for: Secret verification in `reveal_secret()` and `verify_and_unlock()`
+//!
+//! **DLEQ Challenge**: BLAKE2s (matches Cairo's `compute_dleq_challenge_blake2s`)
+//! - Challenge c = BLAKE2s("DLEQ" || G || Y || T || U || R1 || R2 || hashlock) mod n
+//! - Cairo computation: `compute_dleq_challenge_blake2s(...)` (line 577)
+//! - Used for: Fiat-Shamir challenge in DLEQ proof verification
 //! - BLAKE2s is Starknet's official standard (v0.14.1+)
 //! - 8x cheaper proving cost than Poseidon
 //! - Native Cairo stdlib support via core::blake
+//!
+//! **VERIFICATION**: Both Rust and Cairo use:
+//! - SHA-256 for hashlock verification ✅
+//! - BLAKE2s for DLEQ challenge computation ✅
 
 use blake2::{Blake2s256, Digest as Blake2Digest};
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
@@ -24,6 +37,9 @@ use sha2::{Digest, Sha256};
 use std::ops::Deref;
 use thiserror::Error;
 use zeroize::{Zeroize, Zeroizing};
+
+// Safe Ed25519 → BN254 conversion (security-critical)
+pub mod ed25519_bn254;
 
 // TODO: Uncomment when Poseidon is fully implemented
 // mod poseidon;
@@ -42,6 +58,10 @@ pub enum DleqError {
     NonceGenerationFailed,
     #[error("Invalid proof data (decompression or deserialization failed)")]
     InvalidProof,
+    #[error("Scalar is not compatible with BN254 field operations")]
+    ScalarIncompatible,
+    #[error("Scalar conversion error: {0}")]
+    ScalarConversionError(String),
 }
 
 /// DLEQ proof structure containing the second point, challenge, response, and commitments.
@@ -198,6 +218,32 @@ pub fn generate_dleq_proof(
         r1: R1,
         r2: R2,
     })
+}
+
+/// Generate DLEQ proof for Bob's secret (s_b)
+/// 
+/// SECURITY: Verifies Ed25519→BN254 compatibility before proof generation.
+/// This is a convenience function for the two-party protocol.
+pub fn generate_dleq_proof_for_bob(bob_keys: &crate::monero::two_party_keys::BobKeys) -> Result<DleqProof, DleqError> {
+    use crate::dleq::ed25519_bn254::ed25519_scalar_to_bn254_safe;
+    use zeroize::Zeroizing;
+    
+    let secret = bob_keys.spend_share();
+    
+    // CRITICAL: Validate scalar is safe for cross-curve use
+    let _bn254_bytes = ed25519_scalar_to_bn254_safe(&secret)
+        .map_err(|e| DleqError::ScalarConversionError(e.to_string()))?;
+    
+    let secret_bytes = bob_keys.secret_bytes();
+    let adaptor_point = bob_keys.adaptor_point();
+    let hashlock = bob_keys.hashlock();
+    
+    generate_dleq_proof(
+        &Zeroizing::new(secret),
+        &secret_bytes,
+        &adaptor_point,
+        &hashlock,
+    )
 }
 
 
