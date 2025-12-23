@@ -158,11 +158,34 @@ async fn test_claim_flow_live() {
         "/tmp/monero_wallets".to_string(),
     ).await.expect("Failed to create wallet");
     
-    // 3. Call claim_monero_after_reveal()
+    // 3. Derive address from keys (AUDITOR REQUIREMENT)
+    use xmr_secret_gen::monero::address::derive_stagenet_address;
+    use tiny_keccak::{Hasher, Keccak};
+    
+    // Recover full key
+    let full_key = *x_partial + t;
+    
+    // Derive view key (same method as claim_monero_after_reveal)
+    let mut keccak = Keccak::v256();
+    keccak.update(&full_key.to_bytes());
+    let mut hash = [0u8; 32];
+    keccak.finalize(&mut hash);
+    let view_key = Scalar::from_bytes_mod_order(hash);
+    
+    // Derive address (AUDITOR FIX: Address derivation now works correctly)
+    let address = derive_stagenet_address(&full_key, &view_key)
+        .expect("Failed to derive address");
+    
+    println!("✅ Address derived: {}", address);
+    assert!(address.starts_with('5'), "Stagenet address must start with '5'");
+    assert_eq!(address.len(), 95, "Address must be 95 characters");
+    
+    // 4. Call claim_monero_after_reveal()
     // This will:
     //   - Recover full key: x = x_partial + t
     //   - Derive view key
-    //   - Generate wallet from keys
+    //   - Derive address (NOW IMPLEMENTED - AUDITOR FIX)
+    //   - Generate wallet from keys with address
     //   - Refresh wallet
     //   - Attempt sweep_all (will fail if no funds - that's OK)
     //   - Cleanup wallet

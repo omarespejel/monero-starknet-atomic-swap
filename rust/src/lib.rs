@@ -12,8 +12,6 @@ pub mod monero;
 pub mod monero_wallet;
 pub mod starknet;
 pub mod swap;
-// TODO: Uncomment when Poseidon is fully implemented
-// pub mod poseidon;
 
 pub use dleq::{generate_dleq_proof, DleqProof, DleqError};
 pub use monero::SwapKeyPair;
