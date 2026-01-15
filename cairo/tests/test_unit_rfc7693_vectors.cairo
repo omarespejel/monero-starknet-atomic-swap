@@ -54,10 +54,17 @@ mod rfc7693_tests {
             empty_hashlock,
             ED25519_ORDER,
         );
-        
-        // Should produce a valid scalar (even if zero inputs)
-        // The important thing is that it completes without error
-        assert(challenge != 0 || true, 'RFC 7693 empty input handled');
+        let challenge2 = compute_dleq_challenge_blake2s(
+            ED25519_BASE_POINT_COMPRESSED,
+            ED25519_SECOND_GENERATOR_COMPRESSED,
+            zero_point,
+            zero_point,
+            zero_point,
+            zero_point,
+            empty_hashlock,
+            ED25519_ORDER,
+        );
+        assert(challenge == challenge2, 'RFC 7693 empty deterministic');
     }
 
     /// RFC 7693 Test Vector 2: Known answer test
@@ -193,9 +200,17 @@ mod rfc7693_tests {
             hashlock,
             ED25519_ORDER,
         );
-
-        // Should produce valid scalar
-        assert(challenge != 0 || true, 'RFC 7693: Unkeyed mode works');
+        let challenge2 = compute_dleq_challenge_blake2s(
+            ED25519_BASE_POINT_COMPRESSED,
+            ED25519_SECOND_GENERATOR_COMPRESSED,
+            point,
+            point,
+            point,
+            point,
+            hashlock,
+            ED25519_ORDER,
+        );
+        assert(challenge == challenge2, 'RFC 7693 unkeyed deterministic');
     }
 }
 

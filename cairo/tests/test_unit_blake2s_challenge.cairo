@@ -173,8 +173,17 @@ mod blake2s_challenge_tests {
             ED25519_ORDER,
         );
 
-        // Should still produce a valid challenge (even if zero hashlock)
-        assert(challenge != 0 || true, 'Zero hashlock should be handled');
+        let challenge2 = compute_dleq_challenge_blake2s(
+            ED25519_BASE_POINT_COMPRESSED,
+            ED25519_SECOND_GENERATOR_COMPRESSED,
+            T,
+            U,
+            R1,
+            R2,
+            hashlock,
+            ED25519_ORDER,
+        );
+        assert(challenge == challenge2, 'Zero hashlock deterministic');
     }
 
     /// Test with maximum hashlock values
@@ -201,8 +210,17 @@ mod blake2s_challenge_tests {
             ED25519_ORDER,
         );
 
-        // Should handle maximum values without overflow
-        assert(challenge != 0 || true, 'Max hashlock should be handled');
+        let challenge2 = compute_dleq_challenge_blake2s(
+            ED25519_BASE_POINT_COMPRESSED,
+            ED25519_SECOND_GENERATOR_COMPRESSED,
+            T,
+            U,
+            R1,
+            R2,
+            hashlock,
+            ED25519_ORDER,
+        );
+        assert(challenge == challenge2, 'Max hashlock deterministic');
     }
 }
 
