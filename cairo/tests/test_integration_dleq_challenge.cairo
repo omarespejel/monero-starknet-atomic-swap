@@ -11,6 +11,7 @@ mod dleq_challenge_only_tests {
     use atomic_lock::blake2s_challenge::compute_dleq_challenge_blake2s;
     use core::array::ArrayTrait;
     use core::integer::u256;
+    use core::traits::TryInto;
     // Constants from rust/test_vectors.json (match test_vectors.cairo)
     const TESTVECTOR_G_COMPRESSED: u256 = u256 {
         low: 0x66666666666666666666666666666658,
@@ -40,6 +41,7 @@ mod dleq_challenge_only_tests {
         low: 0x14def9dea2f79cd65812631a5cf5d3ed,
         high: 0x10000000000000000000000000000000,
     };
+    const TESTVECTOR_CHALLENGE_LOW: felt252 = 0xff93d53eda6f2910e3a1313a226533c5;
 
     /// Test: Compute challenge with Rust test vectors
     ///
@@ -72,6 +74,10 @@ mod dleq_challenge_only_tests {
             hashlock,
             ED25519_ORDER,
         );
+
+        let cairo_challenge_u256: u256 = cairo_challenge.into();
+        let expected_low: u128 = TESTVECTOR_CHALLENGE_LOW.try_into().unwrap();
+        assert(cairo_challenge_u256.low == expected_low, 'Challenge low mismatch');
         
         // Expected challenge from Rust: 0xdb8e86169afd3293b58260ada05e90bb436a67e38f1aac7799f8581342a7c204
         // Note: This is 256 bits, which exceeds felt252 range

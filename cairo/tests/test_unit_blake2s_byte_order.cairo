@@ -10,6 +10,7 @@ mod blake2s_byte_order_tests {
     use atomic_lock::blake2s_challenge::compute_dleq_challenge_blake2s;
     use core::array::ArrayTrait;
     use core::integer::u256;
+    use core::traits::TryInto;
 
     /// Ed25519 order (from RFC 8032)
     const ED25519_ORDER: u256 = u256 {
@@ -30,6 +31,7 @@ mod blake2s_byte_order_tests {
         low: 0x97390f51643851560e5f46ae6af8a3c9,
         high: 0x2260cdf3092329c21da25ee8c9a21f56,
     };
+    const TESTVECTOR_CHALLENGE_LOW: felt252 = 0xff93d53eda6f2910e3a1313a226533c5;
 
     /// Test: Verify DLEQ tag endianness
     ///
@@ -100,10 +102,17 @@ mod blake2s_byte_order_tests {
             zero_hashlock,
             ED25519_ORDER,
         );
-        
-        // Should produce valid scalar (non-zero for non-zero inputs)
-        // The exact value depends on byte order - we verify determinism
-        assert(challenge != 0 || true, 'u256 serialization test');
+        let challenge2 = compute_dleq_challenge_blake2s(
+            ED25519_BASE_POINT_COMPRESSED,
+            ED25519_SECOND_GENERATOR_COMPRESSED,
+            ED25519_BASE_POINT_COMPRESSED, // T = G
+            ED25519_BASE_POINT_COMPRESSED, // U = G (placeholder)
+            ED25519_BASE_POINT_COMPRESSED, // R1 = G (placeholder)
+            ED25519_BASE_POINT_COMPRESSED, // R2 = G (placeholder)
+            zero_hashlock,
+            ED25519_ORDER,
+        );
+        assert(challenge == challenge2, 'u256 serialization ok');
     }
 
     /// Test: Verify hashlock u32 array interpretation
@@ -217,12 +226,10 @@ mod blake2s_byte_order_tests {
             hashlock,
             ED25519_ORDER,
         );
-        
-        // Should produce valid scalar (non-zero for real inputs)
-        // The exact value is validated in test_e2e_dleq.cairo
-        // Verify challenge is computed (non-zero for real inputs)
-        // Exact value validation happens in test_e2e_dleq.cairo
-        assert(challenge != 0 || true, 'Byte order works');
+
+        let challenge_u256: u256 = challenge.into();
+        let expected_low: u128 = TESTVECTOR_CHALLENGE_LOW.try_into().unwrap();
+        assert(challenge_u256.low == expected_low, 'Byte order low mismatch');
     }
 }
 

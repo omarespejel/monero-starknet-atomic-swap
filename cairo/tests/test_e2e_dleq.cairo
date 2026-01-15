@@ -11,6 +11,7 @@
 #[cfg(test)]
 mod e2e_dleq_tests {
     use atomic_lock::IAtomicLockDispatcher;
+    use atomic_lock::blake2s_challenge::compute_dleq_challenge_blake2s;
     use core::array::ArrayTrait;
     use core::serde::Serde;
     use core::traits::TryInto;
@@ -207,20 +208,20 @@ mod e2e_dleq_tests {
         // 2. Hints were generated for truncated scalars
         // 3. Constructor must compare truncated challenges to match what MSM uses
         let challenge_from_json = TEST_VECTOR_C_TRUNCATED;
-        
-        // TODO: Debug why computed challenge doesn't match JSON challenge
-        // For now, use challenge from JSON (cryptographically bound to response)
-        // let computed_challenge = compute_dleq_challenge_blake2s(
-        //     TESTVECTOR_G_COMPRESSED,
-        //     TESTVECTOR_Y_COMPRESSED,
-        //     TESTVECTOR_T_COMPRESSED,
-        //     TESTVECTOR_U_COMPRESSED,
-        //     TESTVECTOR_R1_COMPRESSED,
-        //     TESTVECTOR_R2_COMPRESSED,
-        //     hashlock,
-        //     ED25519_ORDER,
-        // );
-        // assert(computed_challenge == challenge_from_json, 'Challenge mismatch');
+
+        let computed_challenge = compute_dleq_challenge_blake2s(
+            TESTVECTOR_G_COMPRESSED,
+            TESTVECTOR_Y_COMPRESSED,
+            TESTVECTOR_T_COMPRESSED,
+            TESTVECTOR_U_COMPRESSED,
+            TESTVECTOR_R1_COMPRESSED,
+            TESTVECTOR_R2_COMPRESSED,
+            hashlock,
+            ED25519_ORDER,
+        );
+        let computed_u256: u256 = computed_challenge.into();
+        let expected_low: u128 = TEST_VECTOR_C_TRUNCATED.try_into().unwrap();
+        assert(computed_u256.low == expected_low, 'Challenge mismatch');
         
         // Get real MSM hints (generated from test vectors)
         let (s_hint_for_g, s_hint_for_y, c_neg_hint_for_t, c_neg_hint_for_u) = get_real_msm_hints();
