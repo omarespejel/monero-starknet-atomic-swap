@@ -22,6 +22,7 @@ jsonrpc_client = { version = "0.7", features = ["reqwest"] }
 monero-epee-bin-serde = "1"
 rust_decimal = { version = "1", features = ["serde-float"] }
 tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 
 # ===== AUDITED CRYPTOGRAPHY =====
 # Quarkslab-audited elliptic curve operations (2023)
@@ -124,6 +125,10 @@ path = "src/bin/regenerate_r1.rs"
 [[bin]]
 name = "generate_canonical_test_vectors"
 path = "src/bin/generate_canonical_test_vectors.rs"
+
+[[bin]]
+name = "relay_reveal"
+path = "src/bin/relay_reveal.rs"
 
 [dev-dependencies]
 assert_cmd = "2.0"
