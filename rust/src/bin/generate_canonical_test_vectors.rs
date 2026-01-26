@@ -39,7 +39,9 @@ fn main() {
     .expect("Proof generation should succeed for valid inputs");
 
     // Convert to Cairo format
-    let cairo_format = proof.to_cairo_format(&adaptor_point);
+    let cairo_format = proof
+        .to_cairo_format(&adaptor_point)
+        .expect("Failed to derive Cairo sqrt hints");
 
     // Create canonical test vector with ALL intermediate values
     let output = json!({
@@ -62,6 +64,7 @@ fn main() {
         "adaptor_point_compressed": hex::encode(cairo_format.adaptor_point_compressed),
         "adaptor_point_sqrt_hint": hex::encode(cairo_format.adaptor_point_sqrt_hint),
         "dleq_second_point_compressed": hex::encode(cairo_format.second_point_compressed),
+        "second_point_compressed": hex::encode(cairo_format.second_point_compressed),
         "second_point_sqrt_hint": hex::encode(cairo_format.second_point_sqrt_hint),
         "challenge": hex::encode(cairo_format.challenge),
         "response": hex::encode(cairo_format.response),

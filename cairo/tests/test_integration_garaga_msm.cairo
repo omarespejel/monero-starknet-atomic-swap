@@ -35,9 +35,9 @@ mod garaga_msm_all_calls_tests {
     };
 
     const BASE_128: felt252 = 0x100000000000000000000000000000000;
-    const RESPONSE_LOW: felt252 = 0x47cff7b5713428a889bfad01f6fa4e00;
-    const RESPONSE_HIGH: felt252 = 0x0850ef802e40bbd177b22dd7319a9bc0;
-    const CHALLENGE_FELT: felt252 = 0x6212e6122afa3670f0f578dffd3b2703;
+    const RESPONSE_LOW: felt252 = 0x1e741f8fec4161ea41b23ce6d007ba12;
+    const RESPONSE_HIGH: felt252 = 0x026ed77551e578013227c9b98bd25c66;
+    const CHALLENGE_FELT: felt252 = 0x8d664bb70810bdab323a44354d98f94a;
 
     #[test]
     fn test_msm_sg_isolation() {
@@ -50,16 +50,38 @@ mod garaga_msm_all_calls_tests {
         };
         
         let s_hint_for_g = array![
-            0xd21de05d0b4fe220a6fcca9b,
-            0xa8e827ce9b59e1a5770bd9a,
-            0x4e14ea0d8a7581a1,
+
+        
+            0x52f522935135e7c5474d3b99,
+
+        
+            0x7ff7e65231c434008a0c02f8,
+
+        
+            0x41a3962ca5bba9db,
+
+        
             0x0,
-            0x8cfb1d3e412e174d0ad03ad4,
-            0x4417fe7cc6824de3b328f2a0,
-            0x13f6f393b443ac08,
+
+        
+            0xa144206dc24b7180d05200e0,
+
+        
+            0xe8a798301a354777473cd98e,
+
+        
+            0x7ca5add375ea088,
+
+        
             0x0,
-            0x1fd0f994a4c11a4543d86f4578e7b9ed,
-            0x39099b31d1013f73ec51ebd61fdfe2ab
+
+        
+            0x1e741f8fec4161ea41b23ce6d007ba12,
+
+        
+            0x100000000000000000000000000000001
+
+        
         ].span();
         
         let sG = msm_g1(
@@ -87,16 +109,38 @@ mod garaga_msm_all_calls_tests {
         };
         
         let s_hint_for_y = array![
-            0xcdb4e41a66188ec060e0e45b,
-            0x1cf0f0ff51495823cad8d964,
-            0x2dcda3d3bbeda8a3,
+
+        
+            0x3b81c211fd322bb7dbcb711c,
+
+        
+            0x2082c0dd34f9225f2eb5e0b0,
+
+        
+            0x311b02be49202932,
+
+        
             0x0,
-            0x8b8b33d4304cc1bedc45545c,
-            0x5fbf8dbd7bd2029ba859c5bb,
-            0x145b0ef370c62319,
+
+        
+            0x18c0245425f95187b10e1913,
+
+        
+            0x922be9d1d5313d1c7a4cb499,
+
+        
+            0x51d9b0eb8a969e37,
+
+        
             0x0,
-            0x1fd0f994a4c11a4543d86f4578e7b9ed,
-            0x39099b31d1013f73ec51ebd61fdfe2ab
+
+        
+            0x1e741f8fec4161ea41b23ce6d007ba12,
+
+        
+            0x100000000000000000000000000000001
+
+        
         ].span();
         
         let sY = msm_g1(
@@ -122,16 +166,38 @@ mod garaga_msm_all_calls_tests {
         let c_neg_scalar = (ED25519_ORDER - (c_scalar % ED25519_ORDER)) % ED25519_ORDER;
         
         let c_neg_hint_for_t = array![
-            0x959983489a84cf6bb55fde22,
-            0xfbea3c47483b8fb99b0e29ef,
-            0x3fe816922486f803,
+
+        
+            0xcb63575f3729fe6cbe7f8496,
+
+        
+            0x9dc314d92447fddbfc1be6cd,
+
+        
+            0x7d6caff1e7cdaa02,
+
+        
             0x0,
-            0x406a020256217f7a00633c4a,
-            0x6b9be390479e99c682cae8f0,
-            0x7b48b6a59c2c6732,
+
+        
+            0x78dc46b41742aa135083e2da,
+
+        
+            0xecafad9bd49fe98686457cc6,
+
+        
+            0x592bb6f3eaf7ca3,
+
+        
             0x0,
-            0x208a4ac47d492a7b82475d0c0c798e52,
-            0x29c3b379b559be107e5c78bb9abb6515
+
+        
+            0x34a3efff5488d0dfc135bf37e3357b53,
+
+        
+            0x1cf7b1760ae5d3463a08a196fd625720
+
+        
         ].span();
         
         let neg_cT = msm_g1(
@@ -157,16 +223,38 @@ mod garaga_msm_all_calls_tests {
         let c_neg_scalar = (ED25519_ORDER - (c_scalar % ED25519_ORDER)) % ED25519_ORDER;
         
         let c_neg_hint_for_u = array![
-            0x6bea23ab976cb56319ceb69d,
-            0xba4983a65676829fc603f500,
-            0x65b0b083f90952f1,
+
+        
+            0x61ebcae684d8530622e29b45,
+
+        
+            0x694dbc34734f56c0e29f5240,
+
+        
+            0x1913755501e61b9a,
+
+        
             0x0,
-            0x7e7a6ae6e23418c184e6d824,
-            0x119cf240405f414ec4ed2cc6,
-            0x15cea0344fcb9e58,
+
+        
+            0x2a37ba10878046ff378a7d73,
+
+        
+            0x25857fe5ce7f65cea1bbc1e0,
+
+        
+            0xca82b2053c5e43e,
+
+        
             0x0,
-            0x208a4ac47d492a7b82475d0c0c798e52,
-            0x29c3b379b559be107e5c78bb9abb6515
+
+        
+            0x34a3efff5488d0dfc135bf37e3357b53,
+
+        
+            0x1cf7b1760ae5d3463a08a196fd625720
+
+        
         ].span();
         
         let neg_cU = msm_g1(

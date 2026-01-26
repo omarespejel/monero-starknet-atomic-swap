@@ -213,4 +213,3 @@ mod rfc7693_tests {
         assert(challenge == challenge2, 'RFC 7693 unkeyed deterministic');
     }
 }
-

@@ -1,5 +1,9 @@
 # ADR-002: BLAKE2s Over Poseidon for DLEQ Challenge
 
+**Status**: Parked for deployment. BLAKE2s is retained in the codebase, but the
+active deployable path uses Poseidon until `blake2s_compress` is available on
+Starknet mainnet/testnet.
+
 ## Status
 
 Accepted (2025-12-05)

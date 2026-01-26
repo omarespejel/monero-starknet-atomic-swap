@@ -115,14 +115,14 @@ def main():
     # Use the sqrt hints that match Cairo's test_e2e_dleq.cairo
     # These are already correct and verified to work with Cairo
     # From test_e2e_dleq.cairo:
-    # TEST_ADAPTOR_POINT_SQRT_HINT: low=0x448c18dcf34127e112ff945a65defbfc, high=0x17611da35f39a2a5e3a9fddb8d978e4f
-    # TEST_SECOND_POINT_SQRT_HINT: low=0xdcad2173817c163b5405cec7698eb4b8, high=0x742bb3c44b13553c8ddff66565b44cac
+    # TEST_ADAPTOR_POINT_SQRT_HINT: low=0x3bfd09e75b63f27a4ae88a8bdfc69e60, high=0x28664e2f65e4af77cb320d4aef96f9a2
+    # TEST_SECOND_POINT_SQRT_HINT: low=0x635b91350975fa3c61a0849aee237a31, high=0x583d9575cba9ddafe6fdd681b794ab3e
     
-    adaptor_sqrt_low = 0x448c18dcf34127e112ff945a65defbfc
-    adaptor_sqrt_high = 0x17611da35f39a2a5e3a9fddb8d978e4f
+    adaptor_sqrt_low = 0x3bfd09e75b63f27a4ae88a8bdfc69e60
+    adaptor_sqrt_high = 0x28664e2f65e4af77cb320d4aef96f9a2
     
-    second_sqrt_low = 0xdcad2173817c163b5405cec7698eb4b8
-    second_sqrt_high = 0x742bb3c44b13553c8ddff66565b44cac
+    second_sqrt_low = 0x635b91350975fa3c61a0849aee237a31
+    second_sqrt_high = 0x583d9575cba9ddafe6fdd681b794ab3e
     
     # Step 1: Decompress T and U using GARAGA'S EXACT ALGORITHM
     print("\n### DECOMPRESSING POINTS WITH GARAGA ###\n")

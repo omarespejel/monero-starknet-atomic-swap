@@ -67,7 +67,11 @@ pub trait IERC20<TContractState> {
 }
 
 // Module declarations for production-grade cryptographic utilities
+// NOTE: BLAKE2s is kept for future enablement once libfunc is available.
+// For now, Poseidon is the active deployable path.
+#[cfg(test)]
 pub mod blake2s_challenge;
+pub mod poseidon_challenge;
 pub mod edwards_serialization;
 
 #[starknet::contract]
@@ -93,7 +97,7 @@ pub mod AtomicLock {
     use openzeppelin::security::ReentrancyGuardComponent;
     
     // Import production-grade cryptographic modules (using audited libraries)
-    use super::blake2s_challenge::compute_dleq_challenge_blake2s;
+    use super::poseidon_challenge::compute_dleq_challenge_poseidon;
     
     /// Ed25519 curve order (from RFC 8032)
     /// This matches Garaga's get_ED25519_order_modulus() value
@@ -576,7 +580,7 @@ pub mod AtomicLock {
         let G_compressed = ED25519_BASE_POINT_COMPRESSED;
         let Y_compressed = ED25519_SECOND_GENERATOR_COMPRESSED;
         
-        let c_prime = compute_dleq_challenge_blake2s(
+        let c_prime = compute_dleq_challenge_poseidon(
             G_compressed,
             Y_compressed,
             adaptor_point_edwards_compressed,
@@ -604,7 +608,7 @@ pub mod AtomicLock {
         // CRITICAL: Compare truncated REDUCED challenges
         // Rust stores the REDUCED scalar in test_vectors.json as big-endian bytes
         // TEST_VECTOR_C_TRUNCATED is the low 128 bits of the REDUCED challenge (big-endian)
-        // Cairo computes: BLAKE2s digest -> reduce mod order -> felt252
+        // Cairo computes: Poseidon digest -> reduce mod order -> felt252
         // The felt252 represents the reduced scalar, but we need to compare the truncated value
         // Convert felt252 to u256 first (always succeeds), then extract low 128 bits
         let c_prime_u256: u256 = c_prime.into();
@@ -614,7 +618,7 @@ pub mod AtomicLock {
         // Both c_prime and dleq_challenge are already reduced scalars
         if c_prime_u256.low != dleq_challenge_u256.low {
             // The challenge mismatch indicates either:
-            // 1. Challenge computation difference (BLAKE2s implementation?)
+            // 1. Challenge computation difference (Poseidon implementation?)
             // 2. Challenge passed via calldata differs from what test computed
             // 3. Input serialization difference (points, hashlock)
             // NOTE: All inputs (hashlock, points) are verified to match expected values
@@ -1380,7 +1384,7 @@ pub mod AtomicLock {
         // Recomputing it here would cause hint stream exhaustion or other resource issues.
         // 
         // Architecture: Single Source of Truth
-        // - Constructor computes and validates challenge: c' = compute_dleq_challenge_blake2s(...)
+        // - Constructor computes and validates challenge: c' = compute_dleq_challenge_poseidon(...)
         // - Constructor asserts: c == c' (validates the proof)
         // - This function trusts the validated challenge and only performs MSM verification
         //
@@ -1489,12 +1493,11 @@ pub mod AtomicLock {
     /// @return felt252 Challenge scalar (reduced mod ED25519_ORDER)
     /// @security Uses Cairo's Poseidon implementation (gas-efficient, audited)
     /// @invariant Challenge is deterministic given same inputs (Fiat-Shamir)
-    // NOTE: BLAKE2s challenge computation and serialization functions have been moved to
-    // the blake2s_challenge module for better organization and reusability.
-    // This module uses ONLY audited libraries: Cairo core BLAKE2s (Starkware).
-    // See: blake2s_challenge::compute_dleq_challenge_blake2s()
+    // NOTE: Poseidon is the deployable challenge path.
+    // BLAKE2s is retained in blake2s_challenge for future enablement.
+    // See: poseidon_challenge::compute_dleq_challenge_poseidon()
     
-    /// @notice Compute DLEQ challenge using BLAKE2s with compressed Edwards points
+    /// @notice Compute DLEQ challenge using Poseidon with compressed Edwards points
     /// @dev Legacy function signature for backward compatibility
     /// @dev Converts Weierstrass G1Points to compressed Edwards format
     /// @param G Standard Ed25519 generator (Weierstrass)
@@ -1506,7 +1509,7 @@ pub mod AtomicLock {
     /// @param hashlock SHA-256 hash of secret (8×u32 words)
     /// @return Challenge scalar c reduced mod Ed25519 order
     /// @note This function converts Weierstrass points to compressed Edwards for hashing
-    /// @note For new code, use compute_dleq_challenge_blake2s() with compressed points directly
+    /// @note For new code, use compute_dleq_challenge_poseidon() with compressed points directly
     fn compute_dleq_challenge(
         G: G1Point,
         Y: G1Point,
@@ -1548,7 +1551,7 @@ pub mod AtomicLock {
         let hash_felt = state.finalize();
         
         // Convert felt252 hash to scalar mod curve order
-        let hash_u256 = u256 { low: hash_felt.try_into().unwrap(), high: 0 };
+        let hash_u256: u256 = hash_felt.try_into().unwrap();
         let scalar = reduce_scalar_ed25519(hash_u256);
         
         // Convert back to felt252

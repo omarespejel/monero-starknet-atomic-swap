@@ -214,7 +214,7 @@ async fn submit_invoke_tx(&self, calls: Vec<Call>) -> Result<String> {
 **Cryptographic Core**: ✅ **PRODUCTION READY**
 
 - Two-party key generation: Secure (Serai DEX pattern, CypherStack audited)
-- DLEQ proofs: Sound and complete (BLAKE2s challenge, SHA-256 hashlock)
+- DLEQ proofs: Sound and complete (Poseidon challenge, SHA-256 hashlock; BLAKE2s parked)
 - Address derivation: Battle-tested (`monero-rs` v0.21)
 - Cross-curve safety: Verified (Ed25519→BN254 compatibility checks)
 - Zero-scalar rejection: Implemented (Alice + Bob)

@@ -57,25 +57,25 @@ mod gas_benchmark_tests {
         };
 
         let r1_compressed: u256 = u256 {
-            low: 0x90b1ab352981d43ec51fba0af7ab51c7,
-            high: 0xc21ebc88e5e59867b280909168338026,
+            low: 0x3cb02521d7a17fedca11c02ea41fe334,
+            high: 0x11ef09256f90d942ca7a0e4ae05926a5,
         };
         let r1_sqrt_hint: u256 = u256 {
-            low: 0x72a9698d3171817c239f4009cc36fc97,
-            high: 0x3f2b84592a9ee701d24651e3aa3c837d,
+            low: 0x623d9789d855bcc4f0fbd8683b350688,
+            high: 0x0a2d15cdfbfcf6181e92f0b7c74b477e,
         };
 
         let r2_compressed: u256 = u256 {
-            low: 0x02d386e8fd6bd85a339171211735bcba,
-            high: 0x10defc0130a9f3055798b1f5a99aeb67,
+            low: 0xb4fb26c272cbe6b84d65d4f908aff02f,
+            high: 0xf58498fd33c0fbca066f3fdff2f49225,
         };
         let r2_sqrt_hint: u256 = u256 {
-            low: 0x043f2c451f9ca69ff1577d77d646a50e,
-            high: 0x4ee64b0e07d89e906f9e8b7bea09283e,
+            low: 0x598521e3f6d818ed84721901f0d87f89,
+            high: 0x09d2fd2811966933dff4c8ab0d9059fc,
         };
 
-        let challenge: felt252 = 0xff93d53eda6f2910e3a1313a226533c5;
-        let response: felt252 = 0xc09b9a31d72db277d1bb402e80ef5008;
+        let challenge: felt252 = 0x8d664bb70810bdab323a44354d98f94a;
+        let response: felt252 = 0x1e741f8fec4161ea41b23ce6d007ba12;
 
         let fake_glv_hint = array![
             0x4af5bf430174455ca59934c5, 0x748d85ad870959a54bca47ba,
@@ -86,35 +86,143 @@ mod gas_benchmark_tests {
         ].span();
 
         let s_hint_for_g = array![
-            0xa82b6800cf6fafb9e422ff00, 0xa9d32170fa1d6e70ce9f5875,
-            0x38d522e54f3cc905, 0x0,
-            0x6632b6936c8a0092f2fa8193, 0x48849326ffd29b0fd452c82e,
-            0x1cb22722b8aeac6d, 0x0,
-            0x3ce8213ee078382bd7862b141d23a01e, 0x12a88328ee6fe07c656e9f1f11921d2ff
+
+
+            0x52f522935135e7c5474d3b99,
+
+
+            0x7ff7e65231c434008a0c02f8,
+
+
+            0x41a3962ca5bba9db,
+
+
+            0x0,
+
+
+            0xa144206dc24b7180d05200e0,
+
+
+            0xe8a798301a354777473cd98e,
+
+
+            0x7ca5add375ea088,
+
+
+            0x0,
+
+
+            0x1e741f8fec4161ea41b23ce6d007ba12,
+
+
+            0x100000000000000000000000000000001
+
+
         ].span();
 
         let s_hint_for_y = array![
-            0x5f8703b67e528a68c666436f, 0x4319c91a2264dceb203b3c7,
-            0x131bcf26d61c6749, 0x0,
-            0x2b9edf9810114e3f99120ee8, 0x23ac0997ff9d26665393f4f1,
-            0xa2adc2ad21db8d1, 0x0,
-            0x3ce8213ee078382bd7862b141d23a01e, 0x12a88328ee6fe07c656e9f1f11921d2ff
+
+
+            0x3b81c211fd322bb7dbcb711c,
+
+
+            0x2082c0dd34f9225f2eb5e0b0,
+
+
+            0x311b02be49202932,
+
+
+            0x0,
+
+
+            0x18c0245425f95187b10e1913,
+
+
+            0x922be9d1d5313d1c7a4cb499,
+
+
+            0x51d9b0eb8a969e37,
+
+
+            0x0,
+
+
+            0x1e741f8fec4161ea41b23ce6d007ba12,
+
+
+            0x100000000000000000000000000000001
+
+
         ].span();
 
         let c_neg_hint_for_t = array![
-            0xcc7bbab2a86720f06fa72b5a, 0x27ebc6cd7c83bd71f4819168,
-            0x2b4af1beb7dc4112, 0x0,
-            0xd0ac52873f110a396803c36c, 0xc23304c89672797661dbefa3,
-            0x547b7c3862004a5a, 0x0,
-            0xba5f45d69eaafbaaa06091a65e2873d, 0x1301450999c6615fa5bded0ada7e22902
+
+
+            0xcb63575f3729fe6cbe7f8496,
+
+
+            0x9dc314d92447fddbfc1be6cd,
+
+
+            0x7d6caff1e7cdaa02,
+
+
+            0x0,
+
+
+            0x78dc46b41742aa135083e2da,
+
+
+            0xecafad9bd49fe98686457cc6,
+
+
+            0x592bb6f3eaf7ca3,
+
+
+            0x0,
+
+
+            0x34a3efff5488d0dfc135bf37e3357b53,
+
+
+            0x1cf7b1760ae5d3463a08a196fd625720
+
+
         ].span();
 
         let c_neg_hint_for_u = array![
-            0x3aa67aef7c64a7b253e4a0fc, 0x2799eb3ed1784408cb1f6360,
-            0x6d7fa630d5721877, 0x0,
-            0x9fed6006f4d300b627b45f, 0xf8f69fd5bc96748bf6e2541b,
-            0x56b40a0879ad40ae, 0x0,
-            0xba5f45d69eaafbaaa06091a65e2873d, 0x1301450999c6615fa5bded0ada7e22902
+
+
+            0x61ebcae684d8530622e29b45,
+
+
+            0x694dbc34734f56c0e29f5240,
+
+
+            0x1913755501e61b9a,
+
+
+            0x0,
+
+
+            0x2a37ba10878046ff378a7d73,
+
+
+            0x25857fe5ce7f65cea1bbc1e0,
+
+
+            0xca82b2053c5e43e,
+
+
+            0x0,
+
+
+            0x34a3efff5488d0dfc135bf37e3357b53,
+
+
+            0x1cf7b1760ae5d3463a08a196fd625720
+
+
         ].span();
 
         // Deploy contract - gas will be measured by snforge

@@ -3,9 +3,9 @@
 //! This uses curve25519-dalek to decompress points and extract x-coordinates
 //! via Montgomery form, which matches what Garaga expects.
 
-use curve25519_dalek::edwards::CompressedEdwardsY;
 use serde_json::json;
 use std::fs;
+use xmr_secret_gen::dleq::sqrt_hint_from_compressed;
 
 fn main() {
     // Read test vectors
@@ -30,7 +30,7 @@ fn main() {
     println!();
 
     // Collect hints first, then update JSON
-    let mut hints: Vec<(String, String, u128, u128)> = Vec::new();
+    let mut hints: Vec<(String, String, [u8; 32], u128, u128)> = Vec::new();
 
     for key in &point_keys {
         let compressed_hex = test_vectors[key]
@@ -44,22 +44,15 @@ fn main() {
             .try_into()
             .expect("Must be 32 bytes");
 
-        // Decompress point
-        let compressed = CompressedEdwardsY(bytes);
-        let point = compressed
-            .decompress()
-            .expect(&format!("Failed to decompress {}", key));
-
-        // Get x-coordinate via Montgomery form
-        let montgomery = point.to_montgomery();
-        let x_bytes = montgomery.to_bytes();
+        let x_bytes =
+            sqrt_hint_from_compressed(&bytes).expect(&format!("Failed to derive {}", key));
 
         // Convert to u256 format (low/high u128)
         let x_low = u128::from_le_bytes(x_bytes[..16].try_into().unwrap());
         let x_high = u128::from_le_bytes(x_bytes[16..].try_into().unwrap());
 
         let hint_key = key.replace("_compressed", "_sqrt_hint");
-        hints.push((hint_key.clone(), compressed_hex.clone(), x_low, x_high));
+        hints.push((hint_key.clone(), compressed_hex.clone(), x_bytes, x_low, x_high));
 
         println!("{}:", key);
         println!("  Compressed: {}", compressed_hex);
@@ -69,8 +62,8 @@ fn main() {
     }
 
     // Now update test vectors
-    for (hint_key, _, x_low, x_high) in &hints {
-        test_vectors[hint_key] = json!(format!("{:064x}{:064x}", x_high, x_low));
+    for (hint_key, _, x_bytes, x_low, x_high) in &hints {
+        test_vectors[hint_key] = json!(hex::encode(x_bytes));
         test_vectors[format!("{}_u256", hint_key)] = json!({
             "low": format!("0x{:032x}", x_low),
             "high": format!("0x{:032x}", x_high),

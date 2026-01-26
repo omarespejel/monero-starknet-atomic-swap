@@ -40,6 +40,9 @@ keccak = "0.1"    # For Monero's Keccak256 (NOT SHA3!)
 tiny-keccak = { version = "=2.0.2", features = ["keccak"] }  # For view key derivation
 uuid = { version = "1.0", features = ["v4"] }  # For wallet name generation
 zeroize = { version = "=1.8.1", features = ["derive"] }
+# Poseidon hashing (Starknet-compatible, cross-platform)
+lambdaworks-crypto = "0.10"
+lambdaworks-math = "0.10"
 
 # ===== SERIALIZATION & UTILITIES =====
 serde = { version = "1", features = ["derive"] }
@@ -70,12 +73,13 @@ url = "2.5"
 # For production (Linux): use official starknet-rs + signing
 [target.'cfg(not(target_os = "macos"))'.dependencies]
 starknet = "0.15"
-starknet-crypto = "0.7"  # For STARK curve transaction signing
+starknet-crypto = "0.7"  # For STARK curve transaction signing (non-macOS)
 
 # For macOS dev: use minimal starknet-ff (no size-of dependency)
 [target.'cfg(target_os = "macos")'.dependencies]
 starknet-ff = "0.3"
 sha3 = "0.10"      # For starknet_keccak selector computation
+
 
 [features]
 default = []

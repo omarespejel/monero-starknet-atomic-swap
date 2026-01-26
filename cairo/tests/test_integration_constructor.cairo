@@ -3,7 +3,7 @@
 
 #[cfg(test)]
 mod constructor_step_by_step_tests {
-    use atomic_lock::blake2s_challenge::compute_dleq_challenge_blake2s;
+    use atomic_lock::poseidon_challenge::compute_dleq_challenge_poseidon;
     use core::array::ArrayTrait;
     use core::integer::u256;
     use garaga::signatures::eddsa_25519::decompress_edwards_pt_from_y_compressed_le_into_weirstrass_point;
@@ -28,12 +28,12 @@ mod constructor_step_by_step_tests {
         high: 0x5c79d0fa84d6440908e2e2065e60d1cd,
     };
     const TESTVECTOR_R1_COMPRESSED: u256 = u256 {
-        low: 0x90b1ab352981d43ec51fba0af7ab51c7,
-        high: 0xc21ebc88e5e59867b280909168338026,
+        low: 0x3cb02521d7a17fedca11c02ea41fe334,
+        high: 0x11ef09256f90d942ca7a0e4ae05926a5,
     };
     const TESTVECTOR_R2_COMPRESSED: u256 = u256 {
-        low: 0x02d386e8fd6bd85a339171211735bcba,
-        high: 0x10defc0130a9f3055798b1f5a99aeb67,
+        low: 0xb4fb26c272cbe6b84d65d4f908aff02f,
+        high: 0xf58498fd33c0fbca066f3fdff2f49225,
     };
     const ED25519_ORDER: u256 = u256 {
         low: 0x14def9dea2f79cd65812631a5cf5d3ed,
@@ -53,20 +53,20 @@ mod constructor_step_by_step_tests {
         high: 0x742bb3c44b13553c8ddff66565b44cac,
     };
     const TEST_R1_SQRT_HINT: u256 = u256 {
-        low: 0x8d569672ce8e7e83dc60bff633c90356,
-        high: 0x40d47ba6d56118fe2db9ae1c55c37c82,
+        low: 0x623d9789d855bcc4f0fbd8683b350688,
+        high: 0x0a2d15cdfbfcf6181e92f0b7c74b477e,
     };
     const TEST_R2_SQRT_HINT: u256 = u256 {
-        low: 0x43f2c451f9ca69ff1577d77d646a50e,
-        high: 0x4ee64b0e07d89e906f9e8b7bea09283e,
+        low: 0x598521e3f6d818ed84721901f0d87f89,
+        high: 0x09d2fd2811966933dff4c8ab0d9059fc,
     };
     // Use constants from single source of truth (test_vectors.cairo)
     // CRITICAL: Use ORIGINAL SHA-256 big-endian words (not pre-swapped)
     // hashlock_to_u256() will byte-swap them - test constants should NOT be pre-swapped
     const BASE_128: felt252 = 0x100000000000000000000000000000000;
-    const RESPONSE_LOW: felt252 = 0x47cff7b5713428a889bfad01f6fa4e00;
-    const RESPONSE_HIGH: felt252 = 0x0850ef802e40bbd177b22dd7319a9bc0;
-    const CHALLENGE_FELT: felt252 = 0x6212e6122afa3670f0f578dffd3b2703;
+    const RESPONSE_LOW: felt252 = 0x1e741f8fec4161ea41b23ce6d007ba12;
+    const RESPONSE_HIGH: felt252 = 0x026ed77551e578013227c9b98bd25c66;
+    const CHALLENGE_FELT: felt252 = 0x8d664bb70810bdab323a44354d98f94a;
 
     fn get_test_dleq_response() -> felt252 {
         RESPONSE_LOW + RESPONSE_HIGH * BASE_128
@@ -74,52 +74,96 @@ mod constructor_step_by_step_tests {
 
     fn get_real_msm_hints() -> (Span<felt252>, Span<felt252>, Span<felt252>, Span<felt252>) {
         let s_hint_for_g = array![
-            0xd21de05d0b4fe220a6fcca9b,
-            0xa8e827ce9b59e1a5770bd9a,
-            0x4e14ea0d8a7581a1,
+
+            0x52f522935135e7c5474d3b99,
+
+            0x7ff7e65231c434008a0c02f8,
+
+            0x41a3962ca5bba9db,
+
             0x0,
-            0x8cfb1d3e412e174d0ad03ad4,
-            0x4417fe7cc6824de3b328f2a0,
-            0x13f6f393b443ac08,
+
+            0xa144206dc24b7180d05200e0,
+
+            0xe8a798301a354777473cd98e,
+
+            0x7ca5add375ea088,
+
             0x0,
-            0x1fd0f994a4c11a4543d86f4578e7b9ed,
-            0x39099b31d1013f73ec51ebd61fdfe2ab
+
+            0x1e741f8fec4161ea41b23ce6d007ba12,
+
+            0x100000000000000000000000000000001
+
         ].span();
         let s_hint_for_y = array![
-            0xcdb4e41a66188ec060e0e45b,
-            0x1cf0f0ff51495823cad8d964,
-            0x2dcda3d3bbeda8a3,
+
+            0x3b81c211fd322bb7dbcb711c,
+
+            0x2082c0dd34f9225f2eb5e0b0,
+
+            0x311b02be49202932,
+
             0x0,
-            0x8b8b33d4304cc1bedc45545c,
-            0x5fbf8dbd7bd2029ba859c5bb,
-            0x145b0ef370c62319,
+
+            0x18c0245425f95187b10e1913,
+
+            0x922be9d1d5313d1c7a4cb499,
+
+            0x51d9b0eb8a969e37,
+
             0x0,
-            0x1fd0f994a4c11a4543d86f4578e7b9ed,
-            0x39099b31d1013f73ec51ebd61fdfe2ab
+
+            0x1e741f8fec4161ea41b23ce6d007ba12,
+
+            0x100000000000000000000000000000001
+
         ].span();
         let c_neg_hint_for_t = array![
-            0x959983489a84cf6bb55fde22,
-            0xfbea3c47483b8fb99b0e29ef,
-            0x3fe816922486f803,
+
+            0xcb63575f3729fe6cbe7f8496,
+
+            0x9dc314d92447fddbfc1be6cd,
+
+            0x7d6caff1e7cdaa02,
+
             0x0,
-            0x406a020256217f7a00633c4a,
-            0x6b9be390479e99c682cae8f0,
-            0x7b48b6a59c2c6732,
+
+            0x78dc46b41742aa135083e2da,
+
+            0xecafad9bd49fe98686457cc6,
+
+            0x592bb6f3eaf7ca3,
+
             0x0,
-            0x208a4ac47d492a7b82475d0c0c798e52,
-            0x29c3b379b559be107e5c78bb9abb6515
+
+            0x34a3efff5488d0dfc135bf37e3357b53,
+
+            0x1cf7b1760ae5d3463a08a196fd625720
+
         ].span();
         let c_neg_hint_for_u = array![
-            0x6bea23ab976cb56319ceb69d,
-            0xba4983a65676829fc603f500,
-            0x65b0b083f90952f1,
+
+            0x61ebcae684d8530622e29b45,
+
+            0x694dbc34734f56c0e29f5240,
+
+            0x1913755501e61b9a,
+
             0x0,
-            0x7e7a6ae6e23418c184e6d824,
-            0x119cf240405f414ec4ed2cc6,
-            0x15cea0344fcb9e58,
+
+            0x2a37ba10878046ff378a7d73,
+
+            0x25857fe5ce7f65cea1bbc1e0,
+
+            0xca82b2053c5e43e,
+
             0x0,
-            0x208a4ac47d492a7b82475d0c0c798e52,
-            0x29c3b379b559be107e5c78bb9abb6515
+
+            0x34a3efff5488d0dfc135bf37e3357b53,
+
+            0x1cf7b1760ae5d3463a08a196fd625720
+
         ].span();
         (s_hint_for_g, s_hint_for_y, c_neg_hint_for_t, c_neg_hint_for_u)
     }
@@ -170,7 +214,7 @@ mod constructor_step_by_step_tests {
             0xb6acca81_u32, 0xa0939a85_u32, 0x6c35e4c4_u32, 0x188e95b9_u32,
             0x1731aab1_u32, 0xd4629a4c_u32, 0xee79dd09_u32, 0xded4fc94_u32
         ].span();
-        let challenge = compute_dleq_challenge_blake2s(
+        let challenge = compute_dleq_challenge_poseidon(
             TESTVECTOR_G_COMPRESSED,
             TESTVECTOR_Y_COMPRESSED,
             TESTVECTOR_T_COMPRESSED,
@@ -196,16 +240,27 @@ mod constructor_step_by_step_tests {
         };
         // Use hardcoded hint (matching test_garaga_msm_all_calls which works)
         let s_hint_for_g = array![
-            0xd21de05d0b4fe220a6fcca9b,
-            0xa8e827ce9b59e1a5770bd9a,
-            0x4e14ea0d8a7581a1,
+
+            0x52f522935135e7c5474d3b99,
+
+            0x7ff7e65231c434008a0c02f8,
+
+            0x41a3962ca5bba9db,
+
             0x0,
-            0x8cfb1d3e412e174d0ad03ad4,
-            0x4417fe7cc6824de3b328f2a0,
-            0x13f6f393b443ac08,
+
+            0xa144206dc24b7180d05200e0,
+
+            0xe8a798301a354777473cd98e,
+
+            0x7ca5add375ea088,
+
             0x0,
-            0x1fd0f994a4c11a4543d86f4578e7b9ed,
-            0x39099b31d1013f73ec51ebd61fdfe2ab
+
+            0x1e741f8fec4161ea41b23ce6d007ba12,
+
+            0x100000000000000000000000000000001
+
         ].span();
         
         let sG = msm_g1(
@@ -253,16 +308,27 @@ mod constructor_step_by_step_tests {
         };
         // Use hardcoded hint (matching test_garaga_msm_all_calls which works)
         let s_hint_for_y = array![
-            0xcdb4e41a66188ec060e0e45b,
-            0x1cf0f0ff51495823cad8d964,
-            0x2dcda3d3bbeda8a3,
+
+            0x3b81c211fd322bb7dbcb711c,
+
+            0x2082c0dd34f9225f2eb5e0b0,
+
+            0x311b02be49202932,
+
             0x0,
-            0x8b8b33d4304cc1bedc45545c,
-            0x5fbf8dbd7bd2029ba859c5bb,
-            0x145b0ef370c62319,
+
+            0x18c0245425f95187b10e1913,
+
+            0x922be9d1d5313d1c7a4cb499,
+
+            0x51d9b0eb8a969e37,
+
             0x0,
-            0x1fd0f994a4c11a4543d86f4578e7b9ed,
-            0x39099b31d1013f73ec51ebd61fdfe2ab
+
+            0x1e741f8fec4161ea41b23ce6d007ba12,
+
+            0x100000000000000000000000000000001
+
         ].span();
         
         let sY = msm_g1(
@@ -329,52 +395,96 @@ mod constructor_step_by_step_tests {
         // TEST: Use hardcoded hints instead of get_real_msm_hints()
         // This will tell us if get_real_msm_hints() is causing span corruption
         let s_hint_for_g = array![
-            0xd21de05d0b4fe220a6fcca9b,
-            0xa8e827ce9b59e1a5770bd9a,
-            0x4e14ea0d8a7581a1,
+
+            0x52f522935135e7c5474d3b99,
+
+            0x7ff7e65231c434008a0c02f8,
+
+            0x41a3962ca5bba9db,
+
             0x0,
-            0x8cfb1d3e412e174d0ad03ad4,
-            0x4417fe7cc6824de3b328f2a0,
-            0x13f6f393b443ac08,
+
+            0xa144206dc24b7180d05200e0,
+
+            0xe8a798301a354777473cd98e,
+
+            0x7ca5add375ea088,
+
             0x0,
-            0x1fd0f994a4c11a4543d86f4578e7b9ed,
-            0x39099b31d1013f73ec51ebd61fdfe2ab
+
+            0x1e741f8fec4161ea41b23ce6d007ba12,
+
+            0x100000000000000000000000000000001
+
         ].span();
         let s_hint_for_y = array![
-            0xcdb4e41a66188ec060e0e45b,
-            0x1cf0f0ff51495823cad8d964,
-            0x2dcda3d3bbeda8a3,
+
+            0x3b81c211fd322bb7dbcb711c,
+
+            0x2082c0dd34f9225f2eb5e0b0,
+
+            0x311b02be49202932,
+
             0x0,
-            0x8b8b33d4304cc1bedc45545c,
-            0x5fbf8dbd7bd2029ba859c5bb,
-            0x145b0ef370c62319,
+
+            0x18c0245425f95187b10e1913,
+
+            0x922be9d1d5313d1c7a4cb499,
+
+            0x51d9b0eb8a969e37,
+
             0x0,
-            0x1fd0f994a4c11a4543d86f4578e7b9ed,
-            0x39099b31d1013f73ec51ebd61fdfe2ab
+
+            0x1e741f8fec4161ea41b23ce6d007ba12,
+
+            0x100000000000000000000000000000001
+
         ].span();
         let c_neg_hint_for_t = array![
-            0x959983489a84cf6bb55fde22,
-            0xfbea3c47483b8fb99b0e29ef,
-            0x3fe816922486f803,
+
+            0xcb63575f3729fe6cbe7f8496,
+
+            0x9dc314d92447fddbfc1be6cd,
+
+            0x7d6caff1e7cdaa02,
+
             0x0,
-            0x406a020256217f7a00633c4a,
-            0x6b9be390479e99c682cae8f0,
-            0x7b48b6a59c2c6732,
+
+            0x78dc46b41742aa135083e2da,
+
+            0xecafad9bd49fe98686457cc6,
+
+            0x592bb6f3eaf7ca3,
+
             0x0,
-            0x208a4ac47d492a7b82475d0c0c798e52,
-            0x29c3b379b559be107e5c78bb9abb6515
+
+            0x34a3efff5488d0dfc135bf37e3357b53,
+
+            0x1cf7b1760ae5d3463a08a196fd625720
+
         ].span();
         let c_neg_hint_for_u = array![
-            0x6bea23ab976cb56319ceb69d,
-            0xba4983a65676829fc603f500,
-            0x65b0b083f90952f1,
+
+            0x61ebcae684d8530622e29b45,
+
+            0x694dbc34734f56c0e29f5240,
+
+            0x1913755501e61b9a,
+
             0x0,
-            0x7e7a6ae6e23418c184e6d824,
-            0x119cf240405f414ec4ed2cc6,
-            0x15cea0344fcb9e58,
+
+            0x2a37ba10878046ff378a7d73,
+
+            0x25857fe5ce7f65cea1bbc1e0,
+
+            0xca82b2053c5e43e,
+
             0x0,
-            0x208a4ac47d492a7b82475d0c0c798e52,
-            0x29c3b379b559be107e5c78bb9abb6515
+
+            0x34a3efff5488d0dfc135bf37e3357b53,
+
+            0x1cf7b1760ae5d3463a08a196fd625720
+
         ].span();
 
         // MSM call 1: s·G
@@ -458,7 +568,7 @@ mod constructor_step_by_step_tests {
             0xb6acca81_u32, 0xa0939a85_u32, 0x6c35e4c4_u32, 0x188e95b9_u32,
             0x1731aab1_u32, 0xd4629a4c_u32, 0xee79dd09_u32, 0xded4fc94_u32
         ].span();
-        let challenge = compute_dleq_challenge_blake2s(
+        let challenge = compute_dleq_challenge_poseidon(
             TESTVECTOR_G_COMPRESSED,
             TESTVECTOR_Y_COMPRESSED,
             TESTVECTOR_T_COMPRESSED,

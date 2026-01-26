@@ -67,7 +67,7 @@ mod garaga_msm_debug_tests {
         
         // Truncated response scalar (matching reduce_felt_to_scalar)
         let s_scalar = u256 {
-            low: 0x47cff7b5713428a889bfad01f6fa4e00,
+            low: 0x1e741f8fec4161ea41b23ce6d007ba12,
             high: 0x0
         };
         
@@ -76,16 +76,16 @@ mod garaga_msm_debug_tests {
         
         // Use hint from test (s_hint_for_g)
         let hint = array![
-            0xd21de05d0b4fe220a6fcca9b,
-            0xa8e827ce9b59e1a5770bd9a,
-            0x4e14ea0d8a7581a1,
+            0x52f522935135e7c5474d3b99,
+            0x7ff7e65231c434008a0c02f8,
+            0x41a3962ca5bba9db,
             0x0,
-            0x8cfb1d3e412e174d0ad03ad4,
-            0x4417fe7cc6824de3b328f2a0,
-            0x13f6f393b443ac08,
+            0xa144206dc24b7180d05200e0,
+            0xe8a798301a354777473cd98e,
+            0x7ca5add375ea088,
             0x0,
-            0x1fd0f994a4c11a4543d86f4578e7b9ed,
-            0x39099b31d1013f73ec51ebd61fdfe2ab
+            0x1e741f8fec4161ea41b23ce6d007ba12,
+            0x100000000000000000000000000000001
         ].span();
         
         // This is the exact call from _verify_dleq_proof

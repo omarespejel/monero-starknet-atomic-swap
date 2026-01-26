@@ -61,7 +61,7 @@ This codebase uses **audited cryptographic libraries** for all critical operatio
 | File | Lines | Risk | Notes |
 |------|-------|------|-------|
 | `cairo/src/lib.cairo` | ~1700 | High | Smart contract - main audit target |
-| `cairo/src/blake2s_challenge.cairo` | ~350 | Medium | BLAKE2s challenge computation (RFC 7693 compliant) |
+| `cairo/src/blake2s_challenge.cairo` | ~350 | Medium | BLAKE2s challenge computation (RFC 7693 compliant, parked until libfunc available) |
 
 **Total custom crypto**: ~600 lines Rust, ~2050 lines Cairo
 

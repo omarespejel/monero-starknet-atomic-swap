@@ -87,8 +87,9 @@ def main():
     response_hex = vectors['response']
     challenge_hex = vectors['challenge']
     
-    response_int = int(response_hex, 16)
-    challenge_int = int(challenge_hex, 16)
+    # Rust stores scalars as little-endian bytes (Scalar::to_bytes()).
+    response_int = int.from_bytes(bytes.fromhex(response_hex), 'little')
+    challenge_int = int.from_bytes(bytes.fromhex(challenge_hex), 'little')
     
     # Ed25519 order
     curve = CURVES[CurveID.ED25519.value]

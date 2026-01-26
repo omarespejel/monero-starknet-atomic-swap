@@ -1,14 +1,14 @@
 /// # DLEQ Challenge Computation Test (Isolated)
 ///
-/// This test isolates the BLAKE2s challenge computation to verify byte-order compatibility
+/// This test isolates the Poseidon challenge computation to verify transcript compatibility
 /// without requiring point decompression or full DLEQ verification.
 ///
-/// **Purpose**: Verify that Cairo's BLAKE2s challenge matches Rust's challenge computation
+/// **Purpose**: Verify that Cairo's Poseidon challenge matches Rust's challenge computation
 /// for the same inputs, confirming byte-order correctness.
 
 #[cfg(test)]
 mod dleq_challenge_only_tests {
-    use atomic_lock::blake2s_challenge::compute_dleq_challenge_blake2s;
+    use atomic_lock::poseidon_challenge::compute_dleq_challenge_poseidon;
     use core::array::ArrayTrait;
     use core::integer::u256;
     use core::traits::TryInto;
@@ -30,18 +30,18 @@ mod dleq_challenge_only_tests {
         high: 0x5c79d0fa84d6440908e2e2065e60d1cd,
     };
     const TESTVECTOR_R1_COMPRESSED: u256 = u256 {
-        low: 0x90b1ab352981d43ec51fba0af7ab51c7,
-        high: 0xc21ebc88e5e59867b280909168338026,
+        low: 0x3cb02521d7a17fedca11c02ea41fe334,
+        high: 0x11ef09256f90d942ca7a0e4ae05926a5,
     };
     const TESTVECTOR_R2_COMPRESSED: u256 = u256 {
-        low: 0x02d386e8fd6bd85a339171211735bcba,
-        high: 0x10defc0130a9f3055798b1f5a99aeb67,
+        low: 0xb4fb26c272cbe6b84d65d4f908aff02f,
+        high: 0xf58498fd33c0fbca066f3fdff2f49225,
     };
     const ED25519_ORDER: u256 = u256 {
         low: 0x14def9dea2f79cd65812631a5cf5d3ed,
         high: 0x10000000000000000000000000000000,
     };
-    const TESTVECTOR_CHALLENGE_LOW: felt252 = 0xff93d53eda6f2910e3a1313a226533c5;
+    const TESTVECTOR_CHALLENGE_LOW: felt252 = 0x8d664bb70810bdab323a44354d98f94a;
 
     /// Test: Compute challenge with Rust test vectors
     ///
@@ -63,8 +63,8 @@ mod dleq_challenge_only_tests {
             0x1731aab1_u32, 0xd4629a4c_u32, 0xee79dd09_u32, 0xded4fc94_u32
         ].span();
         
-        // Compute challenge using Cairo's BLAKE2s implementation
-        let cairo_challenge = compute_dleq_challenge_blake2s(
+        // Compute challenge using Cairo's Poseidon implementation
+        let cairo_challenge = compute_dleq_challenge_poseidon(
             TESTVECTOR_G_COMPRESSED,
             TESTVECTOR_Y_COMPRESSED,
             TESTVECTOR_T_COMPRESSED,
@@ -88,7 +88,7 @@ mod dleq_challenge_only_tests {
         assert(cairo_challenge != 0, 'Challenge computed');
         
         // Verify determinism (same inputs → same output)
-        let cairo_challenge2 = compute_dleq_challenge_blake2s(
+        let cairo_challenge2 = compute_dleq_challenge_poseidon(
             TESTVECTOR_G_COMPRESSED,
             TESTVECTOR_Y_COMPRESSED,
             TESTVECTOR_T_COMPRESSED,
@@ -115,7 +115,7 @@ mod dleq_challenge_only_tests {
         let point1 = u256 { low: 0x1234, high: 0 };
         let point2 = u256 { low: 0x5678, high: 0 };
         
-        let challenge1 = compute_dleq_challenge_blake2s(
+        let challenge1 = compute_dleq_challenge_poseidon(
             TESTVECTOR_G_COMPRESSED,
             TESTVECTOR_Y_COMPRESSED,
             point1,
@@ -126,7 +126,7 @@ mod dleq_challenge_only_tests {
             ED25519_ORDER,
         );
         
-        let challenge2 = compute_dleq_challenge_blake2s(
+        let challenge2 = compute_dleq_challenge_poseidon(
             TESTVECTOR_G_COMPRESSED,
             TESTVECTOR_Y_COMPRESSED,
             point2,

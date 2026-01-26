@@ -10,7 +10,7 @@ This document specifies the atomic swap protocol between Monero and Starknet tok
 ## Protocol Parameters
 
 - Hash function: SHA-256 (for hashlocks)
-- Challenge hash: BLAKE2s (for DLEQ proofs)
+- Challenge hash: Poseidon (for DLEQ proofs; BLAKE2s kept for future enablement)
 - Elliptic curve: Ed25519 (curve_index=4 in Garaga)
 - Timelock minimum: 3 hours (✅ implemented in P0 fixes)
 - Grace period: 2 hours (✅ implemented in two-phase unlock)
@@ -130,7 +130,7 @@ Bob computes DLEQ proof for `s_b`:
 - `U = t·Y`: Second point for DLEQ
 - `k`: Deterministic nonce (domain-separated SHA-256)
 - `R1 = k·G`, `R2 = k·Y`: Commitments
-- `c = BLAKE2s("DLEQ" || G || Y || T || U || R1 || R2 || H)`: Challenge
+- `c = Poseidon("DLEQ" || G || Y || T || U || R1 || R2 || H)`: Challenge
 - `s = k + c·t`: Response
 
 ### Step 3: Contract Deployment

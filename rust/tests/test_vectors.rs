@@ -34,7 +34,9 @@ fn generate_cairo_test_vectors() {
         .expect("Proof generation should succeed for valid inputs");
 
     // Convert to Cairo format
-    let cairo_format = proof.to_cairo_format(&adaptor_point);
+    let cairo_format = proof
+        .to_cairo_format(&adaptor_point)
+        .expect("Failed to derive Cairo sqrt hints");
 
     // Create test vector JSON
     let test_vector = json!({
@@ -85,7 +87,9 @@ fn generate_multiple_test_vectors() {
 
         let proof = generate_dleq_proof(&secret_zeroizing, &secret_bytes, &adaptor_point, &hashlock)
             .expect("Proof generation should succeed for valid inputs");
-        let cairo_format = proof.to_cairo_format(&adaptor_point);
+        let cairo_format = proof
+            .to_cairo_format(&adaptor_point)
+            .expect("Failed to derive Cairo sqrt hints");
 
         test_vectors.push(json!({
             "test_id": i,

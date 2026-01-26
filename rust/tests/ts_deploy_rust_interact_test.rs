@@ -12,7 +12,10 @@
 //! Prerequisites:
 //! - Starknet devnet running: `docker run -p 5050:5050 shardlabs/starknet-devnet-rs --seed 0`
 //! - TypeScript dependencies installed: `cd scripts/ts && npm install`
+//! - Test vectors generated: `cd rust && cargo run --bin generate_test_vector`
 //! - Run with: `cargo test --test ts_deploy_rust_interact_test -- --ignored --nocapture`
+//!
+//! See `tests/README_HYBRID_TEST.md` for detailed documentation.
 
 use anyhow::{Context, Result};
 use sha2::{Digest, Sha256};
@@ -35,15 +38,21 @@ const DEVNET_PRIVATE_KEY: &str = "0x00000000000000000000000000000000000000000000
 async fn deploy_via_typescript() -> Result<String> {
     println!("📦 Deploying contract via TypeScript...");
     
-    // Get project root (assuming we're in rust/tests/)
+    // Get project root
+    // CARGO_MANIFEST_DIR is rust/ when running from rust/tests/
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    // rust/ -> parent -> monero-secret-gen/
     let project_root = manifest_dir
         .parent()
-        .unwrap()
-        .parent()
-        .unwrap();
+        .context("Failed to get project root")?;
     
     let ts_dir = project_root.join("scripts").join("ts");
+    
+    // Debug: Print paths for troubleshooting
+    tracing::debug!("Manifest dir: {:?}", manifest_dir);
+    tracing::debug!("Project root: {:?}", project_root);
+    tracing::debug!("TS dir: {:?}", ts_dir);
+    tracing::debug!("TS node_modules exists: {}", ts_dir.join("node_modules").exists());
     
     // Check if node_modules exists
     if !ts_dir.join("node_modules").exists() {
@@ -144,51 +153,117 @@ async fn test_ts_deploy_rust_interact() -> Result<()> {
     // Using a placeholder - in production this would be the actual AtomicLock class hash
     let class_hash = "0x0"; // Placeholder - not used for invoke operations
     
-    let client: Box<dyn StarknetClient> = Box::new(
-        StarknetManualClient::devnet(
-            DEVNET_ACCOUNT,
-            DEVNET_PRIVATE_KEY,
-            class_hash,
-        )?
-    );
+    let client_manual = StarknetManualClient::devnet(
+        DEVNET_ACCOUNT,
+        DEVNET_PRIVATE_KEY,
+        class_hash,
+    )?;
+    
+    let client: Box<dyn StarknetClient> = Box::new(client_manual);
     
     println!("   ✅ Rust client created");
     
-    // Step 5: Prepare secret for reveal
-    println!("\n📝 Step 5: Prepare Secret for Reveal");
-    let secret_bytes = bob.secret_bytes();
-    let hashlock_words = secret_to_hashlock_words(&secret_bytes);
+    // Step 5: Load test vectors to match TypeScript deployment
+    println!("\n📝 Step 5: Load Test Vectors (to match TypeScript deployment)");
     
-    println!("   ✅ Secret prepared");
-    println!("   📍 Secret bytes: {}", hex::encode(secret_bytes));
-    println!("   📍 Hashlock words: {:?}", hashlock_words);
+    // TypeScript deployment uses test_vectors.json, so we need to use the same secret
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let project_root = manifest_dir.parent().unwrap().parent().unwrap();
+    let test_vectors_path = project_root.join("rust").join("test_vectors.json");
     
-    // Step 6: Call reveal_secret on deployed contract
-    println!("\n📝 Step 6: Call reveal_secret() via Rust");
+    if !test_vectors_path.exists() {
+        return Err(anyhow::anyhow!(
+            "Test vectors not found: {:?}. Generate with: cd rust && cargo run --bin generate_test_vector",
+            test_vectors_path
+        ));
+    }
     
-    // Use the existing reveal_secret method
-    let reveal_tx_hash = client.reveal_secret(&contract_address, &secret_bytes).await
+    let test_vectors_json: Value = serde_json::from_str(
+        &fs::read_to_string(&test_vectors_path)
+            .context("Failed to read test vectors")?
+    )?;
+    
+    let secret_hex = test_vectors_json["secret"]
+        .as_str()
+        .context("Missing secret in test vectors")?;
+    let secret_bytes = hex::decode(secret_hex.strip_prefix("0x").unwrap_or(secret_hex))
+        .context("Invalid hex in secret")?;
+    
+    if secret_bytes.len() != 32 {
+        return Err(anyhow::anyhow!("Secret must be 32 bytes"));
+    }
+    
+    let secret_bytes_array: [u8; 32] = secret_bytes.try_into().unwrap();
+    
+    println!("   ✅ Test vectors loaded");
+    println!("   📍 Using secret from test_vectors.json (matches TypeScript deployment)");
+    
+    // Step 6: Verify initial contract state
+    println!("\n📝 Step 6: Verify Initial Contract State");
+    
+    // Create a separate client instance for view calls (simpler than downcasting)
+    let view_client = StarknetManualClient::devnet(
+        DEVNET_ACCOUNT,
+        DEVNET_PRIVATE_KEY,
+        "0x0",
+    )?;
+    
+    let is_revealed_before = view_client.is_secret_revealed(&contract_address).await?;
+    let is_unlocked_before = view_client.is_unlocked(&contract_address).await?;
+    
+    println!("   ✅ Contract state checked");
+    println!("   📍 is_secret_revealed: {}", is_revealed_before);
+    println!("   📍 is_unlocked: {}", is_unlocked_before);
+    assert!(!is_revealed_before, "Secret should not be revealed initially");
+    assert!(!is_unlocked_before, "Contract should not be unlocked initially");
+    
+    // Step 7: Call reveal_secret on deployed contract
+    println!("\n📝 Step 7: Call reveal_secret() via Rust");
+    
+    let reveal_tx_hash = client.reveal_secret(&contract_address, &secret_bytes_array).await
         .context("Failed to reveal secret")?;
     
     println!("   ✅ Secret revealed!");
     println!("   📍 Transaction hash: {}", reveal_tx_hash);
     
-    // Step 7: Wait for transaction confirmation
-    println!("\n📝 Step 7: Wait for Transaction Confirmation");
+    // Step 8: Wait for transaction confirmation
+    println!("\n📝 Step 8: Wait for Transaction Confirmation");
+    println!("   ⏳ Waiting for transaction to be included in block...");
     
-    // Wait a bit for transaction to be included
-    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+    let receipt = view_client.wait_for_transaction(&reveal_tx_hash).await
+        .context("Failed to wait for transaction confirmation")?;
     
-    println!("   ✅ Transaction confirmed (assuming devnet is fast)");
+    let status = receipt.get("status")
+        .and_then(|s| s.as_str())
+        .unwrap_or("unknown");
     
-    // Step 8: Verify contract state
-    println!("\n📝 Step 8: Verify Contract State");
+    println!("   ✅ Transaction confirmed!");
+    println!("   📍 Status: {}", status);
     
-    // Check if secret was revealed by calling is_secret_revealed()
-    // Note: This requires implementing a view call method, but for now we'll verify
-    // the transaction was submitted successfully
-    println!("   ✅ Secret reveal transaction submitted successfully");
-    println!("   📝 In production, verify is_secret_revealed() == true");
+    // Verify transaction was accepted
+    assert!(
+        status == "ACCEPTED_ON_L2" || status == "ACCEPTED_ON_L1",
+        "Transaction should be accepted, got: {}",
+        status
+    );
+    
+    // Step 9: Verify contract state after reveal
+    println!("\n📝 Step 9: Verify Contract State After Reveal");
+    
+    let is_revealed_after = view_client.is_secret_revealed(&contract_address).await?;
+    let is_unlocked_after = view_client.is_unlocked(&contract_address).await?;
+    
+    println!("   ✅ Contract state verified");
+    println!("   📍 is_secret_revealed: {} (expected: true)", is_revealed_after);
+    println!("   📍 is_unlocked: {} (expected: false, grace period active)", is_unlocked_after);
+    
+    assert!(is_revealed_after, "Secret should be revealed after reveal_secret()");
+    // Note: is_unlocked may still be false if grace period hasn't expired
+    
+    // Step 10: Test claim_tokens (after grace period - would need to wait in real scenario)
+    println!("\n📝 Step 10: Test claim_tokens() (would require grace period wait)");
+    println!("   ⚠️  Skipping claim_tokens test - requires 2-hour grace period");
+    println!("   📝 In production, call claim_tokens() after grace period expires");
     
     println!("\n✅ Hybrid E2E Test Complete!");
     println!("{}", "=".repeat(80));
@@ -197,8 +272,10 @@ async fn test_ts_deploy_rust_interact() -> Result<()> {
     println!("   ✅ DLEQ proof generation: PASS");
     println!("   ✅ TypeScript deployment: PASS");
     println!("   ✅ Rust client creation: PASS");
+    println!("   ✅ Contract state verification (before): PASS");
     println!("   ✅ Secret reveal via Rust: PASS");
-    println!("   ⚠️  Contract state verification: PENDING (requires view call implementation)");
+    println!("   ✅ Contract state verification (after): PASS");
+    println!("   📝 Full E2E flow verified: TypeScript deploy → Rust interact → State verified");
     
     Ok(())
 }
@@ -254,6 +331,28 @@ async fn test_full_swap_flow_hybrid() -> Result<()> {
     let reveal_tx_hash = client.reveal_secret(&contract_address, &secret_bytes).await?;
     println!("   ✅ Secret revealed!");
     println!("   📍 Transaction hash: {}", reveal_tx_hash);
+    
+    // Wait for transaction confirmation
+    println!("\n📝 Step 8: Wait for Transaction Confirmation");
+    let view_client = StarknetManualClient::devnet(
+        DEVNET_ACCOUNT,
+        DEVNET_PRIVATE_KEY,
+        "0x0",
+    )?;
+    
+    let receipt = view_client.wait_for_transaction(&reveal_tx_hash).await?;
+    let status = receipt.get("status")
+        .and_then(|s| s.as_str())
+        .unwrap_or("unknown");
+    println!("   ✅ Transaction confirmed! Status: {}", status);
+    
+    // Verify contract state after reveal
+    println!("\n📝 Step 9: Verify Contract State After Reveal");
+    let is_revealed = view_client.is_secret_revealed(&contract_address).await?;
+    let is_unlocked = view_client.is_unlocked(&contract_address).await?;
+    println!("   ✅ is_secret_revealed: {} (expected: true)", is_revealed);
+    println!("   ✅ is_unlocked: {} (expected: false, grace period)", is_unlocked);
+    assert!(is_revealed, "Secret should be revealed");
     
     println!("\n📝 Step 7: Verify address derivation");
     use xmr_secret_gen::monero::address::derive_stagenet_address;

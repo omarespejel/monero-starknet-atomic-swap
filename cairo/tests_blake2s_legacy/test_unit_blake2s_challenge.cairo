@@ -223,4 +223,3 @@ mod blake2s_challenge_tests {
         assert(challenge == challenge2, 'Max hashlock deterministic');
     }
 }
-

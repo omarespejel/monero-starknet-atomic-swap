@@ -16,19 +16,16 @@
 //! - Cairo verification: `compute_sha256_byte_array(@secret)` (line 777)
 //! - Used for: Secret verification in `reveal_secret()` and `verify_and_unlock()`
 //!
-//! **DLEQ Challenge**: BLAKE2s (matches Cairo's `compute_dleq_challenge_blake2s`)
-//! - Challenge c = BLAKE2s("DLEQ" || G || Y || T || U || R1 || R2 || hashlock) mod n
-//! - Cairo computation: `compute_dleq_challenge_blake2s(...)` (line 577)
+//! **DLEQ Challenge**: Poseidon (matches Cairo's `compute_dleq_challenge_poseidon`)
+//! - Challenge c = Poseidon("DLEQ" || G || Y || T || U || R1 || R2 || hashlock) mod n
+//! - Cairo computation: `compute_dleq_challenge_poseidon(...)`
 //! - Used for: Fiat-Shamir challenge in DLEQ proof verification
-//! - BLAKE2s is Starknet's official standard (v0.14.1+)
-//! - 8x cheaper proving cost than Poseidon
-//! - Native Cairo stdlib support via core::blake
+//! - BLAKE2s path kept in repo for future enablement
 //!
 //! **VERIFICATION**: Both Rust and Cairo use:
 //! - SHA-256 for hashlock verification ✅
-//! - BLAKE2s for DLEQ challenge computation ✅
+//! - Poseidon for DLEQ challenge computation ✅
 
-use blake2::{Blake2s256, Digest as Blake2Digest};
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
 use curve25519_dalek::scalar::Scalar;
@@ -41,9 +38,15 @@ use zeroize::{Zeroize, Zeroizing};
 // Safe Ed25519 → BN254 conversion (security-critical)
 pub mod ed25519_bn254;
 
-// TODO: Uncomment when Poseidon is fully implemented
-// mod poseidon;
-// use poseidon::compute_poseidon_challenge;
+use lambdaworks_crypto::hash::poseidon::{starknet::PoseidonCairoStark252, Poseidon};
+use lambdaworks_math::field::{
+    element::FieldElement as PoseidonFieldElement,
+    fields::fft_friendly::stark_252_prime_field::Stark252PrimeField,
+};
+use num_bigint::BigUint;
+use num_traits::One;
+
+type PoseidonFE = PoseidonFieldElement<Stark252PrimeField>;
 
 /// DLEQ proof generation errors.
 #[derive(Debug, Error, Clone, PartialEq)]
@@ -62,6 +65,8 @@ pub enum DleqError {
     ScalarIncompatible,
     #[error("Scalar conversion error: {0}")]
     ScalarConversionError(String),
+    #[error("Failed to derive Edwards x-coordinate for sqrt hint")]
+    SqrtHintDerivationFailed,
 }
 
 /// DLEQ proof structure containing the second point, challenge, response, and commitments.
@@ -249,33 +254,89 @@ pub fn generate_dleq_proof_for_bob(bob_keys: &crate::monero::two_party_keys::Bob
 
 /// Convert an Edwards point to compressed format and sqrt hint.
 ///
-/// The sqrt hint is the x-coordinate of the point, stored as a u256 (32 bytes, little-endian).
+/// The sqrt hint is the Edwards x-coordinate (u256, 32 bytes little-endian).
 /// This is needed by Cairo's `decompress_edwards_pt_from_y_compressed_le_into_weirstrass_point`.
-///
-/// # Arguments
-///
-/// * `point` - The Edwards point to compress
-///
-/// # Returns
-///
-/// A tuple of (compressed_point, sqrt_hint) where:
-/// - compressed_point: 32-byte compressed Edwards format (y-coordinate + sign bit)
-/// - sqrt_hint: 32-byte x-coordinate as u256 (little-endian)
-fn edwards_point_to_cairo_format(point: &EdwardsPoint) -> ([u8; 32], [u8; 32]) {
-    // Compress the point (standard Ed25519 format: y-coordinate + sign bit)
+fn edwards_point_to_cairo_format(
+    point: &EdwardsPoint,
+) -> Result<([u8; 32], [u8; 32]), DleqError> {
     let compressed = point.compress().to_bytes();
+    let sqrt_hint = edwards_x_from_compressed(&compressed)?;
+    Ok((compressed, sqrt_hint))
+}
 
-    // Extract x-coordinate for sqrt hint
-    // Convert point to Montgomery form to get x-coordinate
-    // The Montgomery form's x-coordinate corresponds to the Edwards x-coordinate
-    let montgomery = point.to_montgomery();
-    let x_bytes = montgomery.to_bytes();
+/// Derive the Edwards x-coordinate from a compressed Edwards Y encoding.
+///
+/// This mirrors the Ed25519 decompression math to recover x from y:
+/// x^2 = (y^2 - 1) / (d*y^2 + 1) mod p, with sign bit selection.
+///
+/// This is used only for Cairo sqrt hints (off-chain serialization), not in proof math.
+fn edwards_x_from_compressed(compressed: &[u8; 32]) -> Result<[u8; 32], DleqError> {
+    let p = ed25519_field_prime();
+    let d = ed25519_d(&p);
+    let sqrt_m1 = ed25519_sqrt_m1(&p);
 
-    // The sqrt hint is the x-coordinate as u256 (little-endian, 32 bytes)
-    let mut sqrt_hint = [0u8; 32];
-    sqrt_hint.copy_from_slice(&x_bytes);
+    let compressed_int = BigUint::from_bytes_le(compressed);
+    let sign_bit = ((&compressed_int >> 255) & BigUint::one()) == BigUint::one();
+    let y_mask = (BigUint::one() << 255) - BigUint::one();
+    let y = &compressed_int & &y_mask;
 
-    (compressed, sqrt_hint)
+    let y2 = (&y * &y) % &p;
+    let numerator = (&y2 + &p - BigUint::one()) % &p;
+    let denominator = (&d * &y2 + BigUint::one()) % &p;
+    let denominator_inv = modinv(&denominator, &p);
+    let x2 = (&numerator * &denominator_inv) % &p;
+
+    // x = x2^((p+3)/8)
+    let exp = (&p + BigUint::from(3u8)) >> 3;
+    let mut x = x2.modpow(&exp, &p);
+    if (&x * &x) % &p != x2 {
+        x = (&x * &sqrt_m1) % &p;
+    }
+    if (&x * &x) % &p != x2 {
+        return Err(DleqError::SqrtHintDerivationFailed);
+    }
+
+    let x_is_odd = (&x & BigUint::one()) == BigUint::one();
+    if x_is_odd != sign_bit {
+        x = (&p - &x) % &p;
+    }
+
+    let x_bytes = x.to_bytes_le();
+    if x_bytes.len() > 32 {
+        return Err(DleqError::SqrtHintDerivationFailed);
+    }
+    let mut out = [0u8; 32];
+    out[..x_bytes.len()].copy_from_slice(&x_bytes);
+    Ok(out)
+}
+
+/// Derive a Cairo sqrt hint from a compressed Edwards point.
+pub fn sqrt_hint_from_compressed(
+    compressed: &[u8; 32],
+) -> Result<[u8; 32], DleqError> {
+    edwards_x_from_compressed(compressed)
+}
+
+fn ed25519_field_prime() -> BigUint {
+    (BigUint::one() << 255) - BigUint::from(19u8)
+}
+
+fn ed25519_d(p: &BigUint) -> BigUint {
+    // d = -121665 / 121666 mod p
+    let minus_121665 = p - BigUint::from(121665u32);
+    let inv_121666 = modinv(&BigUint::from(121666u32), p);
+    (minus_121665 * inv_121666) % p
+}
+
+fn ed25519_sqrt_m1(p: &BigUint) -> BigUint {
+    // sqrt(-1) = 2^((p-1)/4) mod p
+    let exp = (p - BigUint::one()) >> 2;
+    BigUint::from(2u8).modpow(&exp, p)
+}
+
+fn modinv(value: &BigUint, modulus: &BigUint) -> BigUint {
+    // modulus is prime (2^255 - 19), so inv = value^(p-2)
+    value.modpow(&(modulus - BigUint::from(2u8)), modulus)
 }
 
 /// Serializable version of DLEQ proof for JSON/network transport.
@@ -390,20 +451,24 @@ impl DleqProof {
     /// # Returns
     ///
     /// A `DleqProofForCairo` containing all data needed for Cairo.
-    pub fn to_cairo_format(&self, adaptor_point: &EdwardsPoint) -> DleqProofForCairo {
+    pub fn to_cairo_format(
+        &self,
+        adaptor_point: &EdwardsPoint,
+    ) -> Result<DleqProofForCairo, DleqError> {
         let G = ED25519_BASEPOINT_POINT;
         let Y = get_second_generator();
 
         // Convert all points to compressed format with sqrt hints
-        let (adaptor_compressed, adaptor_sqrt_hint) = edwards_point_to_cairo_format(adaptor_point);
+        let (adaptor_compressed, adaptor_sqrt_hint) =
+            edwards_point_to_cairo_format(adaptor_point)?;
         let (second_compressed, second_sqrt_hint) =
-            edwards_point_to_cairo_format(&self.second_point);
-        let (g_compressed, _) = edwards_point_to_cairo_format(&G);
-        let (y_compressed, _) = edwards_point_to_cairo_format(&Y);
-        let (r1_compressed, _) = edwards_point_to_cairo_format(&self.r1);
-        let (r2_compressed, _) = edwards_point_to_cairo_format(&self.r2);
+            edwards_point_to_cairo_format(&self.second_point)?;
+        let (g_compressed, _) = edwards_point_to_cairo_format(&G)?;
+        let (y_compressed, _) = edwards_point_to_cairo_format(&Y)?;
+        let (r1_compressed, _) = edwards_point_to_cairo_format(&self.r1)?;
+        let (r2_compressed, _) = edwards_point_to_cairo_format(&self.r2)?;
 
-        DleqProofForCairo {
+        Ok(DleqProofForCairo {
             adaptor_point_compressed: adaptor_compressed,
             adaptor_point_sqrt_hint: adaptor_sqrt_hint,
             second_point_compressed: second_compressed,
@@ -414,7 +479,7 @@ impl DleqProof {
             y_compressed,
             r1_compressed,
             r2_compressed,
-        }
+        })
     }
 }
 
@@ -507,20 +572,19 @@ fn generate_deterministic_nonce(
 ///
 /// Challenge: c = H(tag || G || Y || T || U || R1 || R2 || hashlock) mod n
 ///
-/// **Implementation:** Uses BLAKE2s (Starknet's official standard)
-/// - 8x cheaper proving cost than Poseidon
-/// - Native Cairo stdlib support via core::blake
-/// - Matches Cairo implementation exactly
+/// **Implementation:** Uses Poseidon (deployable on Starknet today)
+/// - Matches Cairo Poseidon transcript exactly
+/// - Uses compressed Edwards points serialized as u256 low/high limbs
 ///
 /// **Format:**
-/// - tag: "DLEQ" (4 bytes, 0x444c4551)
-/// - G, Y, T, U, R1, R2: Ed25519 points (compressed format, 32 bytes each)
-/// - hashlock: 32-byte hash
+/// - tag: "DLEQ" (felt252, 0x444c4551) twice
+/// - G, Y, T, U, R1, R2: Ed25519 points (compressed Edwards, u256 low/high)
+/// - hashlock: 8 u32 words (SHA-256 big-endian words)
 ///
 /// **Serialization Order:**
-/// 1. Tag: "DLEQ" (4 bytes)
-/// 2. Points in order: G, Y, T, U, R1, R2 (each 32 bytes compressed)
-/// 3. Hashlock (32 bytes)
+/// 1. Tag: "DLEQ" (felt252), repeated twice
+/// 2. Points in order: G, Y, T, U, R1, R2 (each u256 low then high)
+/// 3. Hashlock words (8 u32, big-endian)
 fn compute_challenge(
     G: &EdwardsPoint,
     Y: &EdwardsPoint,
@@ -530,33 +594,55 @@ fn compute_challenge(
     R2: &EdwardsPoint,
     hashlock: &[u8; 32],
 ) -> Scalar {
-    // Use BLAKE2s (Starknet's official standard, matches Cairo)
-    let mut hasher = Blake2s256::new();
+    let mut inputs: Vec<PoseidonFE> = Vec::with_capacity(2 + 12 + 8);
+    let dleq_tag = poseidon_fe_from_u128(0x444c4551_u128);
+    inputs.push(dleq_tag);
+    inputs.push(dleq_tag);
 
-    // Tag: "DLEQ" (4 bytes) for domain separation
-    // This matches Cairo's tag: 0x444c4551
-    hasher.update(b"DLEQ");
+    push_compressed_point(&mut inputs, G);
+    push_compressed_point(&mut inputs, Y);
+    push_compressed_point(&mut inputs, T);
+    push_compressed_point(&mut inputs, U);
+    push_compressed_point(&mut inputs, R1);
+    push_compressed_point(&mut inputs, R2);
 
-    // Serialize points in compressed format (32 bytes each)
-    // Order: G, Y, T, U, R1, R2 (must match Cairo exactly)
-    hasher.update(G.compress().as_bytes());
-    hasher.update(Y.compress().as_bytes());
-    hasher.update(T.compress().as_bytes());
-    hasher.update(U.compress().as_bytes());
-    hasher.update(R1.compress().as_bytes());
-    hasher.update(R2.compress().as_bytes());
+    for i in 0..8 {
+        let word = u32::from_be_bytes([
+            hashlock[i * 4],
+            hashlock[i * 4 + 1],
+            hashlock[i * 4 + 2],
+            hashlock[i * 4 + 3],
+        ]);
+        inputs.push(poseidon_fe_from_u128(word as u128));
+    }
 
-    // Add hashlock (32 bytes)
-    // NOTE: Rust's hashlock is already a [u8; 32] byte array, so BLAKE2s sees it correctly.
-    // Cairo needs byte-swapping because it stores hashlock as Big-Endian u32 words.
-    // The byte-swap fix is in Cairo, not here.
-    hasher.update(hashlock);
+    let hash_felt = PoseidonCairoStark252::hash_many(&inputs);
+    let hash_bytes = hash_felt.to_bytes_le();
+    let mut low_bytes = [0u8; 16];
+    low_bytes.copy_from_slice(&hash_bytes[..16]);
+    let hash_u128 = u128::from_le_bytes(low_bytes);
 
-    // Reduce hash to scalar mod curve order
-    let hash = hasher.finalize();
     let mut scalar_bytes = [0u8; 32];
-    scalar_bytes.copy_from_slice(&hash);
+    scalar_bytes[..16].copy_from_slice(&hash_u128.to_le_bytes());
     Scalar::from_bytes_mod_order(scalar_bytes)
+}
+
+fn push_compressed_point(inputs: &mut Vec<PoseidonFE>, point: &EdwardsPoint) {
+    let bytes = point.compress().to_bytes();
+    let mut low_bytes = [0u8; 16];
+    let mut high_bytes = [0u8; 16];
+    low_bytes.copy_from_slice(&bytes[..16]);
+    high_bytes.copy_from_slice(&bytes[16..]);
+    let low = u128::from_le_bytes(low_bytes);
+    let high = u128::from_le_bytes(high_bytes);
+    inputs.push(poseidon_fe_from_u128(low));
+    inputs.push(poseidon_fe_from_u128(high));
+}
+
+fn poseidon_fe_from_u128(value: u128) -> PoseidonFE {
+    // Use from_hex to ensure Montgomery conversion matches Cairo.
+    PoseidonFieldElement::from_hex(&format!("{:x}", value))
+        .expect("Poseidon field element from hex")
 }
 
 #[cfg(test)]

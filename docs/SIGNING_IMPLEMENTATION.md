@@ -135,9 +135,23 @@ async fn test_invoke_with_signing() {
 }
 ```
 
-**Test Deployment** (Pending):
+**Test Deployment** (Hybrid Approach):
 ```rust
-// TODO: Implement when deploy_and_deposit() is ready
+// Use TypeScript for deployment, Rust for interactions
+// See rust/tests/ts_deploy_rust_interact_test.rs for full example
+
+// 1. Deploy via TypeScript
+let contract_address = deploy_via_typescript().await?;
+
+// 2. Interact via Rust
+let client = StarknetManualClient::devnet(...)?;
+let tx_hash = client.reveal_secret(&contract_address, &secret).await?;
+
+// 3. Wait for confirmation
+let receipt = client.wait_for_transaction(&tx_hash).await?;
+
+// 4. Verify state
+let is_revealed = client.is_secret_revealed(&contract_address).await?;
 ```
 
 ---

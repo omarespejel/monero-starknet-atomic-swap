@@ -166,7 +166,7 @@ pub struct BobKeys {
     /// 
     /// **CRITICAL**: Uses SHA-256 (not BLAKE2s) to match Cairo's hashlock verification.
     /// Cairo contract uses `compute_sha256_byte_array(@secret)` for hashlock verification.
-    /// DLEQ challenge uses BLAKE2s (separate from hashlock).
+    /// DLEQ challenge uses Poseidon (separate from hashlock).
     #[zeroize(skip)]
     pub hashlock: [u8; 32],
     /// Adaptor point T = s_b·G (same as S_b, but kept for clarity)
@@ -211,7 +211,7 @@ impl BobKeys {
         // Compute hashlock from raw bytes (before scalar reduction)
         // CRITICAL: Uses SHA-256 to match Cairo's hashlock verification
         // Cairo: compute_sha256_byte_array(@secret) -> 8×u32 words
-        // DLEQ challenge uses BLAKE2s (separate computation)
+        // DLEQ challenge uses Poseidon (separate computation)
         let hashlock: [u8; 32] = Sha256::digest(s_b_bytes).into();
         
         // Store raw bytes for hashlock verification (Cairo compatibility)

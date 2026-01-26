@@ -2,8 +2,8 @@
 ///
 /// This binary reads test_vectors.json and generates sqrt hints (x-coordinates)
 /// for R1 and R2 points, which are needed for Cairo point decompression.
-use curve25519_dalek::edwards::CompressedEdwardsY;
 use std::fs;
+use xmr_secret_gen::dleq::sqrt_hint_from_compressed;
 
 fn main() {
     // Read test vectors
@@ -32,19 +32,10 @@ fn main() {
         .try_into()
         .expect("R2 must be 32 bytes");
 
-    let r1_compressed = CompressedEdwardsY(r1_bytes);
-    let r2_compressed = CompressedEdwardsY(r2_bytes);
-
-    // Decompress to get full Edwards points
-    let r1_point = r1_compressed.decompress().expect("Failed to decompress R1");
-    let r2_point = r2_compressed.decompress().expect("Failed to decompress R2");
-
-    // Extract x-coordinates (sqrt hints) via Montgomery form
-    let r1_montgomery = r1_point.to_montgomery();
-    let r2_montgomery = r2_point.to_montgomery();
-
-    let r1_x_bytes = r1_montgomery.to_bytes();
-    let r2_x_bytes = r2_montgomery.to_bytes();
+    let r1_x_bytes =
+        sqrt_hint_from_compressed(&r1_bytes).expect("Failed to derive R1 sqrt hint");
+    let r2_x_bytes =
+        sqrt_hint_from_compressed(&r2_bytes).expect("Failed to derive R2 sqrt hint");
 
     // Convert to u256 format (low/high u128)
     let r1_x_low = u128::from_le_bytes(r1_x_bytes[..16].try_into().unwrap());

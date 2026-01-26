@@ -11,6 +11,7 @@ use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use serde_json::{json, Value};
 use sha3::{Digest, Keccak256};
+use tracing;
 
 #[cfg(not(target_os = "macos"))]
 use starknet_crypto::{pedersen_hash, sign, FieldElement, Signature};
@@ -588,6 +589,130 @@ impl StarknetClient for StarknetManualClient {
         );
         
         Ok(tx_hash)
+    }
+}
+
+impl StarknetManualClient {
+    /// Call a view function on a contract (read-only, no transaction).
+    /// 
+    /// Uses `starknet_call` RPC method to query contract state.
+    pub async fn call_view_function(
+        &self,
+        contract: &str,
+        function_name: &str,
+        calldata: Vec<Felt>,
+    ) -> Result<Vec<Felt>> {
+        let contract_addr = felt_from_hex(contract)?;
+        let selector = get_selector_from_name(function_name);
+        
+        let result = self
+            .rpc_call(
+                "starknet_call",
+                json!({
+                    "request": {
+                        "contract_address": felt_to_hex(&contract_addr),
+                        "entry_point_selector": felt_to_hex(&selector),
+                        "calldata": calldata.iter().map(|f| felt_to_hex(f)).collect::<Vec<_>>(),
+                    },
+                    "block_id": "latest"
+                }),
+            )
+            .await?;
+        
+        // Parse result as array of hex strings, convert to Felt
+        let result_array = result
+            .as_array()
+            .context("Expected array result from view call")?;
+        
+        let mut felts = Vec::new();
+        for item in result_array {
+            let hex_str = item.as_str().context("Expected hex string in result")?;
+            felts.push(felt_from_hex(hex_str)?);
+        }
+        
+        Ok(felts)
+    }
+
+    /// Check if secret has been revealed on the contract.
+    pub async fn is_secret_revealed(&self, contract: &str) -> Result<bool> {
+        let result = self.call_view_function(contract, "is_secret_revealed", vec![]).await?;
+        
+        if result.is_empty() {
+            return Err(anyhow!("Empty result from is_secret_revealed"));
+        }
+        
+        // Result is a single felt252 (bool): 0 = false, 1 = true
+        Ok(result[0] != Felt::from(0u64))
+    }
+
+    /// Check if contract is unlocked.
+    pub async fn is_unlocked(&self, contract: &str) -> Result<bool> {
+        let result = self.call_view_function(contract, "is_unlocked", vec![]).await?;
+        
+        if result.is_empty() {
+            return Err(anyhow!("Empty result from is_unlocked"));
+        }
+        
+        // Result is a single felt252 (bool): 0 = false, 1 = true
+        Ok(result[0] != Felt::from(0u64))
+    }
+
+    /// Wait for transaction to be confirmed on-chain.
+    /// 
+    /// Polls `starknet_getTransactionReceipt` until transaction is accepted or rejected.
+    /// Returns the transaction receipt.
+    pub async fn wait_for_transaction(&self, tx_hash: &str) -> Result<Value> {
+        let max_attempts = 30; // 30 attempts
+        let delay_secs = 2; // 2 seconds between attempts
+        
+        for attempt in 1..=max_attempts {
+            let result = self
+                .rpc_call(
+                    "starknet_getTransactionReceipt",
+                    json!({ "transaction_hash": tx_hash }),
+                )
+                .await;
+            
+            match result {
+                Ok(receipt) => {
+                    // Check if transaction is accepted
+                    if let Some(status) = receipt.get("status") {
+                        let status_str = status.as_str().unwrap_or("");
+                        if status_str == "ACCEPTED_ON_L2" || status_str == "ACCEPTED_ON_L1" {
+                            return Ok(receipt);
+                        }
+                        if status_str == "REJECTED" {
+                            return Err(anyhow!("Transaction rejected: {}", receipt));
+                        }
+                    }
+                    // If status not found, might be pending - continue waiting
+                }
+                Err(e) => {
+                    // Transaction might not be found yet (pending)
+                    if attempt < max_attempts {
+                        tracing::debug!("Transaction not found yet (attempt {}/{}), waiting...", attempt, max_attempts);
+                    } else {
+                        return Err(anyhow!("Transaction not found after {} attempts: {}", max_attempts, e));
+                    }
+                }
+            }
+            
+            if attempt < max_attempts {
+                // Use async sleep - tokio is available as a dependency
+                tokio::time::sleep(std::time::Duration::from_secs(delay_secs)).await;
+            }
+        }
+        
+        Err(anyhow!("Transaction not confirmed after {} attempts", max_attempts))
+    }
+
+    /// Get transaction receipt (if available).
+    pub async fn get_transaction_receipt(&self, tx_hash: &str) -> Result<Value> {
+        self.rpc_call(
+            "starknet_getTransactionReceipt",
+            json!({ "transaction_hash": tx_hash }),
+        )
+        .await
     }
 }
 

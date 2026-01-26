@@ -54,7 +54,9 @@ async fn test_rust_to_cairo_dleq_roundtrip() -> Result<()> {
     
     // Step 3: Convert to Cairo format
     println!("\n📝 Step 3: Convert DLEQ Proof to Cairo Format");
-    let cairo_format = dleq_proof.to_cairo_format(&bob.adaptor_point());
+    let cairo_format = dleq_proof
+        .to_cairo_format(&bob.adaptor_point())
+        .expect("Failed to derive Cairo sqrt hints");
     
     println!("   ✅ Cairo format conversion complete");
     println!("   📍 Adaptor point compressed: {:?}", hex::encode(cairo_format.adaptor_point_compressed));
@@ -186,7 +188,9 @@ async fn test_full_cross_chain_swap_flow() -> Result<()> {
     assert_eq!(address.len(), 95, "Address must be 95 characters");
     
     println!("\n📝 Step 5: Verify DLEQ proof format for Cairo");
-    let cairo_format = dleq_proof.to_cairo_format(&bob.adaptor_point());
+    let cairo_format = dleq_proof
+        .to_cairo_format(&bob.adaptor_point())
+        .expect("Failed to derive Cairo sqrt hints");
     
     // Verify all required fields are present
     assert_eq!(cairo_format.adaptor_point_compressed.len(), 32);

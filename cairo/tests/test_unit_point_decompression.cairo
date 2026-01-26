@@ -36,26 +36,26 @@ mod point_decompression_tests {
 
     // CORRECT R1 from test_vectors.cairo (matches test_e2e_dleq.cairo)
     const TEST_R1_COMPRESSED: u256 = u256 {
-        low: 0x90b1ab352981d43ec51fba0af7ab51c7,
-        high: 0xc21ebc88e5e59867b280909168338026,
+        low: 0x3cb02521d7a17fedca11c02ea41fe334,
+        high: 0x11ef09256f90d942ca7a0e4ae05926a5,
     };
 
     // CORRECT R1 sqrt hint (matches test_e2e_dleq.cairo)
     const TEST_R1_SQRT_HINT: u256 = u256 { 
-        low: 0x72a9698d3171817c239f4009cc36fc97,
-        high: 0x3f2b84592a9ee701d24651e3aa3c837d,
+        low: 0x623d9789d855bcc4f0fbd8683b350688,
+        high: 0x0a2d15cdfbfcf6181e92f0b7c74b477e,
     };
     
     // CORRECT R2 from test_vectors.cairo (matches test_e2e_dleq.cairo)
     const TEST_R2_COMPRESSED: u256 = u256 {
-        low: 0x02d386e8fd6bd85a339171211735bcba,
-        high: 0x10defc0130a9f3055798b1f5a99aeb67,
+        low: 0xb4fb26c272cbe6b84d65d4f908aff02f,
+        high: 0xf58498fd33c0fbca066f3fdff2f49225,
     };
     
     // CORRECT R2 sqrt hint (matches test_e2e_dleq.cairo)
     const TEST_R2_SQRT_HINT: u256 = u256 { 
-        low: 0x43f2c451f9ca69ff1577d77d646a50e,
-        high: 0x4ee64b0e07d89e906f9e8b7bea09283e,
+        low: 0x598521e3f6d818ed84721901f0d87f89,
+        high: 0x09d2fd2811966933dff4c8ab0d9059fc,
     };
 
     #[test]

@@ -232,4 +232,3 @@ mod blake2s_byte_order_tests {
         assert(challenge_u256.low == expected_low, 'Byte order low mismatch');
     }
 }
-

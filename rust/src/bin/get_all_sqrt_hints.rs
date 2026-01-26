@@ -1,5 +1,5 @@
-use curve25519_dalek::edwards::CompressedEdwardsY;
 use serde_json::json;
+use xmr_secret_gen::dleq::sqrt_hint_from_compressed;
 
 fn main() {
     let test_vectors_path = "test_vectors.json";
@@ -23,10 +23,8 @@ fn main() {
 
     for (name, hex_str) in points {
         let bytes: [u8; 32] = hex::decode(hex_str).unwrap().try_into().unwrap();
-        let compressed = CompressedEdwardsY(bytes);
-        let point = compressed.decompress().unwrap();
-        let montgomery = point.to_montgomery();
-        let x_bytes = montgomery.to_bytes();
+        let x_bytes = sqrt_hint_from_compressed(&bytes)
+            .expect("Failed to derive sqrt hint");
 
         let low = u128::from_le_bytes(x_bytes[..16].try_into().unwrap());
         let high = u128::from_le_bytes(x_bytes[16..].try_into().unwrap());

@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod print_challenge_tests {
-    use atomic_lock::blake2s_challenge::compute_dleq_challenge_blake2s;
+    use atomic_lock::poseidon_challenge::compute_dleq_challenge_poseidon;
     use core::array::ArrayTrait;
     use core::integer::u256;
 
@@ -32,13 +32,13 @@ mod print_challenge_tests {
     };
 
     const TEST_VECTOR_R1_COMPRESSED: u256 = u256 {
-        low: 0x90b1ab352981d43ec51fba0af7ab51c7,
-        high: 0xc21ebc88e5e59867b280909168338026,
+        low: 0x3cb02521d7a17fedca11c02ea41fe334,
+        high: 0x11ef09256f90d942ca7a0e4ae05926a5,
     };
 
     const TEST_VECTOR_R2_COMPRESSED: u256 = u256 {
-        low: 0x02d386e8fd6bd85a339171211735bcba,
-        high: 0x10defc0130a9f3055798b1f5a99aeb67,
+        low: 0xb4fb26c272cbe6b84d65d4f908aff02f,
+        high: 0xf58498fd33c0fbca066f3fdff2f49225,
     };
 
     const TESTVECTOR_HASHLOCK: [u32; 8] = [
@@ -56,7 +56,7 @@ mod print_challenge_tests {
     fn test_print_computed_challenge() {
         let hashlock = TESTVECTOR_HASHLOCK.span();
 
-        let challenge = compute_dleq_challenge_blake2s(
+        let challenge = compute_dleq_challenge_poseidon(
             ED25519_BASE_POINT_COMPRESSED,
             ED25519_SECOND_GENERATOR_COMPRESSED, // From lib.cairo
             TEST_VECTOR_T_COMPRESSED,
@@ -71,8 +71,8 @@ mod print_challenge_tests {
         let challenge_u256: u256 = challenge.into();
         
         // Expected challenge from test_vectors.json (reduced scalar, LE bytes)
-        // Challenge truncated (low 128 bits): 0xff93d53eda6f2910e3a1313a226533c5
-        let expected_low: u128 = 0xff93d53eda6f2910e3a1313a226533c5;
+        // Challenge truncated (low 128 bits): 0x8d664bb70810bdab323a44354d98f94a
+        let expected_low: u128 = 0x8d664bb70810bdab323a44354d98f94a;
 
         // Verify truncated challenge matches expected
         assert(challenge_u256.low == expected_low, 'Challenge mismatch');

@@ -27,12 +27,12 @@ mod blake2s_state_debug_tests {
         high: 0x5c79d0fa84d6440908e2e2065e60d1cd,
     };
     const TESTVECTOR_R1_COMPRESSED: u256 = u256 {
-        low: 0x90b1ab352981d43ec51fba0af7ab51c7,
-        high: 0xc21ebc88e5e59867b280909168338026,
+        low: 0x3cb02521d7a17fedca11c02ea41fe334,
+        high: 0x11ef09256f90d942ca7a0e4ae05926a5,
     };
     const TESTVECTOR_R2_COMPRESSED: u256 = u256 {
-        low: 0x02d386e8fd6bd85a339171211735bcba,
-        high: 0x10defc0130a9f3055798b1f5a99aeb67,
+        low: 0xb4fb26c272cbe6b84d65d4f908aff02f,
+        high: 0xf58498fd33c0fbca066f3fdff2f49225,
     };
     const ED25519_ORDER: u256 = u256 {
         low: 0x14def9dea2f79cd65812631a5cf5d3ed,
@@ -80,4 +80,3 @@ mod blake2s_state_debug_tests {
         assert(challenge_u256.high == expected_high, 'Challenge high mismatch');
     }
 }
-

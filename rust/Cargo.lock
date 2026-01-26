@@ -1768,6 +1768,7 @@ version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d1bd2632acbd9957afc5aeec07ad39f078ae38656654043bf16e046fa2730e23"
 dependencies = [
+ "rayon",
  "serde",
  "serde_json",
 ]
@@ -4477,6 +4478,8 @@ dependencies = [
  "hex",
  "jsonrpc_client",
  "keccak",
+ "lambdaworks-crypto 0.10.0",
+ "lambdaworks-math 0.10.0",
  "mockall",
  "monero",
  "monero-epee-bin-serde",
