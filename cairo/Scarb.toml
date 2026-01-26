@@ -28,6 +28,10 @@ openzeppelin = { git = "https://github.com/OpenZeppelin/cairo-contracts.git", ta
 snforge_std = { git = "https://github.com/foundry-rs/starknet-foundry", tag = "v0.53.0" }
 assert_macros = "2.10.0"
 
+[features]
+default = []
+blake2s_libfunc = []
+
 
 [tool.scarb]
 # Allow prebuilt plugins (faster CI, no Rust needed)
