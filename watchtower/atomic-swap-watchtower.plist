@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>com.atomic.swap.watchtower</string>
+    <key>ProgramArguments</key>
+    <array>
+      <string>/opt/atomic-swap-watchtower/watchtower/target/release/atomic-swap-watchtower</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/opt/atomic-swap-watchtower/watchtower</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/opt/atomic-swap-watchtower/watchtower/watchtower.log</string>
+    <key>StandardErrorPath</key>
+    <string>/opt/atomic-swap-watchtower/watchtower/watchtower.err</string>
+  </dict>
+</plist>

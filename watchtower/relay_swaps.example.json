@@ -1,0 +1,18 @@
+{
+  "defaults": {
+    "starknet_rpc": "https://api.zan.top/public/starknet-sepolia",
+    "account_address": "0xACCOUNT",
+    "private_key": "0xPRIVATE_KEY",
+    "atomic_lock_class_hash": "0xCLASS_HASH",
+    "chain_id": "0x534e5f5345504f4c4941",
+    "confirmations": 10,
+    "poll_interval_secs": 20
+  },
+  "swaps": [
+    {
+      "contract_address": "0xATOMIC_LOCK",
+      "secret_hex": "0x<64-hex-bytes>",
+      "monero_txid": "<txid>"
+    }
+  ]
+}

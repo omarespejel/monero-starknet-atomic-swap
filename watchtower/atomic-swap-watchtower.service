@@ -1,0 +1,14 @@
+[Unit]
+Description=Atomic Swap Watchtower
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/atomic-swap-watchtower/watchtower
+EnvironmentFile=/opt/atomic-swap-watchtower/watchtower/.env
+ExecStart=/opt/atomic-swap-watchtower/watchtower/target/release/atomic-swap-watchtower
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
