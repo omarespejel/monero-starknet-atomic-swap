@@ -4,17 +4,14 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-# Starknet
-starknet = "0.12"
-starknet-providers = "0.12"
-starknet-core = "0.12"
-
 # Async runtime
 tokio = { version = "1", features = ["full"] }
 
 # Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+hex = "0.4"
+sha3 = "0.10"
 
 # Logging
 tracing = "0.1"
@@ -36,4 +33,7 @@ thiserror = "1"
 
 # Lazy static for event selectors
 lazy_static = "1.4"
+
+# Relay integration
+xmr_secret_gen = { path = "../rust" }
 

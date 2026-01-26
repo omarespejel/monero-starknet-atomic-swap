@@ -1,11 +1,12 @@
 use anyhow::Result;
 use reqwest::Client;
 use serde_json::json;
-use tracing::{info, error};
+use tracing::info;
 
 use crate::types::{Alert, AlertLevel};
 
 /// Alert notifier supporting multiple channels
+#[derive(Clone)]
 pub struct Notifier {
     client: Client,
     discord_webhook: Option<String>,
@@ -58,7 +59,7 @@ impl Notifier {
                 "color": color,
                 "fields": [{
                     "name": "Contract",
-                    "value": format!("0x{:x}", alert.contract_address),
+                    "value": alert.contract_address,
                     "inline": true
                 }],
                 "timestamp": chrono::Utc::now().to_rfc3339()
@@ -85,7 +86,7 @@ impl Notifier {
             AlertLevel::Critical => "🚨",
         };
         let text = format!(
-            "{} *{}*\n\n{}\n\nContract: `0x{:x}`",
+            "{} *{}*\n\n{}\n\nContract: `{}`",
             emoji,
             alert.title,
             alert.message,

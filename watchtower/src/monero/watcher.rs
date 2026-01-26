@@ -14,6 +14,40 @@ pub struct TxInfo {
     pub confirmations: u64,
 }
 
+/// Wait until a transaction reaches `min_confirmations`.
+pub async fn wait_for_confirmations(
+    daemon_url: &str,
+    txid: &str,
+    min_confirmations: u64,
+    poll_interval: Duration,
+) -> Result<TxInfo> {
+    loop {
+        match get_tx_info(daemon_url, txid).await {
+            Ok(Some(info)) => {
+                if info.confirmations >= min_confirmations {
+                    info!(
+                        "Monero tx {} reached {} confirmations at height {}",
+                        txid, info.confirmations, info.block_height
+                    );
+                    return Ok(info);
+                }
+                info!(
+                    "Waiting for confirmations: {}/{} for tx {} (height {})",
+                    info.confirmations, min_confirmations, txid, info.block_height
+                );
+            }
+            Ok(None) => {
+                warn!("Monero tx {} not yet in a block; waiting...", txid);
+            }
+            Err(e) => {
+                warn!("Monero RPC error for tx {}: {}", txid, e);
+            }
+        }
+
+        tokio::time::sleep(poll_interval).await;
+    }
+}
+
 /// Monitor a Monero transaction for reorgs.
 ///
 /// This function continuously monitors a Monero transaction to detect if it

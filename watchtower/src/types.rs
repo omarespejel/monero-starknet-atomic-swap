@@ -1,22 +1,21 @@
 use serde::{Deserialize, Serialize};
-use starknet_core::types::Felt;
 
 /// Event emitted when secret is revealed (Phase 1)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SecretRevealedEvent {
-    pub contract_address: Felt,
-    pub revealer: Felt,
+    pub contract_address: String,
+    pub revealer: String,
     pub secret_hash: u32,
     pub claimable_after: u64,
     pub block_number: u64,
-    pub transaction_hash: Felt,
+    pub transaction_hash: String,
 }
 
 /// Event emitted when tokens are claimed (Phase 2)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TokensClaimedEvent {
-    pub contract_address: Felt,
-    pub claimer: Felt,
+    pub contract_address: String,
+    pub claimer: String,
     pub amount: u128,
     pub reveal_timestamp: u64,
     pub claim_timestamp: u64,
@@ -24,12 +23,13 @@ pub struct TokensClaimedEvent {
 
 /// Swap state tracked by watchtower
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum SwapState {
     /// Contract deployed, waiting for secret revelation
     Locked,
     /// Secret revealed, grace period active
     Revealed {
-        revealer: Felt,
+        revealer: String,
         claimable_after: u64,
     },
     /// Tokens claimed, swap complete
@@ -43,6 +43,7 @@ pub enum SwapState {
 pub enum AlertLevel {
     Info,
     Warning,
+    #[allow(dead_code)]
     Critical,
 }
 
@@ -52,7 +53,8 @@ pub struct Alert {
     pub level: AlertLevel,
     pub title: String,
     pub message: String,
-    pub contract_address: Felt,
+    pub contract_address: String,
+    #[allow(dead_code)]
     pub timestamp: u64,
 }
 
