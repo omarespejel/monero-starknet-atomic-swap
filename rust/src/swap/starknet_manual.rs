@@ -33,8 +33,11 @@ pub struct Call {
 pub struct StarknetManualClient {
     rpc_url: String,
     account_address: Felt,
+    #[allow(dead_code)]
     private_key: Felt,
+    #[allow(dead_code)]
     chain_id: Felt,
+    #[allow(dead_code)]
     atomic_lock_class_hash: Felt,
     client: reqwest::Client,
 }
@@ -497,6 +500,7 @@ impl StarknetClient for StarknetManualClient {
         lock_duration_secs: u64,
         amount: u128,
     ) -> Result<(String, u64)> {
+        let _ = (hashlock, amount);
         let now = self.get_block_timestamp().await?;
         let lock_until = now + lock_duration_secs;
         

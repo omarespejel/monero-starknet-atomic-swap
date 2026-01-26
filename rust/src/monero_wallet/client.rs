@@ -25,6 +25,7 @@ pub struct MoneroWallet {
     /// Wallet RPC endpoint (e.g., http://localhost:38088/json_rpc)
     wallet_rpc_url: String,
     /// Daemon RPC endpoint for blockchain queries
+    #[allow(dead_code)]
     daemon_rpc_url: String,
     /// Wallet name (for multi-wallet support)
     wallet_name: String,
@@ -232,6 +233,7 @@ impl MoneroWallet {
         struct Response {
             tx_hash: String,
             tx_key: String,
+            #[allow(dead_code)]
             tx_blob: String,
             amount: u64,
             fee: u64,
@@ -390,6 +392,7 @@ impl MoneroWallet {
         
         #[derive(Deserialize)]
         struct Response {
+            #[allow(dead_code)]
             address: String,
         }
 
@@ -472,6 +475,7 @@ impl MoneroWallet {
         #[derive(Deserialize)]
         struct Response {
             tx_hash_list: Vec<String>,
+            #[allow(dead_code)]
             tx_key_list: Vec<String>,
             fee_list: Vec<u64>,
         }

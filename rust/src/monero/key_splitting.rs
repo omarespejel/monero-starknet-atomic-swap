@@ -9,6 +9,7 @@
 //! - Create STANDARD Monero transaction with full key x
 //!
 //! This is the approach used by Serai DEX (audited by Cypher Stack).
+#![allow(unused_assignments)]
 
 use curve25519_dalek::{
     constants::ED25519_BASEPOINT_POINT as G, edwards::EdwardsPoint, scalar::Scalar,

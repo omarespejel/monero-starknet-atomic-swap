@@ -81,10 +81,8 @@ pub async fn claim_monero_after_reveal(
     destination: &str,
     restore_height: u64,
 ) -> Result<String> {
-    use uuid::Uuid;
-    
     // Step 1: Recover full spend key
-    let mut full_key = Zeroizing::new(*x_partial + t);
+    let full_key = Zeroizing::new(*x_partial + t);
     
     // Step 2: Derive view key (REQUIRED by wallet-rpc)
     let mut view_key = derive_view_key_impl(&full_key);

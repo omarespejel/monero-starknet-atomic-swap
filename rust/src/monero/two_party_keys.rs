@@ -6,6 +6,8 @@
 //! - Combined keys: S = (s_a + s_b)·G, V = (v_a + v_b)·G
 //!
 //! SECURITY: All scalars are verified for BN254 compatibility before use.
+#![allow(non_snake_case)]
+#![allow(unused_assignments)]
 
 use curve25519_dalek::{
     constants::ED25519_BASEPOINT_POINT as G,

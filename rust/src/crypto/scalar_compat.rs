@@ -13,7 +13,6 @@
 
 use curve25519_dalek::scalar::Scalar;
 use num_bigint::BigUint;
-use num_traits::Num;
 
 /// Ed25519 scalar group order: l = 2^252 + 27742317777372353535851937790883648493
 pub const ED25519_ORDER: [u8; 32] = [

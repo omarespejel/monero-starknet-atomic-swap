@@ -25,6 +25,8 @@
 //! **VERIFICATION**: Both Rust and Cairo use:
 //! - SHA-256 for hashlock verification ✅
 //! - Poseidon for DLEQ challenge computation ✅
+#![allow(non_snake_case)]
+#![allow(unused_assignments)]
 
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};

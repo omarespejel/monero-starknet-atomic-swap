@@ -88,6 +88,7 @@ impl StarknetClient {
         function: &str,
         calldata: Vec<String>,
     ) -> Result<Value> {
+        let _ = (contract_address, function, calldata);
         // This is a simplified version - real implementation needs account signing
         anyhow::bail!(
             "Contract calls require account signing - implement with starknet-rs or starknet.js"

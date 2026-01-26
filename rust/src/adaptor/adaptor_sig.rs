@@ -125,7 +125,7 @@ pub fn finalize_signature(
     // In practice, we'd extract this from the signature, but for this
     // simplified version, we compute it from the adaptor scalar
     // (In real CLSAG, the extraction is more complex)
-    let full_key = adaptor_scalar; // Simplified - in practice, extract from signature
+    let _full_key = adaptor_scalar; // Simplified - in practice, extract from signature
 
     (s_final, *adaptor_scalar)
 }
