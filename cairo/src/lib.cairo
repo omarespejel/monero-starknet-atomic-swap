@@ -69,10 +69,58 @@ pub trait IERC20<TContractState> {
 // Module declarations for production-grade cryptographic utilities
 // NOTE: BLAKE2s is kept for future enablement once libfunc is available.
 // For now, Poseidon is the active deployable path.
-#[cfg(test)]
+#[cfg(feature: 'blake2s_libfunc')]
 pub mod blake2s_challenge;
 pub mod poseidon_challenge;
 pub mod edwards_serialization;
+
+/// Compile-time hash selector for DLEQ challenge.
+/// Default path: Poseidon (deployable today).
+#[cfg(feature: 'blake2s_libfunc')]
+pub fn compute_dleq_challenge_compiled(
+    G_compressed: u256,
+    Y_compressed: u256,
+    T_compressed: u256,
+    U_compressed: u256,
+    R1_compressed: u256,
+    R2_compressed: u256,
+    hashlock: Span<u32>,
+    ed25519_order: u256,
+) -> felt252 {
+    blake2s_challenge::compute_dleq_challenge_blake2s(
+        G_compressed,
+        Y_compressed,
+        T_compressed,
+        U_compressed,
+        R1_compressed,
+        R2_compressed,
+        hashlock,
+        ed25519_order,
+    )
+}
+
+#[cfg(not(feature: 'blake2s_libfunc'))]
+pub fn compute_dleq_challenge_compiled(
+    G_compressed: u256,
+    Y_compressed: u256,
+    T_compressed: u256,
+    U_compressed: u256,
+    R1_compressed: u256,
+    R2_compressed: u256,
+    hashlock: Span<u32>,
+    ed25519_order: u256,
+) -> felt252 {
+    poseidon_challenge::compute_dleq_challenge_poseidon(
+        G_compressed,
+        Y_compressed,
+        T_compressed,
+        U_compressed,
+        R1_compressed,
+        R2_compressed,
+        hashlock,
+        ed25519_order,
+    )
+}
 
 #[starknet::contract]
 pub mod AtomicLock {
@@ -97,7 +145,7 @@ pub mod AtomicLock {
     use openzeppelin::security::ReentrancyGuardComponent;
     
     // Import production-grade cryptographic modules (using audited libraries)
-    use super::poseidon_challenge::compute_dleq_challenge_poseidon;
+    use super::compute_dleq_challenge_compiled;
     
     /// Ed25519 curve order (from RFC 8032)
     /// This matches Garaga's get_ED25519_order_modulus() value
@@ -580,7 +628,7 @@ pub mod AtomicLock {
         let G_compressed = ED25519_BASE_POINT_COMPRESSED;
         let Y_compressed = ED25519_SECOND_GENERATOR_COMPRESSED;
         
-        let c_prime = compute_dleq_challenge_poseidon(
+        let c_prime = compute_dleq_challenge_compiled(
             G_compressed,
             Y_compressed,
             adaptor_point_edwards_compressed,

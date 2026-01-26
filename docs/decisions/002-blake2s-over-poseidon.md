@@ -3,6 +3,8 @@
 **Status**: Parked for deployment. BLAKE2s is retained in the codebase, but the
 active deployable path uses Poseidon until `blake2s_compress` is available on
 Starknet mainnet/testnet.
+**Build switch**: once available, enable the Cairo feature
+`blake2s_libfunc` to compile the BLAKE2s challenge path.
 
 ## Status
 
