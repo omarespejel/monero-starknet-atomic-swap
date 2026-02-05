@@ -253,6 +253,18 @@ make test-cairo
 
 ---
 
+## Related Projects
+
+| Repository | Description |
+|------------|-------------|
+| [monero-vm](https://github.com/omarespejel/monero-vm) | Fraud-proof RandomX verifier for trustless Monero verification on Starknet |
+
+**Together these repos enable trustless Monero ↔ Starknet atomic swaps:**
+- **monero-starknet-atomic-swap**: Handles the swap protocol (adaptor signatures, hashlock contracts)
+- **monero-vm**: Verifies RandomX computation disputes (fraud proofs for Monero block validation)
+
+---
+
 ## License
 
 MIT
