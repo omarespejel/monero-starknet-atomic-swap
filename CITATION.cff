@@ -1,0 +1,33 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "Monero-Starknet Atomic Swaps: Trustless Cross-Chain Exchange via On-Chain DLEQ Verification and Optimistic RandomX Fraud Proofs"
+authors:
+  - family-names: "Espejel"
+    given-names: "Omar"
+    orcid: ""
+    affiliation: "Starknet Foundation"
+date-released: "2025-12-04"
+url: "https://github.com/omarespejel/xmr-starknet-atomic-lock"
+repository-code: "https://github.com/omarespejel/xmr-starknet-atomic-lock"
+license: Apache-2.0
+keywords:
+  - monero
+  - starknet
+  - atomic-swap
+  - dleq
+  - cairo
+  - fraud-proofs
+  - randomx
+  - cross-chain
+  - garaga
+  - ed25519
+abstract: >-
+  A trustless cross-chain atomic swap protocol between Monero (XMR) and
+  Starknet assets. The system uses on-chain Discrete Logarithm Equality
+  (DLEQ) proof verification via Garaga's multi-scalar multiplication (MSM)
+  on the Ed25519 curve, a two-phase unlock mechanism to mitigate race
+  conditions, and an optimistic fraud proof system (MoneroVM) for verifying
+  RandomX proof-of-work computations on Starknet. The protocol enables
+  trustless Monero interoperability without requiring changes to the
+  Monero protocol itself.

@@ -8,7 +8,7 @@
 
 [![Security](https://img.shields.io/badge/security-reviewed-brightgreen)](docs/SECURITY.md)
 [![Tests](https://img.shields.io/badge/tests-136%2B%20passing-brightgreen)](#testing)
-[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 
 > ⚠️ **Alpha Software** — Not yet externally audited. Use only on testnets with test funds.
 
@@ -265,9 +265,31 @@ make test-cairo
 
 ---
 
+## Citation
+
+If you use this software in your project or research, **you must cite it**. See the [NOTICE](NOTICE) file for full attribution requirements.
+
+```bibtex
+@software{espejel2025monero_starknet,
+  author       = {Espejel, Omar},
+  title        = {Monero-Starknet Atomic Swaps: Trustless Cross-Chain
+                  Exchange via On-Chain DLEQ Verification and Optimistic
+                  RandomX Fraud Proofs},
+  year         = {2025},
+  url          = {https://github.com/omarespejel/xmr-starknet-atomic-lock},
+  note         = {First commit: December 4, 2025}
+}
+```
+
+---
+
 ## License
 
-MIT
+[Apache License 2.0](LICENSE) — You are free to use, modify, and distribute this software provided you:
+
+1. **Include the LICENSE and NOTICE files** in any redistribution
+2. **Cite this project** in any academic publication or derivative work (see [NOTICE](NOTICE))
+3. **State changes** made to the original code
 
 ---
 

@@ -3,6 +3,9 @@ name = "xmr_secret_gen"
 version = "0.1.0"
 edition = "2021"
 description = "Monero key splitting for Starknet atomic swaps"
+license = "Apache-2.0"
+authors = ["Omar Espejel"]
+repository = "https://github.com/omarespejel/xmr-starknet-atomic-lock"
 
 [dependencies]
 # ===== MONERO INTEGRATION =====
@@ -85,6 +88,7 @@ sha3 = "0.10"      # For starknet_keccak selector computation
 [features]
 default = []
 full-integration = []
+fuzzing = []
 
 [[bin]]
 name = "maker"

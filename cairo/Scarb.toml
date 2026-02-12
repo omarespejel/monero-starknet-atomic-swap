@@ -3,6 +3,9 @@ name = "atomic_lock"
 version = "0.1.0"
 edition = "2024_07"
 cairo-version = "2.14.0"
+license = "Apache-2.0"
+authors = ["Omar Espejel"]
+repository = "https://github.com/omarespejel/xmr-starknet-atomic-lock"
 
 [dependencies]
 # PRODUCTION: Official Starknet SDK (v2.10.0 stable)

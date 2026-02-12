@@ -1,0 +1,74 @@
+Monero-Starknet Atomic Swap & MoneroVM
+Copyright 2025-2026 Omar Espejel
+
+This product includes software developed by Omar Espejel
+(https://github.com/omarespejel).
+
+================================================================================
+ATTRIBUTION AND CITATION REQUIREMENT
+================================================================================
+
+Under Section 4(d) of the Apache License 2.0, any Derivative Works or
+projects that incorporate, adapt, or build upon this software MUST include
+the following attribution notice in a prominent location (README, documentation,
+or NOTICE file):
+
+  "This project uses code from Monero-Starknet Atomic Swap by Omar Espejel,
+   available at https://github.com/omarespejel/xmr-starknet-atomic-lock"
+
+Additionally, any academic paper, technical report, research publication, or
+formal documentation that describes systems derived from or based on this
+software MUST cite the following:
+
+  Espejel, O. (2025). "Monero-Starknet Atomic Swaps: Trustless Cross-Chain
+  Exchange via On-Chain DLEQ Verification and Optimistic RandomX Fraud Proofs."
+  https://github.com/omarespejel/xmr-starknet-atomic-lock
+
+BibTeX:
+
+  @software{espejel2025monero_starknet,
+    author       = {Espejel, Omar},
+    title        = {Monero-Starknet Atomic Swaps: Trustless Cross-Chain
+                    Exchange via On-Chain DLEQ Verification and Optimistic
+                    RandomX Fraud Proofs},
+    year         = {2025},
+    url          = {https://github.com/omarespejel/xmr-starknet-atomic-lock},
+    note         = {First commit: December 4, 2025}
+  }
+
+================================================================================
+COMPONENTS AND ORIGINAL CONTRIBUTIONS
+================================================================================
+
+The following components represent original contributions by the author:
+
+1. On-chain DLEQ proof verification using Garaga MSM on Starknet
+   - Cairo contracts: cairo/src/
+   - First commit: 2025-12-04
+
+2. Two-phase unlock mechanism for atomic swap race condition mitigation
+   - reveal_secret() + claim_tokens() with GRACE_PERIOD
+   - First commit: 2025-12-05
+
+3. BLAKE2s-based DLEQ challenge computation with domain separation
+   - cairo/src/blake2s_challenge.cairo
+   - First commit: 2025-12-05
+
+4. MoneroVM: Optimistic RandomX execution verification via fraud proofs
+   - monero-vm/src/
+   - Bisection protocol with ERC20 bond enforcement
+
+5. Rust DLEQ proof generation with Sha256 nonce derivation
+   - rust/src/
+   - Domain-separated nonce: "DLEQ_NONCE_V1"
+
+================================================================================
+THIRD-PARTY NOTICES
+================================================================================
+
+This software uses the following open-source libraries:
+
+- Garaga (https://github.com/keep-starknet-strange/garaga) - MIT License
+- OpenZeppelin Cairo Contracts - MIT License
+- curve25519-dalek - BSD-3-Clause License
+- snforge (Starknet Foundry) - MIT License
