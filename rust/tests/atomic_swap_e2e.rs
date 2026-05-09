@@ -19,8 +19,7 @@ fn test_full_atomic_swap_flow() {
     let alice_keys = SwapKeyPair::generate();
     assert!(alice_keys.verify(), "Key splitting math must be correct");
 
-    // 2. Alice computes hashlock H = SHA-256(t)
-    // TODO: SwapKeyPair should track raw bytes from generation for Cairo compatibility
+    // 2. Alice computes hashlock H = SHA-256(raw secret bytes), matching Cairo.
     let secret_bytes = alice_keys.adaptor_scalar_bytes();
     let hashlock: [u8; 32] = Sha256::digest(secret_bytes).into();
 
@@ -57,8 +56,10 @@ fn test_full_atomic_swap_flow() {
     // Bob calls verify_and_unlock(secret_t) on Starknet
     // This reveals t via Unlocked event
 
-    // Simulating: Bob reveals t on Starknet
-    let revealed_secret = alice_keys.adaptor_scalar;
+    // Simulating: Bob reveals raw secret bytes on Starknet.
+    let revealed_secret_bytes = alice_keys.adaptor_scalar_bytes();
+    let revealed_secret =
+        curve25519_dalek::scalar::Scalar::from_bytes_mod_order(revealed_secret_bytes);
 
     // === ALICE RECOVERS FULL KEY ===
     // Alice watches for Unlocked event, extracts revealed t
@@ -79,8 +80,8 @@ fn test_full_atomic_swap_flow() {
     // Transaction uses standard CLSAG (from Serai's audited library)
     // No custom CLSAG modification needed!
 
-    // Verify hashlock matches revealed secret
-    let computed_hashlock: [u8; 32] = Sha256::digest(revealed_secret.to_bytes()).into();
+    // Verify hashlock matches the raw revealed bytes Cairo receives.
+    let computed_hashlock: [u8; 32] = Sha256::digest(revealed_secret_bytes).into();
     assert_eq!(
         computed_hashlock, hashlock,
         "Hashlock from revealed secret must match original"

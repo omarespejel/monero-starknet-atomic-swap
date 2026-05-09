@@ -104,6 +104,12 @@ domain-separated DLEQ second generator instead of the legacy `2 * G`
 placeholder. Repo-wide `cd rust && cargo test -q` is green with ignored
 integration tests left ignored.
 
+Legacy `SwapKeyPair` now preserves the raw pre-reduction adaptor secret bytes
+used by Cairo's `SHA-256(raw_secret_bytes)` hashlock check, with explicit
+zero-scalar rejection. Targeted key-splitting/DLEQ/E2E tests, repo-wide
+`cd rust && cargo test -q`, `cd rust && cargo fmt --check`, `git diff --check`,
+`python3 tools/check_secret_hygiene.py`, and `cd cairo && snforge test` are green.
+
 Sepolia rehearsal:
 
 - Address:

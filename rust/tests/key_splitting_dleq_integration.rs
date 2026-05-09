@@ -16,9 +16,7 @@ fn test_swap_keypair_with_dleq_proof() {
     let keys = SwapKeyPair::generate();
     assert!(keys.verify(), "Key splitting math failed");
 
-    // 2. Compute hashlock = SHA256(t.to_bytes())
-    // TODO: SwapKeyPair should track raw bytes from generation for Cairo compatibility
-    // For now, using scalar.to_bytes() - warning will catch if scalar reduction changed bytes
+    // 2. Compute hashlock = SHA256(raw adaptor secret bytes), matching Cairo.
     let secret_bytes = keys.adaptor_scalar_bytes();
     let hashlock: [u8; 32] = Sha256::digest(secret_bytes).into();
 

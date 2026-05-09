@@ -44,7 +44,7 @@ async fn test_full_atomic_swap_e2e() -> Result<()> {
     // 1. Generate swap keys
     println!("\n📝 Step 1: Generate swap keys");
     let keys = SwapKeyPair::generate();
-    let secret_bytes = keys.adaptor_scalar.to_bytes();
+    let secret_bytes = keys.adaptor_scalar_bytes();
     let hashlock: [u8; 32] = Sha256::digest(secret_bytes).into();
 
     println!("   ✅ Generated keys");

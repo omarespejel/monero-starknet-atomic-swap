@@ -15,7 +15,16 @@ use curve25519_dalek::{
     constants::ED25519_BASEPOINT_POINT as G, edwards::EdwardsPoint, scalar::Scalar,
 };
 use rand::{rngs::OsRng, RngCore};
+use thiserror::Error;
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
+pub enum KeySplitError {
+    #[error("partial spend key reduced to zero")]
+    ZeroPartialKey,
+    #[error("adaptor secret reduced to zero")]
+    ZeroAdaptorScalar,
+}
 
 /// Atomic swap key pair for Monero side.
 ///
@@ -30,6 +39,11 @@ pub struct SwapKeyPair {
     pub partial_key: Scalar,
     /// Adaptor scalar t - will be revealed on Starknet
     pub adaptor_scalar: Scalar,
+    /// Raw adaptor secret bytes revealed on Starknet and hashed by Cairo.
+    ///
+    /// This is intentionally pre-reduction. Cairo checks SHA-256(raw bytes),
+    /// while Monero key recovery interprets those bytes as a scalar modulo l.
+    pub adaptor_secret_bytes: [u8; 32],
     /// Full spend key = partial_key + adaptor_scalar
     pub full_spend_key: Scalar,
     /// Adaptor point T = t·G (sent to Starknet)
@@ -45,29 +59,66 @@ impl SwapKeyPair {
     pub fn generate() -> Self {
         let mut rng = OsRng;
 
-        // Generate random scalars (v4.x API: use from_bytes_mod_order)
-        let mut partial_bytes = [0u8; 32];
-        rng.fill_bytes(&mut partial_bytes);
-        let partial_key = Scalar::from_bytes_mod_order(partial_bytes);
-        partial_bytes.zeroize();
+        loop {
+            // Generate random scalars (v4.x API: use from_bytes_mod_order).
+            let mut partial_bytes = [0u8; 32];
+            rng.fill_bytes(&mut partial_bytes);
 
-        let mut adaptor_bytes = [0u8; 32];
-        rng.fill_bytes(&mut adaptor_bytes);
-        let adaptor_scalar = Scalar::from_bytes_mod_order(adaptor_bytes);
-        adaptor_bytes.zeroize();
+            let mut adaptor_secret_bytes = [0u8; 32];
+            rng.fill_bytes(&mut adaptor_secret_bytes);
+
+            let keys = Self::from_raw_scalars(partial_bytes, adaptor_secret_bytes);
+            partial_bytes.zeroize();
+            adaptor_secret_bytes.zeroize();
+
+            if let Ok(keys) = keys {
+                return keys;
+            }
+        }
+    }
+
+    /// Build a key pair from raw pre-reduction scalar bytes.
+    ///
+    /// `adaptor_secret_bytes` are the exact bytes that must be hashed in the
+    /// Starknet hashlock and later revealed. They may differ from
+    /// `adaptor_scalar.to_bytes()` after reduction modulo the ed25519 scalar
+    /// order, so callers must not recompute the hashlock from canonical scalar
+    /// bytes.
+    pub fn from_raw_scalars(
+        mut partial_key_bytes: [u8; 32],
+        mut adaptor_secret_bytes: [u8; 32],
+    ) -> Result<Self, KeySplitError> {
+        let partial_key = Scalar::from_bytes_mod_order(partial_key_bytes);
+        partial_key_bytes.zeroize();
+        if partial_key == Scalar::ZERO {
+            adaptor_secret_bytes.zeroize();
+            return Err(KeySplitError::ZeroPartialKey);
+        }
+
+        let adaptor_scalar = Scalar::from_bytes_mod_order(adaptor_secret_bytes);
+        if adaptor_scalar == Scalar::ZERO {
+            adaptor_secret_bytes.zeroize();
+            return Err(KeySplitError::ZeroAdaptorScalar);
+        }
+
+        let mut stored_adaptor_secret_bytes = adaptor_secret_bytes;
+        adaptor_secret_bytes.zeroize();
 
         let full_spend_key = partial_key + adaptor_scalar;
-
         let adaptor_point = adaptor_scalar * G;
         let public_key = full_spend_key * G;
 
-        Self {
+        let keys = Self {
             partial_key,
             adaptor_scalar,
+            adaptor_secret_bytes: stored_adaptor_secret_bytes,
             full_spend_key,
             adaptor_point,
             public_key,
-        }
+        };
+        stored_adaptor_secret_bytes.zeroize();
+
+        Ok(keys)
     }
 
     /// Recover full spend key when t is revealed from Starknet.
@@ -120,9 +171,18 @@ impl SwapKeyPair {
         self.adaptor_point + partial_public == self.public_key
     }
 
-    /// Get adaptor scalar bytes (for hashlock computation).
+    /// Get raw adaptor secret bytes for Starknet hashlock computation.
+    pub fn adaptor_secret_bytes(&self) -> [u8; 32] {
+        self.adaptor_secret_bytes
+    }
+
+    /// Get raw adaptor secret bytes for Starknet hashlock computation.
+    ///
+    /// Kept for existing callers. Despite the legacy name, this returns the
+    /// pre-reduction bytes that Cairo hashes and expects to be revealed, not
+    /// `adaptor_scalar.to_bytes()`.
     pub fn adaptor_scalar_bytes(&self) -> [u8; 32] {
-        self.adaptor_scalar.to_bytes()
+        self.adaptor_secret_bytes()
     }
 }
 
@@ -161,6 +221,44 @@ mod tests {
     fn test_public_key_derivation() {
         let keys = SwapKeyPair::generate();
         assert_eq!(keys.public_key, keys.full_spend_key * G);
+    }
+
+    #[test]
+    fn test_raw_adaptor_bytes_preserved_for_hashlock() {
+        let partial_bytes = [0x11u8; 32];
+        let adaptor_secret_bytes = [0xffu8; 32];
+
+        let keys = SwapKeyPair::from_raw_scalars(partial_bytes, adaptor_secret_bytes)
+            .expect("valid non-zero reduced scalars");
+
+        assert!(keys.verify());
+        assert_eq!(keys.adaptor_secret_bytes(), adaptor_secret_bytes);
+        assert_eq!(keys.adaptor_scalar_bytes(), adaptor_secret_bytes);
+        assert_ne!(
+            keys.adaptor_scalar.to_bytes(),
+            keys.adaptor_secret_bytes(),
+            "raw hashlock preimage must be kept even when scalar reduction changes bytes"
+        );
+    }
+
+    #[test]
+    fn test_zero_reduced_scalars_rejected() {
+        let valid = [0x11u8; 32];
+
+        assert!(
+            matches!(
+                SwapKeyPair::from_raw_scalars([0u8; 32], valid),
+                Err(KeySplitError::ZeroPartialKey)
+            ),
+            "zero partial key must be rejected"
+        );
+        assert!(
+            matches!(
+                SwapKeyPair::from_raw_scalars(valid, [0u8; 32]),
+                Err(KeySplitError::ZeroAdaptorScalar)
+            ),
+            "zero adaptor scalar must be rejected"
+        );
     }
 
     /// Test recovery across representative scalar values.
