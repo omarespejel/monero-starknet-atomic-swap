@@ -521,9 +521,10 @@ Operations artifacts:
 - Automatic lock discovery: factory/registry contract code, registry event
   decoding, relayer discovery config, focused tests, Sepolia factory deployment,
   factory-created lock deployment, discovery dry-run, and VM live Monero claim
-  proof are done. Remaining production work is configuring the real alert
-  webhook/paging destination and running a second-operator handoff drill with
-  the redacted packet.
+  proof are done. The VM handoff drill script passed locally. Remaining
+  production work is configuring the real alert webhook/paging destination and
+  having an independent operator repeat/sign off the handoff drill with the
+  redacted packet.
 - Starknet test-token finalization: the fresh live-mode STRK lock has been
   claimed and verified on Sepolia; a follow-up heartbeat is scheduled for the
   remaining factory-created Sepolia STRK lock after its `claimable_after` time.
