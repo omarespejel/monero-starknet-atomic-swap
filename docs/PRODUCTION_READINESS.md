@@ -34,9 +34,10 @@ python3 tools/generate_deploy_calldata.py \
   `l1_data_gas`. Rust macOS placeholder signatures are disabled.
 - `scripts/deploy_with_sncast.sh` supports `ATOMIC_SWAP_CLASS_HASH` to deploy an
   already-declared class and `ATOMIC_SWAP_LOCK_UNTIL` for explicit timelocks.
-- Post-deploy state, claim, and refund operations should use
-  `scripts/atomic_lock_sncast_ops.sh state|claim|refund <contract>` for the
-  Sepolia rehearsal path.
+- Post-deploy state, reveal, claim, and refund operations should use
+  `scripts/atomic_lock_sncast_ops.sh state|reveal|claim|refund <contract>` for
+  the Sepolia rehearsal path. `reveal` requires `ATOMIC_SWAP_SECRET_HEX` and the
+  helper does not support mainnet.
 - Monero wallet-rpc must run inside the Lima VM. Use
   `scripts/monero_vm_tunnel.sh vm-address|vm-balance|vm-height` for normal
   checks. Use `start|smoke|stop` only for temporary host-side tests against the
@@ -120,6 +121,10 @@ reveal bytes used by the two-party Monero key path, and stdout secret printing
 is gated behind `--print-secret`. DLEQ proof generation no longer logs raw or
 canonical secret bytes when scalar reduction changes the reveal preimage. The
 artifact writer forces `0600` permissions on Unix.
+
+The taker CLI now validates but does not echo reveal secrets, and it points to
+`scripts/atomic_lock_sncast_ops.sh reveal` instead of raw placeholder invoke
+commands.
 
 Sepolia rehearsal:
 

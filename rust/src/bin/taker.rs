@@ -4,11 +4,12 @@
 //! 1. Watches for AtomicLock contracts on Starknet Sepolia
 //! 2. When conditions are met, prepares the reveal_secret(secret) action
 //! 3. Reveals the secret `t` via the SecretRevealed event
-//! 4. Maker can then finalize Monero signature
+//! 4. Maker can then recover and sweep Monero through wallet-rpc
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use xmr_secret_gen::starknet::{watch_unlocked_events, StarknetClient};
+use zeroize::Zeroize;
 
 #[derive(Parser)]
 #[command(name = "taker")]
@@ -58,11 +59,10 @@ async fn main() -> Result<()> {
     } else if let Some(contract_addr) = args.contract_address {
         println!("\n🔓 Unlocking contract: {}", contract_addr);
 
-        if let Some(secret_hex) = args.secret {
-            println!("   Secret provided: {}", secret_hex);
-
-            // Convert secret to ByteArray format for Cairo
-            let _secret_bytes = hex::decode(&secret_hex).context("Invalid secret hex")?;
+        if let Some(mut secret_hex) = args.secret {
+            validate_secret(&secret_hex).context("Invalid --secret")?;
+            secret_hex.zeroize();
+            println!("   Secret provided: <validated, not printed>");
 
             #[cfg(feature = "full-integration")]
             {
@@ -72,23 +72,13 @@ async fn main() -> Result<()> {
                         "taker does not sign Starknet reveal transactions safely yet. Use the TypeScript/starknet.js path for reveal_secret/claim_tokens; refusing to return a placeholder transaction hash."
                     );
                 } else {
-                    println!("   Full contract interaction requires signed TypeScript/starknet.js tooling");
-                    println!("\n   Manual unlock command:");
-                    println!("   starknet invoke \\");
-                    println!("     --address {} \\", contract_addr);
-                    println!("     --function reveal_secret \\");
-                    println!("     --inputs {}", secret_hex);
+                    print_reveal_instructions(&contract_addr);
                 }
             }
 
             #[cfg(not(feature = "full-integration"))]
             {
-                println!("   Contract interaction requires signed TypeScript/starknet.js tooling");
-                println!("\n   Manual unlock command:");
-                println!("   starknet invoke \\");
-                println!("     --address {} \\", contract_addr);
-                println!("     --function reveal_secret \\");
-                println!("     --inputs {}", secret_hex);
+                print_reveal_instructions(&contract_addr);
             }
         } else {
             println!("   ⚠️  Secret required for unlock");
@@ -106,7 +96,27 @@ async fn main() -> Result<()> {
     println!("   1. Watch for AtomicLock contracts or use known address");
     println!("   2. When ready, call reveal_secret(secret), then claim_tokens after grace");
     println!("   3. Secret `t` will be revealed via SecretRevealed event");
-    println!("   4. Maker can finalize Monero signature");
+    println!("   4. Maker can recover and sweep Monero through the VM wallet-rpc flow");
 
     Ok(())
+}
+
+fn validate_secret(secret_hex: &str) -> Result<()> {
+    let hex_str = secret_hex.strip_prefix("0x").unwrap_or(secret_hex);
+    let mut bytes = hex::decode(hex_str).context("secret must be hex")?;
+    let byte_len = bytes.len();
+    bytes.zeroize();
+    if byte_len != 32 {
+        return Err(anyhow!("secret must be 32 bytes, got {}", byte_len));
+    }
+    Ok(())
+}
+
+fn print_reveal_instructions(contract_addr: &str) {
+    println!("   Signed reveal should use the maintained sncast helper.");
+    println!("   Put the secret in ATOMIC_SWAP_SECRET_HEX outside shell history, then run:");
+    println!(
+        "     scripts/atomic_lock_sncast_ops.sh reveal {}",
+        contract_addr
+    );
 }

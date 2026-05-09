@@ -6,11 +6,13 @@ RPC_URL="${STARKNET_RPC_URL:-https://api.zan.top/public/starknet-sepolia/rpc/v0_
 SNCAST_ACCOUNT="${SNCAST_ACCOUNT:-stealth-deployer-2026-01-21}"
 SNCAST_ACCOUNTS_FILE="${SNCAST_ACCOUNTS_FILE:-$HOME/.starknet_accounts/starknet_open_zeppelin_accounts.json}"
 TOKEN="${ATOMIC_SWAP_TOKEN_ADDRESS:-}"
+SECRET_HEX="${ATOMIC_SWAP_SECRET_HEX:-}"
 
 usage() {
   cat <<'EOF'
 Usage:
   scripts/atomic_lock_sncast_ops.sh state <contract>
+  scripts/atomic_lock_sncast_ops.sh reveal <contract>
   scripts/atomic_lock_sncast_ops.sh claim <contract>
   scripts/atomic_lock_sncast_ops.sh refund <contract>
 
@@ -19,6 +21,7 @@ Environment:
   SNCAST_ACCOUNT
   SNCAST_ACCOUNTS_FILE
   ATOMIC_SWAP_TOKEN_ADDRESS   optional, used for balance_of(contract)
+  ATOMIC_SWAP_SECRET_HEX      required for reveal; 32-byte hex, with or without 0x
 EOF
 }
 
@@ -53,6 +56,16 @@ print(urlunsplit((parts.scheme, netloc, "/".join(path_parts), query, "")))
 PY
 }
 
+secret_bytearray_calldata() {
+  python3 - <<'PY'
+import os
+secret = os.environ.get("ATOMIC_SWAP_SECRET_HEX", "").removeprefix("0x").lower()
+if len(secret) != 64 or any(c not in "0123456789abcdef" for c in secret):
+    raise SystemExit("ATOMIC_SWAP_SECRET_HEX must be exactly 32 bytes / 64 hex chars")
+print("0x1", "0x" + secret[:62], "0x" + secret[62:], "0x1")
+PY
+}
+
 if [ "$NETWORK" != "sepolia" ] && [ "$NETWORK" != "mainnet" ]; then
   echo "STARKNET_NETWORK must be sepolia or mainnet" >&2
   exit 1
@@ -66,7 +79,7 @@ ACTION="${1:-}"
 CONTRACT="${2:-${ATOMIC_SWAP_CONTRACT_ADDRESS:-}}"
 
 case "$ACTION" in
-  state|claim|refund) ;;
+  state|reveal|claim|refund) ;;
   *) usage; exit 2 ;;
 esac
 
@@ -76,8 +89,20 @@ if [ -z "$CONTRACT" ]; then
   exit 2
 fi
 
-require sncast
 require python3
+
+if [ "$ACTION" = "reveal" ] && [ -z "$SECRET_HEX" ]; then
+  echo "Set ATOMIC_SWAP_SECRET_HEX for reveal. It must be 32-byte hex." >&2
+  exit 2
+fi
+
+SECRET_CALLDATA=()
+if [ "$ACTION" = "reveal" ]; then
+  SECRET_CALLDATA_TEXT="$(secret_bytearray_calldata)"
+  read -r -a SECRET_CALLDATA <<< "$SECRET_CALLDATA_TEXT"
+fi
+
+require sncast
 
 sncast_base() {
   sncast --json --accounts-file "$SNCAST_ACCOUNTS_FILE" --account "$SNCAST_ACCOUNT" "$@"
@@ -119,6 +144,13 @@ print_state() {
 
 case "$ACTION" in
   state)
+    print_state
+    ;;
+  reveal)
+    sncast_base --wait invoke --url "$RPC_URL" \
+      --contract-address "$CONTRACT" --function reveal_secret \
+      --calldata "${SECRET_CALLDATA[@]}"
+    echo
     print_state
     ;;
   claim)
