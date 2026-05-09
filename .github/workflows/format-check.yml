@@ -38,16 +38,19 @@ jobs:
       - name: Check Python formatting
         run: |
           black --check --diff tools/ rust/tests/ || true
+
+      - name: Check Ops Python Syntax
+        run: |
+          python -m py_compile ops/claim-relayer/*.py
       
       # Check Cairo formatting
       - name: Setup Scarb
         uses: software-mansion/setup-scarb@v1
         with:
-          scarb-version: "2.8.2"
+          scarb-version: "2.14.0"
       
       - name: Check Cairo formatting
         run: |
           cd cairo
           scarb fmt --check || true
         continue-on-error: true  # Cairo formatter may not be fully stable
-

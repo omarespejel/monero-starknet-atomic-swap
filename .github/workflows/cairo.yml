@@ -13,8 +13,8 @@ on:
       - '.github/workflows/cairo.yml'
 
 env:
-  SCARB_VERSION: "2.10.0"
-  SNFORGE_VERSION: "0.53.0"
+  SCARB_VERSION: "2.14.0"
+  SNFORGE_VERSION: "0.56.0"
 
 jobs:
   test:
@@ -57,3 +57,12 @@ jobs:
         working-directory: cairo
         run: snforge test integration_ -v
 
+      - name: Full Cairo Suite Must Have No Ignored Tests
+        working-directory: cairo
+        run: |
+          set -o pipefail
+          snforge test | tee /tmp/snforge-full.out
+          if grep -Eq ', [1-9][0-9]* ignored' /tmp/snforge-full.out; then
+            echo "Ignored Cairo tests are not allowed in the production readiness suite"
+            exit 1
+          fi

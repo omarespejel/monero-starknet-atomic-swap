@@ -23,22 +23,22 @@ jobs:
       - name: Setup Scarb
         uses: software-mansion/setup-scarb@v1
         with:
-          scarb-version: "2.10.0"
+          scarb-version: "2.14.0"
       
       - name: Setup snforge
-        run: |
-          curl -L https://raw.githubusercontent.com/foundry-rs/starknet-foundry/master/scripts/install.sh | sh
-          snforge --version
+        uses: foundry-rs/setup-snfoundry@v3
+        with:
+          starknet-foundry-version: "0.56.0"
       
       - name: Validate Sqrt Hints
         run: |
           cd cairo
-          snforge test test_unit_point_decompression --exact
+          snforge test test_unit_point_decompression
       
       - name: Validate E2E DLEQ
         run: |
           cd cairo
-          snforge test test_e2e_dleq --exact
+          snforge test test_e2e_dleq
       
       - name: Fail if validation failed
         if: failure()
@@ -48,4 +48,3 @@ jobs:
           echo "Use the authoritative hints from:"
           echo "  cairo/tests/fixtures/AUTHORITATIVE_SQRT_HINTS.cairo"
           exit 1
-

@@ -480,6 +480,8 @@ Operations artifacts:
   address with `deploy_at`, confirms the malicious token reaches
   `ReentrancyGuard: reentrant call`, and passes with
   `l2_gas: ~20334837`.
+- CI now pins Cairo jobs to Scarb `2.14.0` and Starknet Foundry `0.56.0`,
+  runs the full Cairo suite, and fails if any ignored Cairo tests return.
 - `docs/SETUP.md` now marks Linux VM Monero as the required funded-swap path and
   demotes Docker/local Monero to legacy development use.
 

@@ -16,12 +16,12 @@ jobs:
       - name: Setup Scarb
         uses: software-mansion/setup-scarb@v1
         with:
-          scarb-version: "2.10.0"
+          scarb-version: "2.14.0"
       
       - name: Setup Starknet Foundry
         uses: foundry-rs/setup-snfoundry@v3
         with:
-          starknet-foundry-version: "0.37.0"
+          starknet-foundry-version: "0.56.0"
       
       # CRITICAL: Security tests (highest priority)
       - name: Run Security Tests
@@ -45,8 +45,17 @@ jobs:
       - name: Run Integration Tests
         run: |
           cd cairo
-          snforge test integration_ --detailed-resources || true
-        continue-on-error: true
+          snforge test integration_ --detailed-resources
+
+      - name: Full Cairo Suite Must Have No Ignored Tests
+        run: |
+          cd cairo
+          set -o pipefail
+          snforge test --detailed-resources | tee /tmp/snforge-full.out
+          if grep -Eq ', [1-9][0-9]* ignored' /tmp/snforge-full.out; then
+            echo "Ignored Cairo tests are not allowed in the production readiness suite"
+            exit 1
+          fi
 
   gas-benchmarking:
     name: Gas Cost Benchmarking
@@ -57,17 +66,16 @@ jobs:
       - name: Setup Scarb & Starknet Foundry
         uses: software-mansion/setup-scarb@v1
         with:
-          scarb-version: "2.10.0"
+          scarb-version: "2.14.0"
       
       - uses: foundry-rs/setup-snfoundry@v3
         with:
-          starknet-foundry-version: "0.37.0"
+          starknet-foundry-version: "0.56.0"
       
       - name: Run Gas Benchmarks
         run: |
           cd cairo
-          snforge test integration_gas --detailed-resources > gas_report.txt 2>&1 || echo "Gas benchmark test failed (expected while debugging sqrt hints)" > gas_report.txt
-        continue-on-error: true  # Allow failure while debugging sqrt hints
+          snforge test benchmark_dleq_verification_gas --detailed-resources > gas_report.txt 2>&1
       
       - name: Upload Gas Report
         uses: actions/upload-artifact@v3
@@ -75,4 +83,3 @@ jobs:
         with:
           name: gas-report
           path: cairo/gas_report.txt
-

@@ -8,7 +8,7 @@ authors = ["Omar Espejel"]
 repository = "https://github.com/omarespejel/xmr-starknet-atomic-lock"
 
 [dependencies]
-# PRODUCTION: Official Starknet SDK (v2.10.0 stable)
+# PRODUCTION: Official Starknet SDK (v2.14.0 stable)
 starknet = "2.14.0"
 
 # PRODUCTION: Garaga v1.0.1 - Audited elliptic curve library
