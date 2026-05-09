@@ -1,13 +1,12 @@
 [Unit]
-Description=Healthcheck for Starknet-to-Monero claim relayer
+Description=Alert for Starknet-to-Monero claim relayer failure in %i
 After=network-online.target
 Wants=network-online.target
-OnFailure=monero-claim-relayer-alert@%n.service
 
 [Service]
 Type=oneshot
 EnvironmentFile=-/etc/atomic-swap/claim-relayer-healthcheck.env
-ExecStart=/opt/monero-starknet-atomic-swap/ops/claim-relayer/claim-relayer-healthcheck.sh
+ExecStart=/opt/monero-starknet-atomic-swap/ops/claim-relayer/claim-relayer-alert.sh %i
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
