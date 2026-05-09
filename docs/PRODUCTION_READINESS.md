@@ -438,13 +438,15 @@ Operations artifacts:
 - `ops/claim-relayer/claim-relayer-handoff-packet.py` generates a redacted JSON
   handoff packet from the VM config, cursor files, systemd state, and deployed
   git commit. It reports partial-key environment variable names only, never
-  partial spend key values or webhook secrets. If the installed VM tree is not a
-  git checkout, the packet can include installed binary checksums with
-  `--artifact`.
+  partial spend key values or webhook secrets, and it reports secret env-file
+  presence/mode without reading or hashing secret contents. If the installed VM
+  tree is not a git checkout, the packet can include installed binary checksums
+  with `--artifact`.
   - VM validation against `/etc/atomic-swap/claim-relayer.config.json` succeeded:
     the Alchemy RPC key was redacted to `<redacted>`, warnings contained only
     `repo_root did not resolve to a git checkout; verify artifact checksums`,
-    and `claim_relayer_service` was checksummed at
+    the packet found `3` cursor files, confirmed `claim-relayer.secrets` exists
+    with mode `0600`, and `claim_relayer_service` was checksummed at
     `0a3d5949aec3819bb7409d138fdef325849ad11f7e5de4ed93557a55b921315f`.
 - `ops/claim-relayer/claim-relayer-healthcheck.sh` plus
   `monero-claim-relayer-healthcheck.{service,timer}` add a VM-side monitoring

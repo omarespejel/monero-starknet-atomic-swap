@@ -30,6 +30,13 @@ DEFAULT_SERVICES = (
     "monero-claim-relayer-healthcheck.timer",
 )
 
+DEFAULT_PRESENCE_FILES = (
+    "/etc/atomic-swap/claim-relayer.env",
+    "/etc/atomic-swap/claim-relayer.secrets",
+    "/etc/atomic-swap/claim-relayer-healthcheck.env",
+    "/etc/atomic-swap/monero-claim-wallet-rpc.env",
+)
+
 SENSITIVE_KEY_PARTS = (
     "private",
     "secret",
@@ -134,6 +141,30 @@ def cursor_metadata(path: Path) -> dict[str, Any]:
     except Exception as exc:  # noqa: BLE001 - this is diagnostic metadata.
         metadata["json_valid"] = False
         metadata["json_error"] = str(exc)
+    return metadata
+
+
+def cursor_dir_metadata(defaults: dict[str, Any]) -> dict[str, Any]:
+    cursor_dir = Path(defaults.get("cursor_dir") or ".relayer")
+    metadata: dict[str, Any] = {"path": str(cursor_dir), "exists": cursor_dir.exists(), "entries": []}
+    if not cursor_dir.exists() or not cursor_dir.is_dir():
+        return metadata
+    for path in sorted(cursor_dir.glob("*.json")):
+        metadata["entries"].append(cursor_metadata(path))
+    return metadata
+
+
+def presence_file_metadata(path: Path) -> dict[str, Any]:
+    metadata: dict[str, Any] = {"path": str(path), "exists": path.exists()}
+    if not path.exists():
+        return metadata
+    stat_result = path.stat()
+    metadata.update(
+        {
+            "size_bytes": stat_result.st_size,
+            "mode": oct(stat.S_IMODE(stat_result.st_mode)),
+        }
+    )
     return metadata
 
 
@@ -263,9 +294,13 @@ def build_packet(args: argparse.Namespace) -> dict[str, Any]:
             "defaults": redacted_defaults(defaults),
             "locks": [redacted_lock(defaults, lock) for lock in locks],
             "discoveries": [redacted_discovery(discovery) for discovery in discoveries],
+            "cursor_dir": cursor_dir_metadata(defaults),
         },
         "git": git,
         "artifacts": [artifact_metadata(Path(path).expanduser()) for path in args.artifact],
+        "presence_files": [
+            presence_file_metadata(Path(path).expanduser()) for path in args.presence_file
+        ],
         "systemd": [service_status(service) for service in args.service],
         "warnings": warnings,
         "operator_checks": [
@@ -303,6 +338,12 @@ def parse_args() -> argparse.Namespace:
         action="append",
         default=list(DEFAULT_SERVICES),
         help="systemd service/timer to include; may be repeated",
+    )
+    parser.add_argument(
+        "--presence-file",
+        action="append",
+        default=list(DEFAULT_PRESENCE_FILES),
+        help="file whose existence, mode, and size should be reported without hashing or reading content",
     )
     return parser.parse_args()
 

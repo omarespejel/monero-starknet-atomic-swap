@@ -36,8 +36,9 @@ Generate the redacted packet from the VM checkout:
 ```
 
 The packet includes the deployed git commit, sanitized config, cursor file
-metadata, systemd status, and operator checks. It intentionally prints only
-partial-key environment variable names, not their values.
+metadata, cursor directory summary, systemd status, VM env-file presence, and
+operator checks. It intentionally prints only partial-key environment variable
+names, not their values, and it does not read or hash secret env files.
 If `/opt/monero-starknet-atomic-swap` is an installed copy instead of a git
 checkout, pass the actual checkout path as `--repo-root` and record the installed
 binary checksum with `--artifact`.
