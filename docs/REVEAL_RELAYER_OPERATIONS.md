@@ -35,11 +35,15 @@ sudo install -d -o atomic-swap -g atomic-swap /var/log/atomic-swap
 sudo install -d -o atomic-swap -g atomic-swap /home/atomic-swap/.starknet_accounts
 sudo install -d -o atomic-swap -g atomic-swap /home/atomic-swap/.snfoundry
 sudo install -d -o root -g root /opt/monero-starknet-atomic-swap/ops/reveal-relayer
+sudo install -d -o root -g root /opt/monero-starknet-atomic-swap/ops/monero-wallet-rpc
 
 sudo cp ops/reveal-relayer/run-reveal-relayer.sh \
   /opt/monero-starknet-atomic-swap/ops/reveal-relayer/
+sudo cp ops/monero-wallet-rpc/run-wallet-rpc.sh \
+  /opt/monero-starknet-atomic-swap/ops/monero-wallet-rpc/
 sudo cp ops/reveal-relayer/reveal-relayer.env.example \
   /etc/atomic-swap/reveal-relayer/example.env
+sudo cp ops/systemd/monero-wallet-rpc@.service /etc/systemd/system/
 sudo cp ops/systemd/monero-reveal-relayer@.service /etc/systemd/system/
 sudo cp ops/systemd/monero-reveal-relayer-alert@.service /etc/systemd/system/
 sudo systemctl daemon-reload
@@ -72,8 +76,20 @@ Validate the installed systemd units before enabling a swap:
 
 ```bash
 sudo systemd-analyze verify \
+  /etc/systemd/system/monero-wallet-rpc@.service \
   /etc/systemd/system/monero-reveal-relayer@.service \
   /etc/systemd/system/monero-reveal-relayer-alert@.service
+```
+
+For mainnet XMR funding detection, create
+`/etc/atomic-swap/monero-wallet-rpc/mainnet.env` from
+`ops/systemd/monero-wallet-rpc.mainnet.env.example`, then start:
+
+```bash
+sudo systemctl start monero-wallet-rpc@mainnet.service
+curl -s http://127.0.0.1:18091/json_rpc \
+  -d '{"jsonrpc":"2.0","id":"0","method":"get_version"}' \
+  -H 'Content-Type: application/json'
 ```
 
 ## Per-Swap Setup
@@ -91,11 +107,15 @@ Create `/etc/atomic-swap/reveal-relayer/<swap-id>.env` from
 
 - `ATOMIC_SWAP_CONTRACT_ADDRESS`
 - `ATOMIC_SWAP_TOKEN_ADDRESS`
-- `MONERO_TXID`
 - `EXPECTED_MONERO_AMOUNT_PICONERO`
 - `REVEAL_SECRET_FILE`
 - Starknet `SNCAST_ACCOUNT` / `SNCAST_ACCOUNTS_FILE`
 - `MONERO_WALLET_RPC_URL`
+
+`MONERO_TXID` is optional. If it is unset, use a per-swap wallet-rpc wallet and
+the relayer will scan inbound transfers, select the first transfer at or above
+`EXPECTED_MONERO_AMOUNT_PICONERO`, wait for confirmations/unlock, and reveal.
+Set `MONERO_TXID` only when the sender gives an explicit transaction id.
 
 Keep the env file mode at `0600` or `0640`. Keep the secret file at `0600`.
 
@@ -163,8 +183,9 @@ file public and secret-free. Do not bypass the guard with ad hoc edits on the
 VM.
 
 For the mainnet dust demo, keep the staged file as
-`/etc/atomic-swap/reveal-relayer/mainnet-dust-demo.env.pending` until the real
-Monero txid is known. After replacing `MONERO_TXID`, copy it to
-`mainnet-dust-demo.env`, run once with `REVEAL_DRY_RUN=1`, then switch to
-`REVEAL_DRY_RUN=0` only after wallet-rpc confirms the exact payment and enough
-confirmations.
+`/etc/atomic-swap/reveal-relayer/mainnet-dust-demo.env.pending` until the
+per-swap monitor wallet is open and refreshed. If the sender provides a txid,
+fill `MONERO_TXID`; otherwise leave it empty and use wallet-scan mode. Copy the
+pending file to `mainnet-dust-demo.env`, run once with `REVEAL_DRY_RUN=1`, then
+switch to `REVEAL_DRY_RUN=0` only after wallet-rpc confirms the exact payment
+and enough confirmations.

@@ -1,0 +1,24 @@
+[Unit]
+Description=Monero wallet-rpc for atomic-swap %i
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=atomic-swap
+Group=atomic-swap
+EnvironmentFile=/etc/atomic-swap/monero-wallet-rpc/%i.env
+ExecStart=/opt/monero-starknet-atomic-swap/ops/monero-wallet-rpc/run-wallet-rpc.sh
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadOnlyPaths=/opt/monero-starknet-atomic-swap
+ReadWritePaths=/home/atomic-swap/monero-wallets /home/atomic-swap/monero-mainnet-wallets /home/atomic-swap/.shared-ringdb /var/log/atomic-swap
+
+[Install]
+WantedBy=multi-user.target

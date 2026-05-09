@@ -65,9 +65,9 @@ struct Args {
     #[arg(long, default_value = "http://127.0.0.1:38090/json_rpc")]
     wallet_rpc_url: String,
 
-    /// Monero txid to monitor.
+    /// Optional Monero txid to monitor. If omitted, scan inbound wallet transfers.
     #[arg(long)]
-    monero_txid: String,
+    monero_txid: Option<String>,
 
     /// Required incoming Monero amount in piconero.
     #[arg(long)]
@@ -102,7 +102,7 @@ async fn main() -> Result<()> {
     validate_secret_hex(secret.as_str()).context("Invalid reveal secret")?;
 
     info!(
-        txid = %args.monero_txid,
+        txid = args.monero_txid.as_deref().unwrap_or("<scan-wallet>"),
         expected_amount_piconero = args.expected_monero_amount_piconero,
         confirmations = args.confirmations,
         "waiting for Monero payment"
@@ -156,36 +156,52 @@ async fn wait_for_payment(args: &Args) -> Result<TransferInfo> {
 
     loop {
         if args.timeout_secs > 0 && started.elapsed().as_secs() > args.timeout_secs {
-            bail!(
-                "timed out waiting for {} confirmations on Monero tx {}",
-                args.confirmations,
-                args.monero_txid
-            );
+            match args.monero_txid.as_deref() {
+                Some(txid) => bail!(
+                    "timed out waiting for {} confirmations on Monero tx {}",
+                    args.confirmations,
+                    txid
+                ),
+                None => bail!(
+                    "timed out waiting for {} confirmations on inbound Monero payment",
+                    args.confirmations
+                ),
+            }
         }
 
-        match get_wallet_transfer(&args.wallet_rpc_url, &args.monero_txid).await {
+        match get_candidate_transfer(args).await {
             Ok(Some(info)) => {
                 consecutive_errors = 0;
                 if info.amount < args.expected_monero_amount_piconero {
-                    bail!(
-                        "Monero tx {} amount {} piconero is below expected {} piconero",
-                        args.monero_txid,
-                        info.amount,
-                        args.expected_monero_amount_piconero
+                    if let Some(txid) = args.monero_txid.as_deref() {
+                        bail!(
+                            "Monero tx {} amount {} piconero is below expected {} piconero",
+                            txid,
+                            info.amount,
+                            args.expected_monero_amount_piconero
+                        );
+                    }
+                    info!(
+                        txid = %info.txid,
+                        amount_piconero = info.amount,
+                        expected_piconero = args.expected_monero_amount_piconero,
+                        "inbound Monero transfer is below expected amount"
                     );
                 }
-                if info.confirmations >= args.confirmations {
+                if info.amount >= args.expected_monero_amount_piconero
+                    && info.confirmations >= args.confirmations
+                {
                     if transfer_unlock_satisfied(&info) {
                         return Ok(info);
                     }
                     info!(
-                        txid = %args.monero_txid,
+                        txid = %info.txid,
                         unlock_time = info.unlock_time,
                         "Monero transfer has enough confirmations but remains locked"
                     );
                 }
                 info!(
-                    txid = %args.monero_txid,
+                    txid = %info.txid,
                     amount_piconero = info.amount,
                     confirmations = info.confirmations,
                     required_confirmations = args.confirmations,
@@ -194,12 +210,16 @@ async fn wait_for_payment(args: &Args) -> Result<TransferInfo> {
             }
             Ok(None) => {
                 consecutive_errors = 0;
-                warn!(txid = %args.monero_txid, "Monero tx not visible to wallet-rpc yet");
+                if let Some(txid) = args.monero_txid.as_deref() {
+                    warn!(txid, "Monero tx not visible to wallet-rpc yet");
+                } else {
+                    warn!("No inbound Monero transfer visible to wallet-rpc yet");
+                }
             }
             Err(err) => {
                 consecutive_errors += 1;
                 warn!(
-                    txid = %args.monero_txid,
+                    txid = args.monero_txid.as_deref().unwrap_or("<scan-wallet>"),
                     consecutive_errors,
                     max_errors = MAX_CONSECUTIVE_RPC_ERRORS,
                     error = %err,
@@ -212,6 +232,16 @@ async fn wait_for_payment(args: &Args) -> Result<TransferInfo> {
         }
 
         sleep(Duration::from_secs(args.poll_interval_secs)).await;
+    }
+}
+
+async fn get_candidate_transfer(args: &Args) -> Result<Option<TransferInfo>> {
+    match args.monero_txid.as_deref() {
+        Some(txid) => get_wallet_transfer(&args.wallet_rpc_url, txid).await,
+        None => {
+            get_wallet_inbound_transfer(&args.wallet_rpc_url, args.expected_monero_amount_piconero)
+                .await
+        }
     }
 }
 
@@ -233,6 +263,32 @@ async fn get_wallet_transfer(wallet_rpc_url: &str, txid: &str) -> Result<Option<
         .context("failed to parse wallet-rpc response")?;
 
     parse_wallet_transfer_response(txid, &resp)
+}
+
+async fn get_wallet_inbound_transfer(
+    wallet_rpc_url: &str,
+    expected_amount_piconero: u64,
+) -> Result<Option<TransferInfo>> {
+    let client = Client::new();
+    let resp: serde_json::Value = client
+        .post(wallet_rpc_url)
+        .json(&json!({
+            "jsonrpc": "2.0",
+            "id": "0",
+            "method": "get_transfers",
+            "params": {
+                "in": true,
+                "pool": true
+            }
+        }))
+        .send()
+        .await
+        .context("wallet-rpc request failed")?
+        .json()
+        .await
+        .context("failed to parse wallet-rpc response")?;
+
+    parse_wallet_transfers_response(&resp, expected_amount_piconero)
 }
 
 fn parse_wallet_transfer_response(
@@ -266,6 +322,83 @@ fn parse_wallet_transfer_response(
             transfer_type
         );
     }
+
+    Ok(Some(TransferInfo {
+        txid: txid.to_owned(),
+        amount: transfer
+            .get("amount")
+            .and_then(|value| value.as_u64())
+            .ok_or_else(|| anyhow!("wallet-rpc transfer missing amount"))?,
+        confirmations: transfer
+            .get("confirmations")
+            .and_then(|value| value.as_u64())
+            .unwrap_or(0),
+        height: transfer
+            .get("height")
+            .and_then(|value| value.as_u64())
+            .unwrap_or(0),
+        unlock_time: transfer
+            .get("unlock_time")
+            .and_then(|value| value.as_u64())
+            .unwrap_or(0),
+    }))
+}
+
+fn parse_wallet_transfers_response(
+    resp: &serde_json::Value,
+    expected_amount_piconero: u64,
+) -> Result<Option<TransferInfo>> {
+    if let Some(error) = resp.get("error") {
+        let message = error
+            .get("message")
+            .and_then(|value| value.as_str())
+            .unwrap_or("unknown wallet-rpc error");
+        return Err(anyhow!("Monero wallet-rpc error: {}", message));
+    }
+
+    let result = resp
+        .get("result")
+        .ok_or_else(|| anyhow!("wallet-rpc response missing result"))?;
+
+    let mut transfers = Vec::new();
+    for field in ["in", "pool"] {
+        if let Some(items) = result.get(field).and_then(|value| value.as_array()) {
+            for item in items {
+                if let Some(info) = parse_transfer_item(item)? {
+                    transfers.push(info);
+                }
+            }
+        }
+    }
+
+    if transfers.is_empty() {
+        return Ok(None);
+    }
+
+    transfers.sort_by(|left, right| {
+        let left_meets = left.amount >= expected_amount_piconero;
+        let right_meets = right.amount >= expected_amount_piconero;
+        right_meets
+            .cmp(&left_meets)
+            .then_with(|| right.confirmations.cmp(&left.confirmations))
+            .then_with(|| left.height.cmp(&right.height))
+    });
+
+    Ok(transfers.into_iter().next())
+}
+
+fn parse_transfer_item(transfer: &serde_json::Value) -> Result<Option<TransferInfo>> {
+    let transfer_type = transfer
+        .get("type")
+        .and_then(|value| value.as_str())
+        .unwrap_or("in");
+    if transfer_type != "in" && transfer_type != "pool" {
+        return Ok(None);
+    }
+
+    let Some(txid) = transfer.get("txid").and_then(|value| value.as_str()) else {
+        return Ok(None);
+    };
 
     Ok(Some(TransferInfo {
         txid: txid.to_owned(),
@@ -467,6 +600,69 @@ mod tests {
             }
         });
         assert!(parse_wallet_transfer_response("abc", &outbound).is_err());
+    }
+
+    #[test]
+    fn scans_wallet_transfers_by_amount_then_confirmations() {
+        let resp = json!({
+            "result": {
+                "in": [
+                    {
+                        "type": "in",
+                        "txid": "underpaid",
+                        "amount": 4_000_000_000u64,
+                        "confirmations": 100u64,
+                        "height": 10u64,
+                        "unlock_time": 0u64
+                    },
+                    {
+                        "type": "in",
+                        "txid": "candidate_low_conf",
+                        "amount": 5_000_000_000u64,
+                        "confirmations": 2u64,
+                        "height": 20u64,
+                        "unlock_time": 0u64
+                    },
+                    {
+                        "type": "in",
+                        "txid": "candidate_high_conf",
+                        "amount": 5_000_000_000u64,
+                        "confirmations": 12u64,
+                        "height": 21u64,
+                        "unlock_time": 0u64
+                    }
+                ]
+            }
+        });
+
+        let parsed = parse_wallet_transfers_response(&resp, 5_000_000_000)
+            .unwrap()
+            .unwrap();
+        assert_eq!(parsed.txid, "candidate_high_conf");
+    }
+
+    #[test]
+    fn scan_mode_keeps_underpaid_transfer_visible() {
+        let resp = json!({
+            "result": {
+                "in": [
+                    {
+                        "type": "in",
+                        "txid": "underpaid",
+                        "amount": 4_000_000_000u64,
+                        "confirmations": 100u64,
+                        "height": 10u64,
+                        "unlock_time": 0u64
+                    }
+                ]
+            }
+        });
+
+        let parsed = parse_wallet_transfers_response(&resp, 5_000_000_000)
+            .unwrap()
+            .unwrap();
+        assert_eq!(parsed.txid, "underpaid");
+        assert_eq!(parsed.amount, 4_000_000_000);
     }
 
     #[test]

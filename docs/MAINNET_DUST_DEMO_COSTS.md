@@ -81,6 +81,13 @@ URLs here.
   `is_secret_revealed=false`, `is_unlocked=false`,
   `get_claimable_after=0`, `get_lock_until=1778435777`, and contract STRK
   balance `40 STRK`.
+- Mainnet wallet-rpc template installed and started at `2026-05-09T21:33Z`
+  as `monero-wallet-rpc@mainnet.service`, bound to `127.0.0.1:18091`.
+- The per-swap monitor wallet was generated/opened from VM-held swap key
+  material, refreshed from restore height `3670409`, and verified against the
+  public Monero funding address. Refresh result: `received_money=false`.
+- The reveal relayer now supports wallet-scan mode, so the mainnet demo can
+  proceed without requiring the sender to provide a Monero txid.
 
 ## Current Totals
 

@@ -48,7 +48,6 @@ REVEAL_DRY_RUN="${REVEAL_DRY_RUN:-0}"
 require_env STARKNET_RPC_URL
 require_env SNCAST_ACCOUNT
 require_env ATOMIC_SWAP_CONTRACT_ADDRESS
-require_env MONERO_TXID
 require_env EXPECTED_MONERO_AMOUNT_PICONERO
 require_env REVEAL_SECRET_FILE
 
@@ -71,7 +70,6 @@ args=(
   --atomic-lock-ops-script "$ATOMIC_LOCK_OPS_SCRIPT"
   --secret-file "$REVEAL_SECRET_FILE"
   --wallet-rpc-url "$MONERO_WALLET_RPC_URL"
-  --monero-txid "$MONERO_TXID"
   --expected-monero-amount-piconero "$EXPECTED_MONERO_AMOUNT_PICONERO"
   --confirmations "$MONERO_CONFIRMATIONS"
   --poll-interval-secs "$MONERO_POLL_INTERVAL_SECS"
@@ -84,13 +82,16 @@ fi
 if [ -n "${ATOMIC_SWAP_TOKEN_ADDRESS:-}" ]; then
   args+=(--token-address "$ATOMIC_SWAP_TOKEN_ADDRESS")
 fi
+if [ -n "${MONERO_TXID:-}" ]; then
+  args+=(--monero-txid "$MONERO_TXID")
+fi
 if [ "$REVEAL_DRY_RUN" = "1" ]; then
   args+=(--dry-run)
 fi
 
 printf 'Starting reveal relayer for contract=%s monero_txid=%s expected_piconero=%s confirmations=%s dry_run=%s\n' \
   "$ATOMIC_SWAP_CONTRACT_ADDRESS" \
-  "$MONERO_TXID" \
+  "${MONERO_TXID:-<scan-wallet>}" \
   "$EXPECTED_MONERO_AMOUNT_PICONERO" \
   "$MONERO_CONFIRMATIONS" \
   "$REVEAL_DRY_RUN"
