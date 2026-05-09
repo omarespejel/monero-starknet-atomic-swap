@@ -7,6 +7,7 @@ Ed25519 response scalar. Older scripts intentionally truncated both values to 12
 do not reintroduce that truncation.
 """
 
+import argparse
 import json
 from pathlib import Path
 
@@ -111,7 +112,22 @@ def fake_glv_hint(point: G1Point, scalar: int) -> list[int]:
 
 def main() -> None:
     repo = Path(__file__).resolve().parents[1]
-    vectors_path = repo / "rust" / "test_vectors.json"
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--vectors-path",
+        type=Path,
+        default=repo / "rust" / "test_vectors.json",
+        help="Input DLEQ vector JSON. Defaults to the checked-in test vector.",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=repo / "cairo",
+        help="Directory for generated_dleq_vectors.json, adaptor_point_hint.json, and test_hints.json.",
+    )
+    args = parser.parse_args()
+
+    vectors_path = args.vectors_path
     with vectors_path.open() as f:
         vectors = json.load(f)
 
@@ -168,7 +184,8 @@ def main() -> None:
         "cairo_hints": {key: format_hint(value) for key, value in msm_hints.items()},
     }
 
-    cairo_dir = repo / "cairo"
+    cairo_dir = args.output_dir
+    cairo_dir.mkdir(parents=True, exist_ok=True)
     with (cairo_dir / "generated_dleq_vectors.json").open("w") as f:
         json.dump(generated, f, indent=2)
         f.write("\n")

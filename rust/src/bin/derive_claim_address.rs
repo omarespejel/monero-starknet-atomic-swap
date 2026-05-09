@@ -12,6 +12,8 @@ use rand::rngs::OsRng;
 use rand::RngCore;
 use serde_json::json;
 use sha2::{Digest, Sha256};
+use std::fs;
+use std::path::PathBuf;
 use tiny_keccak::{Hasher, Keccak};
 use zeroize::Zeroize;
 
@@ -22,12 +24,20 @@ use xmr_secret_gen::monero::address::derive_address_for_network;
 #[command(about = "Derive Monero claim address from partial key plus revealed secret")]
 struct Args {
     /// Revealed Starknet secret as 32-byte hex.
+    #[arg(long, conflicts_with = "secret_hex_file")]
+    secret_hex: Option<String>,
+
+    /// File containing the revealed Starknet secret as 32-byte hex.
     #[arg(long)]
-    secret_hex: String,
+    secret_hex_file: Option<PathBuf>,
 
     /// Optional partial spend-key share as 32-byte hex. Random if omitted.
-    #[arg(long)]
+    #[arg(long, conflicts_with = "partial_spend_key_hex_file")]
     partial_spend_key_hex: Option<String>,
+
+    /// File containing the optional partial spend-key share as 32-byte hex.
+    #[arg(long)]
+    partial_spend_key_hex_file: Option<PathBuf>,
 
     /// Monero network: mainnet, stagenet, or testnet.
     #[arg(long, default_value = "stagenet")]
@@ -40,8 +50,18 @@ struct Args {
 
 fn main() -> Result<()> {
     let args = Args::parse();
-    let mut secret = parse_32_byte_hex(&args.secret_hex, "secret")?;
-    let partial = match &args.partial_spend_key_hex {
+    let secret_hex = read_required_secret_arg(
+        args.secret_hex.as_deref(),
+        args.secret_hex_file.as_ref(),
+        "secret",
+    )?;
+    let mut secret = parse_32_byte_hex(&secret_hex, "secret")?;
+    let partial_hex = read_optional_secret_arg(
+        args.partial_spend_key_hex.as_deref(),
+        args.partial_spend_key_hex_file.as_ref(),
+        "partial spend key",
+    )?;
+    let partial = match partial_hex.as_deref() {
         Some(value) => parse_32_byte_hex(value, "partial spend key")?,
         None => random_scalar_bytes(),
     };
@@ -79,6 +99,36 @@ fn main() -> Result<()> {
 
     println!("{}", serde_json::to_string_pretty(&output)?);
     Ok(())
+}
+
+fn read_required_secret_arg(
+    inline: Option<&str>,
+    file: Option<&PathBuf>,
+    label: &str,
+) -> Result<String> {
+    read_optional_secret_arg(inline, file, label)?.ok_or_else(|| {
+        anyhow!(
+            "set --{}-hex or --{}-hex-file",
+            label.replace(' ', "-"),
+            label.replace(' ', "-")
+        )
+    })
+}
+
+fn read_optional_secret_arg(
+    inline: Option<&str>,
+    file: Option<&PathBuf>,
+    label: &str,
+) -> Result<Option<String>> {
+    if let Some(value) = inline {
+        return Ok(Some(value.trim().to_string()));
+    }
+    let Some(path) = file else {
+        return Ok(None);
+    };
+    let value = fs::read_to_string(path)
+        .with_context(|| format!("failed to read {} from {}", label, path.display()))?;
+    Ok(Some(value.trim().to_string()))
 }
 
 fn parse_32_byte_hex(value: &str, label: &str) -> Result<[u8; 32]> {

@@ -63,11 +63,20 @@ def push_span(calldata: list[str], values: list[str]) -> None:
     calldata.extend(normalize_hex(value) for value in values)
 
 
-def build_calldata(repo: Path, lock_until: int, depositor: str, token: str, amount: int) -> list[str]:
-    vectors = json.loads((repo / "rust" / "test_vectors.json").read_text())
-    generated = json.loads((repo / "cairo" / "generated_dleq_vectors.json").read_text())
-    hints = json.loads((repo / "cairo" / "test_hints.json").read_text())
-    adaptor_hint = json.loads((repo / "cairo" / "adaptor_point_hint.json").read_text())
+def build_calldata(
+    vectors_path: Path,
+    generated_path: Path,
+    hints_path: Path,
+    adaptor_hint_path: Path,
+    lock_until: int,
+    depositor: str,
+    token: str,
+    amount: int,
+) -> list[str]:
+    vectors = json.loads(vectors_path.read_text())
+    generated = json.loads(generated_path.read_text())
+    hints = json.loads(hints_path.read_text())
+    adaptor_hint = json.loads(adaptor_hint_path.read_text())
 
     calldata: list[str] = []
     push_span(calldata, hashlock_words(vectors["hashlock"]))
@@ -109,6 +118,15 @@ def main() -> None:
     parser.add_argument("--amount", default=os.getenv("ATOMIC_SWAP_AMOUNT", "0"))
     parser.add_argument("--network", default=os.getenv("STARKNET_NETWORK", "sepolia"))
     parser.add_argument("--allow-zero-lock", action="store_true", default=os.getenv("ATOMIC_SWAP_ALLOW_ZERO_LOCK") == "1")
+    parser.add_argument("--vectors-path", type=Path, default=repo / "rust" / "test_vectors.json")
+    parser.add_argument("--generated-path", type=Path, default=repo / "cairo" / "generated_dleq_vectors.json")
+    parser.add_argument("--hints-path", type=Path, default=repo / "cairo" / "test_hints.json")
+    parser.add_argument("--adaptor-hint-path", type=Path, default=repo / "cairo" / "adaptor_point_hint.json")
+    parser.add_argument(
+        "--output",
+        type=Path,
+        help="Optional output path for calldata. Defaults to deployments/<network>/latest_calldata.txt.",
+    )
     args = parser.parse_args()
 
     token = normalize_hex(args.token)
@@ -121,12 +139,22 @@ def main() -> None:
     if amount != 0 and depositor == "0x0":
         raise SystemExit("Set --depositor or ATOMIC_SWAP_DEPOSITOR/STARKNET_ACCOUNT_ADDRESS for non-zero token locks.")
 
-    calldata = build_calldata(repo, args.lock_until, depositor, token, amount)
-    print(" ".join(calldata))
+    calldata = build_calldata(
+        args.vectors_path,
+        args.generated_path,
+        args.hints_path,
+        args.adaptor_hint_path,
+        args.lock_until,
+        depositor,
+        token,
+        amount,
+    )
+    encoded = " ".join(calldata)
+    print(encoded)
 
-    out = repo / "deployments" / args.network / "latest_calldata.txt"
+    out = args.output or repo / "deployments" / args.network / "latest_calldata.txt"
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(" ".join(calldata) + "\n")
+    out.write_text(encoded + "\n")
 
 
 if __name__ == "__main__":

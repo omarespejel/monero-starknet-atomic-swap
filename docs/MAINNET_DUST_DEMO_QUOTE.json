@@ -1,0 +1,31 @@
+{
+  "pair": "XMR/STRK",
+  "xmr_amount": "0.005",
+  "strk_amount": "40",
+  "rate": "8000 STRK per XMR",
+  "starknet_network": "mainnet",
+  "starknet_depositor": "0x679e5d1e49ec2da6bf2cc35d9d8ac783d97d94ceb51fdf75243eea03203ae6a",
+  "starknet_token": "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d",
+  "starknet_amount_wei": "40000000000000000000",
+  "lock_until": 1778435777,
+  "lock_until_utc": "2026-05-10T17:56:17Z",
+  "monero_network": "mainnet",
+  "monero_restore_height": 3670409,
+  "hashlock": "a80a87e3632599d1eaead88fd68f4b621bf0ea35acd126c9cdc7cd56524f5d09",
+  "adaptor_point_compressed": "0b7d475d3b72392f789e3bccdf71cd10b68b1b46cdb3e3e177aace857d9c4a2f",
+  "metadata_hash": "0x11f94292826e2f778c8c352fe1069e836ef28cfd864af3b42839921955f8ed6",
+  "salt": "0x9240ba6a3f78e2584de2c12769de54",
+  "starknet_factory": "0x07f72aa0685938f5c6744a76343b6e946dd5755096719e14c372411f27f12df0",
+  "starknet_atomic_lock": "0x01f84506b71bf584cbb1a0429c160a4c328942ab7f176c050b671670a4bb5d85",
+  "monero_funding_address": "41wDTMA81r9KCyercwNTRTQHU9JPDB556NwYMH9UD1KRVSNXrJpCYBp7PCgWUVtCKW7AxiGsXMxdgJSwRzQL7GKf8UAwZhX",
+  "monero_claim_destination": "42R4x42iivefebdJa7CZugP4u1ui4g2modjZGDB29wNifxdcuWK5d1aAmR1om2RwYN63ZnaLBpBmhB5YgSjhTeSDQbLm826",
+  "starknet_txs": {
+    "account_deploy": "0x04a85addd21f0eb320b9221922aef840a3b90c1439cb7e52e93e0bb8f81da896",
+    "atomic_lock_declare": "0x03a3f6611cfd453482fc48ffd21377a3da6c10da01acd4ffb3a9dddb58dd1b47",
+    "factory_declare": "0x03d7e871d35ab4fa200d3dbed3f4568d4400f92603b46b30d523342b2e9a4cc9",
+    "factory_deploy": "0x007c0913987ff37cd7ae9a052ddd2781483a6f3844498e1ec3e1d200303dd32e",
+    "deploy_lock": "0x03d369b930632140fbefea0364feb9203984d232dbd354000091090d0651eb9e",
+    "approve": "0x0028c89e975bb7e526c8397abbbbc73fc943b35aa6608e4cf69d13dfc2382711",
+    "deposit": "0x014c3e58112380dc20103158b507f1f8a02e49c55cda0a8ca18d7e3583c10404"
+  }
+}
