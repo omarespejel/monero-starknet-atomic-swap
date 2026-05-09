@@ -32,7 +32,6 @@ use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
 use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::IsIdentity;
-use hex;
 use sha2::{Digest, Sha256, Sha512};
 use std::ops::Deref;
 use thiserror::Error;
@@ -183,16 +182,10 @@ pub fn generate_dleq_proof(
         return Err(DleqError::PointMismatch);
     }
 
-    // 3. Verify hashlock = SHA256(raw_secret_bytes) for Cairo compatibility
-    // AUDIT: Warn if scalar reduction changed the bytes (could cause hashlock mismatch)
-    let scalar_bytes = secret.to_bytes();
-    if scalar_bytes != *secret_bytes {
-        eprintln!("⚠️  WARNING: Scalar reduction changed bytes!");
-        eprintln!("    Raw:    {}", hex::encode(secret_bytes));
-        eprintln!("    Scalar: {}", hex::encode(scalar_bytes));
-        eprintln!("    Using raw bytes for hashlock (Cairo-compatible)");
-    }
-
+    // 3. Verify hashlock = SHA256(raw_secret_bytes) for Cairo compatibility.
+    // Do not log raw/canonical bytes here: this library is used with live
+    // reveal preimages, and scalar reduction can be detected without exposing
+    // secret material.
     let computed_hash: [u8; 32] = Sha256::digest(secret_bytes).into();
     if computed_hash != *hashlock {
         return Err(DleqError::HashlockMismatch);

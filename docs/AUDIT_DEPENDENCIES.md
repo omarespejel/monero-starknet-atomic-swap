@@ -75,8 +75,10 @@ This codebase uses **audited cryptographic libraries** for all critical operatio
 - **Production replacement**: Use `monero-oxide` or `monero::SwapKeyPair` (key splitting approach)
 
 ### `rust/src/bin/maker.rs`
-- Uses demo `adaptor_sig` module
-- **TODO**: Update to use `monero::SwapKeyPair` + wallet-rpc for production (wallet-rpc is already the production choice)
+- Emits two-party Monero key-generation artifacts and derives the Starknet
+  hashlock/DLEQ package from Bob's raw reveal bytes.
+- Does not deploy, sign, or broadcast transactions. The local artifact still
+  contains reveal/key-share material and must be treated as a secret file.
 
 ---
 
@@ -197,4 +199,3 @@ The following duplicate files were removed per audit recommendations:
 6. Run production builds on Linux (not macOS)
 
 **Note**: Migration to `monero-oxide` is **NOT planned**. wallet-rpc is the production choice as it uses Monero's own audited CLSAG implementation. `monero-oxide` v0.1.0 is not yet published on crates.io (only v0.0.1 available).
-

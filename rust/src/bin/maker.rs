@@ -1,8 +1,8 @@
 //! Maker (Alice) CLI for XMR↔Starknet atomic swap artifact generation.
 //!
 //! This command:
-//! 1. Generates a secret scalar `t`
-//! 2. Creates adaptor signature for Monero stagenet
+//! 1. Generates two-party Monero key shares
+//! 2. Derives the Starknet hashlock/DLEQ package from Bob's raw reveal bytes
 //! 3. Writes local JSON artifacts for the audited deployment tooling.
 //!
 //! This binary does not deploy contracts, sign Starknet transactions, or
@@ -11,16 +11,15 @@
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
-use curve25519_dalek::scalar::Scalar;
 use serde_json::json;
-use std::path::PathBuf;
-use xmr_secret_gen::adaptor::create_adaptor_signature;
-use xmr_secret_gen::generate_swap_secret;
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use xmr_secret_gen::monero::{AliceKeys, BobKeys, SharedOutput};
 use xmr_secret_gen::swap::{
     MoneroNetwork, StarknetReceiveMode, SwapDirection, SwapTerms, MIN_LOCK_DURATION_SECS,
     TERMS_DEFAULT_MONERO_CONFIRMATIONS,
 };
+use xmr_secret_gen::try_generate_swap_secret_from_bytes;
 
 #[derive(Parser)]
 #[command(name = "maker")]
@@ -72,6 +71,10 @@ struct Args {
     /// Output file for swap state (JSON)
     #[arg(long, default_value = "swap_state.json")]
     output: PathBuf,
+
+    /// Print the local reveal secret to stdout. Off by default to avoid terminal/history leakage.
+    #[arg(long)]
+    print_secret: bool,
 }
 
 #[tokio::main]
@@ -93,34 +96,43 @@ async fn main() -> Result<()> {
         .parse::<StarknetReceiveMode>()
         .context("Invalid --starknet-receive-mode")?;
 
-    // Step 1: Generate secret and swap data
-    println!("\n📝 Step 1: Generating secret scalar `t`...");
-    let swap_secret = generate_swap_secret();
-    let secret_bytes: [u8; 32] = hex::decode(&swap_secret.secret_hex)
-        .context("Failed to decode secret hex")?
-        .try_into()
-        .map_err(|_| anyhow::anyhow!("Invalid secret length"))?;
-    let adaptor_scalar = Scalar::from_bytes_mod_order(secret_bytes);
+    // Step 1: Generate two-party Monero key shares and derive swap data.
+    println!("\n📝 Step 1: Generating two-party Monero key shares...");
+    let alice_keys = AliceKeys::generate();
+    let bob_keys = BobKeys::generate();
+    let shared_output = SharedOutput::new(&alice_keys, &bob_keys);
+    let alice_public = alice_keys.public_data();
+    let bob_public = bob_keys.public_data();
 
-    println!("   Secret: {}", swap_secret.secret_hex);
+    let swap_secret = try_generate_swap_secret_from_bytes(bob_keys.secret_bytes())
+        .context("Failed to generate Starknet DLEQ package from Bob reveal bytes")?;
+    let expected_hash_words: [u32; 8] = core::array::from_fn(|i| {
+        let start = i * 4;
+        u32::from_be_bytes(bob_keys.hashlock()[start..start + 4].try_into().unwrap())
+    });
+    anyhow::ensure!(
+        swap_secret.hash_u32_words == expected_hash_words,
+        "two-party Bob hashlock does not match Starknet deployment hash words"
+    );
+
+    if args.print_secret {
+        println!("   Secret: {}", swap_secret.secret_hex);
+    } else {
+        println!("   Secret: <written only to local artifact; pass --print-secret to display>");
+    }
     println!("   Hash: {:?}", swap_secret.hash_u32_words);
 
-    // Step 2: Split Monero key and create adaptor signature
-    println!("\n🔑 Step 2: Creating Monero adaptor signature...");
-    let full_monero_key = Scalar::from_bytes_mod_order([0x42u8; 32]); // Demo key
-                                                                      // Note: In production, use the same adaptor_scalar from swap_secret
-                                                                      // For demo, we'll use a different approach - split with the generated adaptor_scalar
-    let base_key = full_monero_key - adaptor_scalar;
-    let adaptor_point = &adaptor_scalar * &ED25519_BASEPOINT_POINT;
-
-    let message = b"Monero stagenet transaction for atomic swap";
-    let adaptor_sig = create_adaptor_signature(&base_key, &adaptor_point, message);
-
+    // Step 2: Verify the key-share package that wallet-rpc recovery will use.
+    println!("\n🔑 Step 2: Preparing two-party Monero key exchange artifact...");
     println!(
-        "   Adaptor point: {:?}",
-        adaptor_point.compress().to_bytes()
+        "   Alice spend share public: {}",
+        hex::encode(alice_public.S_a)
     );
-    println!("   Adaptor signature created (ready for Monero stagenet)");
+    println!("   Bob adaptor point: {}", hex::encode(bob_public.S_b));
+    println!(
+        "   Shared spend public key: {}",
+        hex::encode(shared_output.S.compress().to_bytes())
+    );
 
     // Step 3: Prepare contract artifact data. This is not complete deployment calldata:
     // DLEQ MSM hints must come from tools/regenerate_dleq_hints.py.
@@ -196,12 +208,31 @@ async fn main() -> Result<()> {
     println!("\n💾 Step 4: Saving swap state...");
     let swap_state = json!({
         "role": "maker",
+        "artifact_version": 2,
+        "protocol": "two_party_key_generation_v1",
+        "secret_warning": "local-only reveal preimage; do not share before Starknet claim",
         "secret_hex": swap_secret.secret_hex,
-        "adaptor_scalar_hex": hex::encode(adaptor_scalar.to_bytes()),
-        "adaptor_point": hex::encode(adaptor_point.compress().to_bytes()),
-        "adaptor_signature": {
-            "partial_sig": hex::encode(adaptor_sig.partial_sig.to_bytes()),
-            "nonce_commitment": hex::encode(adaptor_sig.nonce_commitment.compress().to_bytes()),
+        "monero_key_exchange": {
+            "alice_public": {
+                "spend_share_point": hex::encode(alice_public.S_a),
+                "view_share_point": hex::encode(alice_public.V_a),
+                "view_share_scalar": hex::encode(alice_public.v_a),
+            },
+            "alice_private_local": {
+                "spend_share_scalar": hex::encode(alice_keys.spend_share().to_bytes()),
+                "view_share_scalar": hex::encode(alice_keys.view_share().to_bytes()),
+            },
+            "bob_public": {
+                "spend_share_point": hex::encode(bob_public.S_b),
+                "view_share_point": hex::encode(bob_public.V_b),
+                "view_share_scalar": hex::encode(bob_public.v_b),
+                "hashlock": hex::encode(bob_public.hashlock),
+            },
+            "shared_output": {
+                "spend_public_key": hex::encode(shared_output.S.compress().to_bytes()),
+                "view_public_key": hex::encode(shared_output.V.compress().to_bytes()),
+                "view_scalar": hex::encode(shared_output.v.to_bytes()),
+            },
         },
         "deployment_data": deployment_data,
         "swap_terms": swap_terms,
@@ -210,7 +241,7 @@ async fn main() -> Result<()> {
         "lock_until": lock_until,
     });
 
-    std::fs::write(&args.output, serde_json::to_string_pretty(&swap_state)?)
+    write_secret_artifact(&args.output, &serde_json::to_string_pretty(&swap_state)?)
         .context("Failed to write swap state file")?;
 
     println!("   Swap state saved to: {}", args.output.display());
@@ -233,10 +264,35 @@ async fn main() -> Result<()> {
 
     println!("\nMaker artifact generation complete.");
     println!("   Next steps:");
-    println!("   1. Share adaptor signature/terms out-of-band with taker");
+    println!("   1. Share public key-exchange data and terms out-of-band with taker");
     println!("   2. Deploy with the TypeScript/starknet.js path, not this binary");
     println!("   3. Monitor SecretRevealed/TokensClaimed events with ABI-aware tooling");
     println!("   4. Finalize/broadcast Monero only through the VM wallet-rpc setup");
 
     Ok(())
+}
+
+fn write_secret_artifact(path: &Path, contents: &str) -> Result<()> {
+    #[cfg(unix)]
+    {
+        use std::fs::{self, OpenOptions};
+        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(path)?;
+        file.write_all(contents.as_bytes())?;
+        file.sync_all()?;
+        fs::set_permissions(path, fs::Permissions::from_mode(0o600))?;
+        Ok(())
+    }
+
+    #[cfg(not(unix))]
+    {
+        std::fs::write(path, contents)?;
+        Ok(())
+    }
 }

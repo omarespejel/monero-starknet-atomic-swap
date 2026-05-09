@@ -32,7 +32,8 @@ use rand::rngs::OsRng;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use zeroize::Zeroizing;
+use thiserror::Error;
+use zeroize::{Zeroize, Zeroizing};
 
 /// Output structure for JSON serialization.
 #[derive(Serialize)]
@@ -54,6 +55,16 @@ pub struct SwapSecret {
     pub dleq_r2_compressed: U256Hex,
     pub dleq_r2_sqrt_hint: U256Hex,
     pub fake_glv_hint: [String; 10],
+}
+
+#[derive(Debug, Error)]
+pub enum SwapSecretError {
+    #[error("swap secret reduced to zero")]
+    ZeroScalar,
+    #[error("failed to generate Cairo adaptor point/hints: {0}")]
+    HintGeneration(String),
+    #[error("DLEQ generation failed: {0}")]
+    Dleq(#[from] DleqError),
 }
 
 /// u256 serialized both as a single little-endian integer and Cairo low/high limbs.
@@ -251,12 +262,36 @@ fn felt_hex_from_le_bytes(bytes: &[u8; 32]) -> String {
 /// Generate a Monero-compatible scalar and compute its SHA-256 hash.
 pub fn generate_swap_secret() -> SwapSecret {
     let mut csprng = OsRng;
-    let mut raw_bytes = [0u8; 32];
-    csprng.fill_bytes(&mut raw_bytes);
+    loop {
+        let mut raw_bytes = [0u8; 32];
+        csprng.fill_bytes(&mut raw_bytes);
 
-    // Reduce to a valid scalar and keep the canonical 32-byte representation.
-    let scalar = Scalar::from_bytes_mod_order(raw_bytes);
-    let secret_bytes = scalar.to_bytes();
+        let secret = try_generate_swap_secret_from_bytes(raw_bytes);
+        raw_bytes.zeroize();
+
+        match secret {
+            Ok(secret) => return secret,
+            Err(SwapSecretError::ZeroScalar) => continue,
+            Err(err) => panic!(
+                "failed to generate Cairo adaptor point/fake-GLV hints; run through tools/uv instead of using placeholder data: {}",
+                err
+            ),
+        }
+    }
+}
+
+/// Generate the Starknet/Cairo deployment package for explicit reveal bytes.
+///
+/// `secret_bytes` are the exact bytes Cairo hashes with SHA-256 and later
+/// receives in `reveal_secret`. The Monero side interprets the same bytes as an
+/// Ed25519 scalar modulo l for adaptor-point and spend-key recovery.
+pub fn try_generate_swap_secret_from_bytes(
+    secret_bytes: [u8; 32],
+) -> Result<SwapSecret, SwapSecretError> {
+    let scalar = Scalar::from_bytes_mod_order(secret_bytes);
+    if scalar == Scalar::ZERO {
+        return Err(SwapSecretError::ZeroScalar);
+    }
 
     // Compute adaptor point T = t·G on Edwards curve (for Monero compatibility check).
     let adaptor_point_edwards: EdwardsPoint = &scalar * &ED25519_BASEPOINT_POINT;
@@ -264,9 +299,7 @@ pub fn generate_swap_secret() -> SwapSecret {
     // Generate real adaptor point and fake-GLV hint using Python tool for consistency with Cairo.
     let secret_hex = hex::encode(secret_bytes);
     let (adaptor_point_x_limbs, adaptor_point_y_limbs, fake_glv_hint) =
-        generate_adaptor_point_from_python(&secret_hex).expect(
-            "failed to generate Cairo adaptor point/fake-GLV hints; run through tools/uv instead of using placeholder data",
-        );
+        generate_adaptor_point_from_python(&secret_hex).map_err(SwapSecretError::HintGeneration)?;
 
     // SHA-256 hash.
     let hash_bytes: [u8; 32] = Sha256::digest(&secret_bytes).into();
@@ -286,11 +319,8 @@ pub fn generate_swap_secret() -> SwapSecret {
         &secret_bytes,
         &adaptor_point_edwards,
         &hashlock,
-    )
-    .expect("DLEQ proof generation should succeed for valid test inputs");
-    let dleq_cairo = dleq_proof
-        .to_cairo_format(&adaptor_point_edwards)
-        .expect("DLEQ proof should convert to Cairo deployment format");
+    )?;
+    let dleq_cairo = dleq_proof.to_cairo_format(&adaptor_point_edwards)?;
 
     let adaptor_point_compressed = u256_hex_from_le_bytes(&dleq_cairo.adaptor_point_compressed);
     let adaptor_point_sqrt_hint = u256_hex_from_le_bytes(&dleq_cairo.adaptor_point_sqrt_hint);
@@ -321,7 +351,7 @@ pub fn generate_swap_secret() -> SwapSecret {
             .collect::<String>()
     );
 
-    SwapSecret {
+    Ok(SwapSecret {
         secret_hex: hex::encode(secret_bytes),
         hash_u32_words: hash_words,
         cairo_hash_literal,
@@ -339,7 +369,7 @@ pub fn generate_swap_secret() -> SwapSecret {
         dleq_r2_compressed,
         dleq_r2_sqrt_hint,
         fake_glv_hint,
-    }
+    })
 }
 
 #[cfg(test)]
@@ -359,5 +389,25 @@ mod tests {
         let scalar = Scalar::from_bytes_mod_order([1u8; 32]);
         let hash: [u8; 32] = Sha256::digest(&scalar.to_bytes()).into();
         assert_eq!(hash.len(), 32);
+    }
+
+    #[test]
+    fn test_explicit_swap_secret_uses_raw_reveal_bytes() {
+        let secret_bytes = [0xffu8; 32];
+        let secret = try_generate_swap_secret_from_bytes(secret_bytes)
+            .expect("non-zero reduced scalar should generate a DLEQ package");
+
+        assert_eq!(secret.secret_hex, hex::encode(secret_bytes));
+        let expected_hash: [u8; 32] = Sha256::digest(secret_bytes).into();
+        let expected_words: [u32; 8] = core::array::from_fn(|i| {
+            let start = i * 4;
+            u32::from_be_bytes(expected_hash[start..start + 4].try_into().unwrap())
+        });
+        assert_eq!(secret.hash_u32_words, expected_words);
+        assert_ne!(
+            Scalar::from_bytes_mod_order(secret_bytes).to_bytes(),
+            secret_bytes,
+            "test vector should exercise scalar reduction changing bytes"
+        );
     }
 }

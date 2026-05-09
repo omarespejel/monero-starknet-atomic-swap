@@ -52,6 +52,11 @@ python3 tools/generate_deploy_calldata.py \
   validated `swap_terms` when `--token-address`, `--amount`, and
   `--expected-monero-amount-piconero` are provided. Treat artifacts without
   `swap_terms` as demo-only.
+- `cargo run --bin maker` now uses the two-party Monero key-generation path for
+  the local swap artifact. It no longer emits the deprecated demo adaptor
+  signature, and it does not print the reveal secret unless `--print-secret` is
+  explicitly passed. On Unix, the output artifact is written with `0600`
+  permissions because it contains local reveal/key-share material.
 - The Rust swap state machine preserves Monero restore height, txid, and amount
   across finality, reveal, and claim transitions. Old JSON swap files missing
   the new optional fields remain deserializable.
@@ -109,6 +114,12 @@ used by Cairo's `SHA-256(raw_secret_bytes)` hashlock check, with explicit
 zero-scalar rejection. Targeted key-splitting/DLEQ/E2E tests, repo-wide
 `cd rust && cargo test -q`, `cd rust && cargo fmt --check`, `git diff --check`,
 `python3 tools/check_secret_hygiene.py`, and `cd cairo && snforge test` are green.
+
+Maker artifacts now derive their Starknet DLEQ package from the same raw Bob
+reveal bytes used by the two-party Monero key path, and stdout secret printing
+is gated behind `--print-secret`. DLEQ proof generation no longer logs raw or
+canonical secret bytes when scalar reduction changes the reveal preimage. The
+artifact writer forces `0600` permissions on Unix.
 
 Sepolia rehearsal:
 
