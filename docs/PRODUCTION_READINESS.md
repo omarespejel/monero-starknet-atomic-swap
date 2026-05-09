@@ -242,6 +242,29 @@ Operations artifacts:
   derives per-lock entries, maps `partial_key_id` to deterministic secret env
   vars such as `RELAYER_PARTIAL_SMOKE1`, and still writes independent per-lock
   cursors.
+- Sepolia factory/discovery smoke proof succeeded:
+  - `AtomicLockFactory` class hash:
+    `0x059efa4e6acec399f7d90128e934e0dbee93ad6c6201323eeed01a1847c49109`
+  - factory declare tx:
+    `0x035b44f42ed92ee7aff97fe42f858c3c7ffdcd5bf2e2b18bc089a980c98b8997`
+  - factory contract:
+    `0x053cb8c9c1590253eabf1fdd88ac6db975c5c91f4705c531b8c664a66b2e4c31`
+  - factory deploy tx:
+    `0x022e4cabc4d6d9de1561d3bddb12b39bc1e8cf601f0419ef27a6bdd5970c2c76`
+  - factory-created zero-value AtomicLock:
+    `0x013fd024676edb864c7918f1db05a28e97c3e7c9e702fb17d344434998572998`
+  - `deploy_lock` tx:
+    `0x069b5af6d6301acac17c830550617946e67bfbc190978aa7c668d393734777b1`,
+    block `9572198`
+  - registry metadata:
+    `partial_key_id=factory1`, `restore_height=2115307`,
+    `monero_network=stagenet`, `metadata_hash=0x1`
+  - discovery-only dry-run from a fresh cursor found the lock and advanced its
+    cursor:
+    `latest_block=9572228`, `safe_tip=9572228`,
+    `from_block=9572198`, `to_block=9572228`, `events_seen=1`,
+    `reveals_claimed=0`, `events_skipped=1`, `enabled_locks=1`,
+    `succeeded_locks=1`, `failed_locks=0`.
 - Systemd templates were syntax-checked in the Monero VM with
   `systemd-analyze verify --root=...` against a temporary root containing the
   expected binary and env-file paths.
@@ -349,9 +372,10 @@ Operations artifacts:
 ## Remaining Blockers
 
 - Automatic lock discovery: factory/registry contract code, registry event
-  decoding, relayer discovery config, and focused tests are done. Remaining
-  proof is a Sepolia factory deployment plus an end-to-end factory-discovered
-  lock claim inside the Monero VM.
+  decoding, relayer discovery config, focused tests, Sepolia factory deployment,
+  factory-created lock deployment, and discovery dry-run proof are done.
+  Remaining proof is an end-to-end factory-discovered live claim inside the
+  Monero VM, plus monitoring for registry scan failures.
 - Monero transaction finalization: `rust/src/monero_full.rs` no longer returns
   placeholder transaction hex. Real spends must go through wallet-rpc/Monero
   transaction tooling.
