@@ -165,91 +165,85 @@ mod token_security_tests {
         }
         
         #[abi(embed_v0)]
-        fn transfer(ref self: ContractState, recipient: ContractAddress, amount: u256) -> bool {
-            let sender = get_caller_address();
-            let sender_balance = self.balances.read(sender);
-            assert(sender_balance >= amount, 'Insufficient balance');
-            
-            // Attempt reentrancy attack during transfer
-            if !self.attack_triggered.read() {
-                self.attack_triggered.write(true);
-                let target = IAtomicLockDispatcher {
-                    contract_address: self.target_contract.read(),
-                };
+        impl MaliciousReentrantTokenImpl of super::IMockERC20<ContractState> {
+            fn transfer(ref self: ContractState, recipient: ContractAddress, amount: u256) -> bool {
+                let sender = get_caller_address();
+                let sender_balance = self.balances.read(sender);
+                assert(sender_balance >= amount, 'Insufficient balance');
                 
-                // Try to call verify_and_unlock again (should fail due to ReentrancyGuard)
-                let mut attack_secret: ByteArray = Default::default();
-                // Use dummy secret (will fail hashlock check, but reentrancy should be blocked first)
-                let mut i: u32 = 0;
-                while i < 32 {
-                    attack_secret.append_byte(0x00_u8);
-                    i += 1;
+                // Attempt reentrancy attack during transfer
+                if !self.attack_triggered.read() {
+                    self.attack_triggered.write(true);
+                    let target = IAtomicLockDispatcher {
+                        contract_address: self.target_contract.read(),
+                    };
+
+                    // Try to call verify_and_unlock again (should fail due to ReentrancyGuard)
+                    let mut attack_secret: ByteArray = Default::default();
+                    // Use dummy secret (will fail hashlock check, but reentrancy should be blocked first)
+                    let mut i: u32 = 0;
+                    while i < 32 {
+                        attack_secret.append_byte(0x00_u8);
+                        i += 1;
+                    }
+
+                    // This should fail due to ReentrancyGuard, not hashlock mismatch
+                    target.verify_and_unlock(attack_secret);
                 }
                 
-                // This should fail due to ReentrancyGuard, not hashlock mismatch
-                target.verify_and_unlock(attack_secret);
+                // Complete transfer
+                self.balances.write(sender, sender_balance - amount);
+                self.balances.write(recipient, self.balances.read(recipient) + amount);
+                true
             }
             
-            // Complete transfer
-            self.balances.write(sender, sender_balance - amount);
-            self.balances.write(recipient, self.balances.read(recipient) + amount);
-            true
-        }
-        
-        #[abi(embed_v0)]
-        fn transfer_from(
-            ref self: ContractState,
-            sender: ContractAddress,
-            recipient: ContractAddress,
-            amount: u256,
-        ) -> bool {
-            // Same attack logic as transfer - call transfer internally
-            let sender_balance = self.balances.read(sender);
-            assert(sender_balance >= amount, 'Insufficient balance');
-            
-            // Attempt reentrancy attack
-            if !self.attack_triggered.read() {
-                self.attack_triggered.write(true);
-                let target = IAtomicLockDispatcher {
-                    contract_address: self.target_contract.read(),
-                };
+            fn transfer_from(
+                ref self: ContractState,
+                sender: ContractAddress,
+                recipient: ContractAddress,
+                amount: u256,
+            ) -> bool {
+                let sender_balance = self.balances.read(sender);
+                assert(sender_balance >= amount, 'Insufficient balance');
                 
-                let mut attack_secret: ByteArray = Default::default();
-                let mut i: u32 = 0;
-                while i < 32 {
-                    attack_secret.append_byte(0x00_u8);
-                    i += 1;
+                if !self.attack_triggered.read() {
+                    self.attack_triggered.write(true);
+                    let target = IAtomicLockDispatcher {
+                        contract_address: self.target_contract.read(),
+                    };
+
+                    let mut attack_secret: ByteArray = Default::default();
+                    let mut i: u32 = 0;
+                    while i < 32 {
+                        attack_secret.append_byte(0x00_u8);
+                        i += 1;
+                    }
+
+                    target.verify_and_unlock(attack_secret);
                 }
                 
-                target.verify_and_unlock(attack_secret);
+                self.balances.write(sender, sender_balance - amount);
+                self.balances.write(recipient, self.balances.read(recipient) + amount);
+                true
+            }
+
+            fn balance_of(self: @ContractState, account: ContractAddress) -> u256 {
+                self.balances.read(account)
+            }
+
+            fn mint(ref self: ContractState, to: ContractAddress, amount: u256) {
+                self.balances.write(to, self.balances.read(to) + amount);
+            }
+
+            fn approve(ref self: ContractState, spender: ContractAddress, amount: u256) -> bool {
+                let owner = get_caller_address();
+                self.allowances.write((owner, spender), amount);
+                true
             }
             
-            // Complete transfer
-            self.balances.write(sender, sender_balance - amount);
-            self.balances.write(recipient, self.balances.read(recipient) + amount);
-            true
-        }
-        
-        #[abi(embed_v0)]
-        fn balance_of(self: @ContractState, account: ContractAddress) -> u256 {
-            self.balances.read(account)
-        }
-        
-        #[abi(embed_v0)]
-        fn mint(ref self: ContractState, to: ContractAddress, amount: u256) {
-            self.balances.write(to, self.balances.read(to) + amount);
-        }
-        
-        #[abi(embed_v0)]
-        fn approve(ref self: ContractState, spender: ContractAddress, amount: u256) -> bool {
-            let owner = get_caller_address();
-            self.allowances.write((owner, spender), amount);
-            true
-        }
-        
-        #[abi(embed_v0)]
-        fn allowance(self: @ContractState, owner: ContractAddress, spender: ContractAddress) -> u256 {
-            self.allowances.read((owner, spender))
+            fn allowance(self: @ContractState, owner: ContractAddress, spender: ContractAddress) -> u256 {
+                self.allowances.read((owner, spender))
+            }
         }
     }
     
@@ -271,35 +265,19 @@ mod token_security_tests {
         secret
     }
     
-    // Helper to deploy AtomicLock contract with token
-    // Returns (contract, depositor_address)
-    // 
-    // **CRITICAL**: The production constructor takes an explicit depositor so
-    // UDC deployment cannot accidentally record UDC as depositor. This helper
-    // returns that explicit depositor address for refund operations.
-    fn deploy_contract_with_token(
+    fn build_atomic_lock_calldata(
         token: ContractAddress,
         amount: u256,
-    ) -> (IAtomicLockDispatcher, ContractAddress) {
+        depositor: ContractAddress,
+    ) -> Array<felt252> {
         // Use full challenge/response (matching test_e2e_dleq.cairo)
         const TEST_VECTOR_C_FULL: felt252 = 0x47c760eb9b6a8797680bef6218e06aacc6570f8be11819d2268bb024f816108;
         const TEST_VECTOR_S_FULL: u256 = u256 { low: 0xbe3ffdd10e06b50b800feb45877b787b, high: 0x2f0ceba8a8c56d6f6b4ed3ae98db234 };
-        
-        // Define the explicit depositor address we'll serialize into constructor calldata.
-        let deployer: ContractAddress = 0x123.try_into().unwrap();
-        
-        // Keep the caller cheat for token operations around this helper; the
-        // AtomicLock depositor itself is now explicit constructor calldata.
-        start_cheat_caller_address_global(deployer);
-        
+
         // Use deploy_with_real_dleq pattern from test_e2e_dleq.cairo
         let hashlock_array = TESTVECTOR_HASHLOCK;
         let hashlock = hashlock_array.span();
-        
-        // Use deploy helper from test_security_audit.cairo pattern (security tests)
-        let declare_res = declare("AtomicLock");
-        let contract = declare_res.unwrap().contract_class();
-        
+
         // Sqrt hints (from test_e2e_dleq.cairo)
         const TEST_ADAPTOR_POINT_SQRT_HINT: u256 = u256 {
             low: 0x448c18dcf34127e112ff945a65defbfc,
@@ -390,7 +368,7 @@ mod token_security_tests {
         let mut calldata = ArrayTrait::new();
         hashlock.serialize(ref calldata);
         Serde::serialize(@FUTURE_TIMESTAMP, ref calldata);
-        Serde::serialize(@deployer, ref calldata);
+        Serde::serialize(@depositor, ref calldata);
         Serde::serialize(@token, ref calldata);
         Serde::serialize(@amount, ref calldata);
         Serde::serialize(@TESTVECTOR_T_COMPRESSED, ref calldata);
@@ -408,14 +386,51 @@ mod token_security_tests {
         Serde::serialize(@TEST_R1_SQRT_HINT, ref calldata);
         Serde::serialize(@TESTVECTOR_R2_COMPRESSED, ref calldata);
         Serde::serialize(@TEST_R2_SQRT_HINT, ref calldata);
-        
+
+        calldata
+    }
+
+    // Helper to deploy AtomicLock contract with token
+    // Returns (contract, depositor_address)
+    //
+    // **CRITICAL**: The production constructor takes an explicit depositor so
+    // UDC deployment cannot accidentally record UDC as depositor. This helper
+    // returns that explicit depositor address for refund operations.
+    fn deploy_contract_with_token(
+        token: ContractAddress,
+        amount: u256,
+    ) -> (IAtomicLockDispatcher, ContractAddress) {
+        let deployer: ContractAddress = 0x123.try_into().unwrap();
+        start_cheat_caller_address_global(deployer);
+
+        let declare_res = declare("AtomicLock");
+        let contract = declare_res.unwrap().contract_class();
+        let calldata = build_atomic_lock_calldata(token, amount, deployer);
+
         // Deploy with explicit depositor calldata.
         let (addr, _) = contract.deploy(@calldata).unwrap();
-        
-        // FIXED: Stop cheating caller address after deployment
+
         stop_cheat_caller_address_global();
-        
-        // Return the deployer address (which matches what's stored in contract)
+
+        (IAtomicLockDispatcher { contract_address: addr }, deployer)
+    }
+
+    fn deploy_contract_with_token_at(
+        token: ContractAddress,
+        amount: u256,
+        contract_address: ContractAddress,
+    ) -> (IAtomicLockDispatcher, ContractAddress) {
+        let deployer: ContractAddress = 0x123.try_into().unwrap();
+        start_cheat_caller_address_global(deployer);
+
+        let declare_res = declare("AtomicLock");
+        let contract = declare_res.unwrap().contract_class();
+        let calldata = build_atomic_lock_calldata(token, amount, deployer);
+        let (addr, _) = contract.deploy_at(@calldata, contract_address).unwrap();
+        assert(addr == contract_address, 'Unexpected lock address');
+
+        stop_cheat_caller_address_global();
+
         (IAtomicLockDispatcher { contract_address: addr }, deployer)
     }
     
@@ -543,131 +558,36 @@ mod token_security_tests {
     // 🔴 CRITICAL: Reentrancy Attack Prevention Tests
     // ============================================================================
     
-    /// Test that reentrancy attack is blocked by ReentrancyGuard
-    /// 
-    /// **Security Property**: ReentrancyGuard must prevent recursive calls during token transfer.
-    /// This test uses a malicious token that attempts to call verify_and_unlock during transfer.
-    /// 
-    /// **Expected Behavior**: ReentrancyGuard should block the attack, causing the malicious
-    /// token's transfer to fail (or the reentrant call to be rejected).
-    /// 
-    /// **Setup Strategy**: 
-    /// 1. Deploy AtomicLock with zero token + zero amount (to get its address)
-    /// 2. Deploy malicious token with AtomicLock address
-    /// 3. Redeploy AtomicLock with malicious token address + amount
-    /// 
-    /// **Note**: Since we can't update the token after deployment, we use a two-step deployment.
-    /// In production, the malicious token would be set from the start.
+    /// Test that ReentrancyGuard blocks recursive calls during token claim.
+    ///
+    /// The malicious token is constructed with the exact AtomicLock address and
+    /// AtomicLock is deployed at that address with the malicious token configured.
     #[test]
-    #[ignore] // Requires a deterministic-address malicious token harness.
-    #[should_panic]
+    #[should_panic(expected: 'ReentrancyGuard: reentrant call')]
     fn test_reentrancy_attack_blocked() {
-        // Step 1: Deploy AtomicLock with zero token/amount to get its address
-        // (This is just to get the address - we'll redeploy with malicious token)
-        let zero_token: ContractAddress = 0.try_into().unwrap();
-        let zero_amount: u256 = u256 { low: 0, high: 0 };
-        let (temp_contract, _depositor) = deploy_contract_with_token(zero_token, zero_amount);
-        
-        // Step 2: Deploy malicious reentrant token with AtomicLock address
+        let target_lock_address: ContractAddress = 0xabc123.try_into().unwrap();
+
         let malicious_token_class = declare("MaliciousReentrantToken").unwrap().contract_class();
         let mut malicious_calldata = ArrayTrait::new();
-        Serde::serialize(@temp_contract.contract_address, ref malicious_calldata);
-        let (_malicious_token_address, _) = malicious_token_class.deploy(@malicious_calldata).unwrap();
-        
-        // Step 3: Deploy AtomicLock with malicious token (this is the real contract for testing)
-        // BUT: We need to deploy malicious token with the AtomicLock address first!
-        // Solution: Deploy AtomicLock, then deploy malicious token with that address,
-        // then redeploy AtomicLock with malicious token address
-        
-        // Actually, simpler approach: Deploy malicious token with a placeholder address first,
-        // then deploy AtomicLock, then update malicious token... but it doesn't have update.
-        
-        // Best approach: Deploy AtomicLock first, get address, deploy malicious token,
-        // then we need to redeploy AtomicLock with malicious token. But we can't update token.
-        
-        // WORKAROUND: Deploy AtomicLock with malicious token address, but deploy malicious token
-        // with a known placeholder first, then the malicious token will have wrong target.
-        // The reentrancy will still be blocked by ReentrancyGuard even if target is wrong.
-        
-        // Step 3: Deploy AtomicLock with malicious token
-        // We'll deploy malicious token with the AtomicLock address we'll create
-        // Since we can't know the address beforehand, we use a two-step approach:
-        // 1. Deploy AtomicLock with zero token/amount to get address
-        // 2. Deploy malicious token with that address  
-        // 3. Redeploy AtomicLock with malicious token (but we can't update token after deployment)
-        
-        // SIMPLER APPROACH: Deploy AtomicLock first, then deploy malicious token with its address,
-        // but we need AtomicLock to use malicious token. This is a circular dependency.
-        
-        // SOLUTION: Deploy AtomicLock with malicious token that has a placeholder target.
-        // The malicious token will try to call verify_and_unlock on the placeholder (which fails),
-        // but the important part is that ReentrancyGuard blocks the reentrancy attempt.
-        // However, the transfer itself might succeed if the reentrancy call fails early.
-        
-        // BETTER SOLUTION: Deploy AtomicLock, get address, deploy malicious token with that address,
-        // then we need AtomicLock to use malicious token. Since we can't update, we'll test that
-        // the malicious token's transfer fails when it tries reentrancy (even with wrong target).
-        
-        // Deploy AtomicLock first (we'll use a regular token for now, then switch conceptually)
+        Serde::serialize(@target_lock_address, ref malicious_calldata);
+        let (malicious_token_address, _) = malicious_token_class.deploy(@malicious_calldata).unwrap();
+
         let amount: u256 = u256 { low: 1000, high: 0 };
-        
-        // Deploy a regular mock token first
-        let regular_token_class = declare("MockERC20").unwrap().contract_class();
-        let (regular_token_address, _) = regular_token_class.deploy(@ArrayTrait::new()).unwrap();
-        let (contract, _depositor) = deploy_contract_with_token(regular_token_address, amount);
-        
-        // Now deploy malicious token with AtomicLock address
-        let mut malicious_calldata_final = ArrayTrait::new();
-        Serde::serialize(@contract.contract_address, ref malicious_calldata_final);
-        let (malicious_token_final, _) = malicious_token_class.deploy(@malicious_calldata_final).unwrap();
-        
-        // The issue: contract uses regular_token, not malicious_token
-        // The reentrancy test needs contract to use malicious_token
-        
-        // WORKAROUND: The test verifies that IF a malicious token tries reentrancy,
-        // ReentrancyGuard blocks it. We can test this by having the malicious token
-        // try to call verify_and_unlock during its own transfer, even if it's not
-        // the token the contract uses. The key is that ReentrancyGuard prevents
-        // nested calls to verify_and_unlock.
-        
-        // Actually, the real test should be: contract uses malicious token, malicious token
-        // tries reentrancy during transfer. Since we can't update token, we'll simulate
-        // by having malicious token mint to contract and then trying to trigger reentrancy
-        // through a different path.
-        
-        // SIMPLEST: Deploy contract with malicious token from start, but malicious token
-        // needs contract address. Use a known address pattern.
-        
-        // Deploy malicious token with a target we'll set later via redeployment
-        // Actually, let's deploy AtomicLock, then deploy malicious token, then
-        // the test verifies ReentrancyGuard works by attempting nested call
-        
-        // Mint tokens to contract using malicious token (even though contract uses regular token)
-        let malicious_token_dispatcher = IMockERC20Dispatcher { contract_address: malicious_token_final };
-        malicious_token_dispatcher.mint(contract.contract_address, amount);
-        
-        // The malicious token will try to call verify_and_unlock when transfer is called
-        // But contract uses regular_token, not malicious_token, so transfer won't go through malicious token
-        
-        // ACTUAL TEST: We need contract to use malicious_token. Since we can't update,
-        // we accept that this test setup is complex. The test verifies the concept:
-        // ReentrancyGuard blocks nested calls to verify_and_unlock.
-        
-        // For now, let's test that ReentrancyGuard exists and works by attempting
-        // a direct nested call (simulating what malicious token would do)
-        
-        // Attempt unlock - this will call regular_token.transfer (not malicious)
-        // But we can verify ReentrancyGuard works by trying nested call
+        let (contract, _depositor) = deploy_contract_with_token_at(
+            malicious_token_address, amount, target_lock_address
+        );
+
+        let malicious_token = IMockERC20Dispatcher { contract_address: malicious_token_address };
+        malicious_token.mint(contract.contract_address, amount);
+
         let unlocker: ContractAddress = 0x456.try_into().unwrap();
         start_cheat_caller_address(contract.contract_address, unlocker);
         
-        let secret = get_valid_secret();
-        // This should work normally since we're using regular token
-        // The malicious token reentrancy test requires contract to use malicious token
-        // which we can't set after deployment. This test setup needs refinement.
-        contract.verify_and_unlock(secret);
-        
-        stop_cheat_caller_address(contract.contract_address);
+        assert(contract.verify_and_unlock(get_valid_secret()), 'Reveal should succeed');
+        let claimable_after = contract.get_claimable_after();
+        start_cheat_block_timestamp(contract.contract_address, claimable_after + 1);
+
+        contract.claim_tokens();
     }
     
     // ============================================================================

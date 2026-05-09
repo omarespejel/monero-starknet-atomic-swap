@@ -73,7 +73,7 @@ python3 -m json.tool ops/claim-relayer/claim-relayer.config.example.json >/tmp/c
 git diff --check
 ```
 
-Known local result for Cairo: `109 passed, 0 failed, 7 ignored`.
+Known local result for Cairo: `114 passed, 0 failed, 0 ignored`.
 
 Sepolia rehearsal:
 
@@ -354,8 +354,13 @@ Operations artifacts:
     `/home/atomic-swap/monero-wallets`.
   - after the proof, `monero-claim-wallet-rpc.service` was stopped and only the
     primary VM wallet RPC on `127.0.0.1:38090` remained listening.
-  - follow-up heartbeat `claim-fresh-sepolia-strk-atomic-lock` is scheduled to
-    claim the test STRK after the Starknet `claimable_after` time.
+  - Starknet STRK claim tx after `claimable_after`:
+    `0x02934de665ab98df4470bae022a91d8cb540fde3bc0a27b92326724a1d670384`
+  - post-claim Starknet validation:
+    `is_secret_revealed=true`, `is_unlocked=true`, contract STRK balance `0`.
+  - follow-up heartbeat `claim-fresh-sepolia-strk-atomic-lock` was moved to
+    claim only the factory-created STRK lock after its Starknet
+    `claimable_after` time.
 - VM systemd live-mode rehearsal also succeeded through the new factory
   discovery path:
   - factory contract:
@@ -457,6 +462,11 @@ Operations artifacts:
 - Ignored constructor diagnostic duplicate was removed from
   `test_integration_constructor.cairo`; full constructor/DLEQ flow remains
   covered by `test_e2e_dleq`.
+- The deterministic-address malicious token harness is active:
+  `test_reentrancy_attack_blocked` deploys AtomicLock at the token's target
+  address with `deploy_at`, confirms the malicious token reaches
+  `ReentrancyGuard: reentrant call`, and passes with
+  `l2_gas: ~20334837`.
 - `docs/SETUP.md` now marks Linux VM Monero as the required funded-swap path and
   demotes Docker/local Monero to legacy development use.
 
@@ -467,10 +477,9 @@ Operations artifacts:
   factory-created lock deployment, discovery dry-run, and VM live Monero claim
   proof are done. Remaining production work is configuring the real alert
   webhook/paging destination and running a second-operator handoff drill.
-- Starknet test-token finalization: follow-up heartbeat is scheduled to call
-  `claim_tokens` for the remaining revealed Sepolia STRK locks after their
-  `claimable_after` times.
-- Remaining ignored Cairo test: deterministic-address malicious token harness.
+- Starknet test-token finalization: the fresh live-mode STRK lock has been
+  claimed and verified on Sepolia; a follow-up heartbeat is scheduled for the
+  remaining factory-created Sepolia STRK lock after its `claimable_after` time.
 - External security review: required before any meaningful-value mainnet use.
 
 ## Explicit Non-Goals For This Stage
