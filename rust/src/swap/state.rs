@@ -45,17 +45,27 @@ pub enum SwapState {
         lock_until: u64,
         monero_txid: String,
         monero_amount: u64,
+        #[serde(default)]
+        monero_restore_height: Option<u64>, // Restore height must survive resume/finality waits.
     },
     XmrConfirmed {
         swap_id: String,
         contract_address: String,
         lock_until: u64,
         monero_txid: String,
+        #[serde(default)]
+        monero_amount: Option<u64>,
+        #[serde(default)]
+        monero_restore_height: Option<u64>, // Restore height must survive until Monero claim.
     },
     SecretRevealed {
         swap_id: String,
         contract_address: String,
         reveal_timestamp: u64,
+        #[serde(default)]
+        monero_txid: Option<String>, // Preserved for final ledger/recovery after Starknet claim.
+        #[serde(default)]
+        monero_amount: Option<u64>,
         monero_restore_height: Option<u64>, // Monero block height when swap was initiated (for optimized sync)
         partial_spend_key: Option<[u8; 32]>, // Partial spend key (x_partial) for claiming Monero
         claim_destination: Option<String>,  // Monero address to claim funds to

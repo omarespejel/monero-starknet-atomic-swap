@@ -101,7 +101,8 @@ where
             contract_address,
             lock_until,
             monero_txid,
-            ..
+            monero_amount,
+            monero_restore_height,
         } => {
             tracing::info!(
                 "[{}] Waiting for {} confirmations...",
@@ -130,12 +131,17 @@ where
                 contract_address: contract_address.clone(),
                 lock_until: *lock_until,
                 monero_txid: monero_txid.clone(),
+                monero_amount: Some(*monero_amount),
+                monero_restore_height: *monero_restore_height,
             }
         }
 
         SwapState::XmrConfirmed {
             swap_id,
             contract_address,
+            monero_txid,
+            monero_amount,
+            monero_restore_height,
             ..
         } => {
             tracing::info!("[{}] Revealing secret on Starknet...", swap_id);
@@ -147,16 +153,15 @@ where
 
             let reveal_timestamp = starknet.get_block_timestamp().await?;
 
-            // Note: partial_spend_key and claim_destination should be set by caller
-            // when creating the swap. For now, we'll use None and require them to be set
-            // before claiming Monero.
             SwapState::SecretRevealed {
                 swap_id: swap_id.clone(),
                 contract_address: contract_address.clone(),
                 reveal_timestamp,
-                monero_restore_height: None, // Should be preserved from earlier states
-                partial_spend_key: None,     // Must be set before claiming
-                claim_destination: None,     // Must be set before claiming
+                monero_txid: Some(monero_txid.clone()),
+                monero_amount: *monero_amount,
+                monero_restore_height: *monero_restore_height,
+                partial_spend_key: None, // Must be attached before claiming Monero.
+                claim_destination: None, // Must be attached before claiming Monero.
             }
         }
 
@@ -164,6 +169,7 @@ where
             swap_id,
             contract_address,
             reveal_timestamp,
+            monero_txid,
             ..
         } => {
             let now = starknet.get_block_timestamp().await?;
@@ -189,7 +195,7 @@ where
             SwapState::Completed {
                 swap_id: swap_id.clone(),
                 starknet_tx: tx,
-                monero_txid: String::new(), // Could track from earlier state
+                monero_txid: monero_txid.clone().unwrap_or_default(),
             }
         }
 
@@ -225,6 +231,7 @@ pub fn resume_with_xmr_txid(
             contract_address,
             lock_until,
             expected_monero_amount,
+            monero_restore_height,
             hashlock: _,
             ..
         } => {
@@ -244,6 +251,7 @@ pub fn resume_with_xmr_txid(
                 lock_until: *lock_until,
                 monero_txid,
                 monero_amount,
+                monero_restore_height: *monero_restore_height,
             })
         }
         _ => Err(anyhow!(

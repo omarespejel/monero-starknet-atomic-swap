@@ -80,6 +80,8 @@ async fn test_full_atomic_swap_e2e() -> Result<()> {
         swap_id: "e2e-test".to_string(),
         contract_address: contract_address.to_string(),
         reveal_timestamp,
+        monero_txid: None,
+        monero_amount: None,
         monero_restore_height: restore_height,
         partial_spend_key: Some(keys.partial_key.to_bytes()),
         claim_destination: Some("5A1...".to_string()), // Placeholder destination

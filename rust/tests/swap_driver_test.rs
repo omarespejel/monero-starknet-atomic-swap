@@ -173,7 +173,7 @@ async fn test_resume_with_xmr_txid() {
         resume_with_xmr_txid(&state, "monero_txid_123".to_string(), 1_000_000_000).unwrap();
 
     assert!(
-        matches!(new_state, SwapState::XmrSent { monero_txid, .. } if monero_txid == "monero_txid_123")
+        matches!(new_state, SwapState::XmrSent { monero_txid, monero_restore_height, .. } if monero_txid == "monero_txid_123" && monero_restore_height == Some(1000))
     );
 }
 
@@ -190,6 +190,7 @@ async fn test_step_xmr_sent_to_confirmed() {
         lock_until: 1010800,
         monero_txid: "txid123".to_string(),
         monero_amount: 1_000_000_000,
+        monero_restore_height: Some(1000),
     };
 
     let result = step(&state, &db, &monero, &starknet, &secret)
@@ -197,7 +198,9 @@ async fn test_step_xmr_sent_to_confirmed() {
         .unwrap();
 
     assert!(result.is_some());
-    assert!(matches!(result.unwrap(), SwapState::XmrConfirmed { .. }));
+    assert!(
+        matches!(result.unwrap(), SwapState::XmrConfirmed { monero_txid, monero_amount, monero_restore_height, .. } if monero_txid == "txid123" && monero_amount == Some(1_000_000_000) && monero_restore_height == Some(1000))
+    );
 }
 
 #[tokio::test]
@@ -212,6 +215,8 @@ async fn test_step_xmr_confirmed_to_secret_revealed() {
         contract_address: "0xabc".to_string(),
         lock_until: 1010800,
         monero_txid: "txid123".to_string(),
+        monero_amount: Some(1_000_000_000),
+        monero_restore_height: Some(1000),
     };
 
     let result = step(&state, &db, &monero, &starknet, &secret)
@@ -221,11 +226,19 @@ async fn test_step_xmr_confirmed_to_secret_revealed() {
     assert!(result.is_some());
     match result.unwrap() {
         SwapState::SecretRevealed {
-            monero_restore_height: _,
-            partial_spend_key: _,
-            claim_destination: _,
+            monero_txid,
+            monero_amount,
+            monero_restore_height,
+            partial_spend_key,
+            claim_destination,
             ..
-        } => {}
+        } => {
+            assert_eq!(monero_txid.as_deref(), Some("txid123"));
+            assert_eq!(monero_amount, Some(1_000_000_000));
+            assert_eq!(monero_restore_height, Some(1000));
+            assert_eq!(partial_spend_key, None);
+            assert_eq!(claim_destination, None);
+        }
         _ => panic!("Expected SecretRevealed state"),
     }
 }
@@ -241,6 +254,8 @@ async fn test_step_secret_revealed_waits_for_grace_period() {
         swap_id: "test-6".to_string(),
         contract_address: "0xabc".to_string(),
         reveal_timestamp: 1000000, // Same as current time
+        monero_txid: Some("txid123".to_string()),
+        monero_amount: Some(1_000_000_000),
         monero_restore_height: Some(1000),
         partial_spend_key: None,
         claim_destination: None,
@@ -264,6 +279,8 @@ async fn test_step_secret_revealed_to_completed() {
         swap_id: "test-7".to_string(),
         contract_address: "0xabc".to_string(),
         reveal_timestamp: 1000000,
+        monero_txid: Some("txid123".to_string()),
+        monero_amount: Some(1_000_000_000),
         monero_restore_height: Some(1000),
         partial_spend_key: None,
         claim_destination: None,
@@ -274,7 +291,9 @@ async fn test_step_secret_revealed_to_completed() {
         .unwrap();
 
     assert!(result.is_some());
-    assert!(matches!(result.unwrap(), SwapState::Completed { .. }));
+    assert!(
+        matches!(result.unwrap(), SwapState::Completed { monero_txid, .. } if monero_txid == "txid123")
+    );
 }
 
 #[tokio::test]
@@ -290,6 +309,7 @@ async fn test_step_timeout_triggers_refund() {
         lock_until: 1010800, // Already expired
         monero_txid: "txid123".to_string(),
         monero_amount: 1_000_000_000,
+        monero_restore_height: Some(1000),
     };
 
     let result = step(&state, &db, &monero, &starknet, &secret)

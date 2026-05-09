@@ -25,8 +25,7 @@ use xmr_secret_gen::swap::relayer::{
     RetryPolicy, SecretReveal, SecretRevealRelayer,
 };
 
-const DEFAULT_STARKNET_RPC: &str =
-    "https://api.zan.top/public/starknet-sepolia/rpc/v0_10";
+const DEFAULT_STARKNET_RPC: &str = "https://api.zan.top/public/starknet-sepolia/rpc/v0_10";
 
 #[derive(Parser, Debug)]
 #[command(name = "claim_relayer_service")]

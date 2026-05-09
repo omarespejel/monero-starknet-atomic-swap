@@ -26,6 +26,7 @@ fn test_json_file_db_roundtrip() {
         lock_until: 9999999999,
         monero_txid: "monero_tx_123".to_string(),
         monero_amount: 1_000_000_000,
+        monero_restore_height: Some(1000),
     };
 
     db.save(&state).unwrap();
@@ -98,17 +99,22 @@ fn test_all_state_variants_serialize() {
             lock_until: 9999999999,
             monero_txid: "tx123".to_string(),
             monero_amount: 1000000,
+            monero_restore_height: Some(1000),
         },
         SwapState::XmrConfirmed {
             swap_id: "test4".to_string(),
             contract_address: "0xabc".to_string(),
             lock_until: 9999999999,
             monero_txid: "tx123".to_string(),
+            monero_amount: Some(1000000),
+            monero_restore_height: Some(1000),
         },
         SwapState::SecretRevealed {
             swap_id: "test5".to_string(),
             contract_address: "0xabc".to_string(),
             reveal_timestamp: 1234567890,
+            monero_txid: Some("tx123".to_string()),
+            monero_amount: Some(1000000),
             monero_restore_height: Some(1000),
             partial_spend_key: Some([0u8; 32]),
             claim_destination: Some("5A1...".to_string()),
@@ -138,4 +144,46 @@ fn test_db_load_nonexistent() {
     let db = JsonFileDb::new(tmp.path()).unwrap();
     let result = db.load("nonexistent").unwrap();
     assert!(result.is_none());
+}
+
+#[test]
+fn test_state_deserialization_keeps_backward_compatibility_for_old_swap_files() {
+    let old_xmr_sent = r#"{
+        "state": "xmr_sent",
+        "swap_id": "old-sent",
+        "contract_address": "0xabc",
+        "lock_until": 9999999999,
+        "monero_txid": "tx123",
+        "monero_amount": 1000000
+    }"#;
+    let parsed: SwapState = serde_json::from_str(old_xmr_sent).unwrap();
+    assert!(
+        matches!(parsed, SwapState::XmrSent { monero_restore_height, .. } if monero_restore_height.is_none())
+    );
+
+    let old_xmr_confirmed = r#"{
+        "state": "xmr_confirmed",
+        "swap_id": "old-confirmed",
+        "contract_address": "0xabc",
+        "lock_until": 9999999999,
+        "monero_txid": "tx123"
+    }"#;
+    let parsed: SwapState = serde_json::from_str(old_xmr_confirmed).unwrap();
+    assert!(
+        matches!(parsed, SwapState::XmrConfirmed { monero_amount, monero_restore_height, .. } if monero_amount.is_none() && monero_restore_height.is_none())
+    );
+
+    let old_secret_revealed = r#"{
+        "state": "secret_revealed",
+        "swap_id": "old-reveal",
+        "contract_address": "0xabc",
+        "reveal_timestamp": 1234567890,
+        "monero_restore_height": 1000,
+        "partial_spend_key": null,
+        "claim_destination": null
+    }"#;
+    let parsed: SwapState = serde_json::from_str(old_secret_revealed).unwrap();
+    assert!(
+        matches!(parsed, SwapState::SecretRevealed { monero_txid, monero_amount, monero_restore_height, .. } if monero_txid.is_none() && monero_amount.is_none() && monero_restore_height == Some(1000))
+    );
 }

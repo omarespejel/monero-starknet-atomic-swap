@@ -7,6 +7,44 @@ This document specifies the atomic swap protocol between Monero and Starknet tok
 **Production Protocol**: Two-party key generation (`x = s_a + s_b`)  
 **Legacy Protocol**: Single-party key splitting (`x = x_partial + t`) - deprecated but supported
 
+## Product Directions
+
+The backend now treats swap direction as an explicit quote term, not something
+to infer from token names or UI copy.
+
+### XMR -> Starknet
+
+User sends XMR and receives a Starknet token claim. This is the first path for
+Monero users entering Starknet.
+
+1. Liquidity provider creates/funds the Starknet `AtomicLock`.
+2. User sends the exact XMR amount to the generated Monero swap address.
+3. After Monero finality, the Starknet-token claimer reveals the secret on
+   Starknet.
+4. The Monero claimant watches `SecretRevealed`, reconstructs the spend key,
+   and sweeps XMR.
+5. After the grace period, the Starknet-token claimer claims the locked token.
+
+For the privacy-pool version, step 5 should later be replaced by a helper that
+claims into a privacy-pool open note instead of a public wallet balance.
+
+### Starknet -> XMR
+
+User locks a Starknet token and receives XMR. This is the exit path for users
+leaving Starknet into Monero.
+
+1. User creates/funds the Starknet `AtomicLock`.
+2. Liquidity provider sends the exact XMR amount to the generated Monero swap
+   address.
+3. After Monero finality, the Starknet-token claimer reveals the secret on
+   Starknet.
+4. User-side Monero claimant watches `SecretRevealed`, reconstructs the spend
+   key, and sweeps XMR to the user's Monero address.
+5. After the grace period, the Starknet-token claimer claims the locked token.
+
+Both directions use the same Starknet contract. The difference is product role
+assignment, quote terms, and which side controls the Monero claim automation.
+
 ## Protocol Parameters
 
 - Hash function: SHA-256 (for hashlocks)

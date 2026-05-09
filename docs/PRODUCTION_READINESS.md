@@ -45,6 +45,12 @@ python3 tools/generate_deploy_calldata.py \
   `claim_revealed_secrets`. For live Monero claims, run it inside the Monero VM
   or another Linux environment that has local access to the wallet-rpc wallet
   directory; host-side RPC tunneling is only acceptable for dry-runs.
+- Product/API code should use explicit `SwapTerms.direction` values for
+  `xmr_to_starknet` and `starknet_to_xmr`; do not infer direction from token
+  symbols, UI labels, or which party happens to run a given relayer.
+- The Rust swap state machine preserves Monero restore height, txid, and amount
+  across finality, reveal, and claim transitions. Old JSON swap files missing
+  the new optional fields remain deserializable.
 
 ## Verified Locally
 
@@ -77,6 +83,19 @@ git diff --check
 ```
 
 Known local result for Cairo: `113 passed, 0 failed, 0 ignored`.
+
+Additional backend validation for the bidirectional quote/state slice:
+
+```bash
+cd rust && cargo test -q --test swap_terms_test --test swap_state_test --test swap_driver_test --test swap_security_test --test handle_secret_revealed_test
+cd rust && cargo fmt --check
+python3 tools/check_secret_hygiene.py
+```
+
+Known current repo-wide Rust caveat: `cd rust && cargo test -q` still fails in
+`tests/rust_cairo_compatibility.rs` on the existing DLEQ vector assertions
+`test_dleq_challenge_rust_cairo_match` and `test_full_proof_verifies`. The
+state/terms slice above passes independently and does not touch those vectors.
 
 Sepolia rehearsal:
 

@@ -139,6 +139,8 @@ async fn test_cannot_reveal_after_timeout() {
         contract_address: "0x123".to_string(),
         lock_until: 1000, // Expired
         monero_txid: "abc".to_string(),
+        monero_amount: Some(1_000_000_000),
+        monero_restore_height: Some(1000),
     };
 
     let mut mock_monero = MockMonero::new();
@@ -175,6 +177,8 @@ async fn test_claim_before_grace_period_fails() {
         swap_id: "test".to_string(),
         contract_address: "0x123".to_string(),
         reveal_timestamp,
+        monero_txid: Some("abc".to_string()),
+        monero_amount: Some(1_000_000_000),
         monero_restore_height: Some(1000),
         partial_spend_key: None,
         claim_destination: None,
@@ -216,6 +220,8 @@ async fn test_claim_after_grace_period_succeeds() {
         swap_id: "test".to_string(),
         contract_address: "0x123".to_string(),
         reveal_timestamp,
+        monero_txid: Some("abc".to_string()),
+        monero_amount: Some(1_000_000_000),
         monero_restore_height: Some(1000),
         partial_spend_key: None,
         claim_destination: None,
@@ -444,6 +450,7 @@ async fn test_timeout_checked_on_every_step() {
         lock_until,
         monero_txid: "abc".to_string(),
         monero_amount: 1_000_000_000,
+        monero_restore_height: Some(1000),
     };
 
     let result = step(&state, &db, &mock_monero, &mock_starknet, &secret)
@@ -507,6 +514,8 @@ async fn test_double_reveal_attack_prevented() {
         contract_address: "0x123".to_string(),
         lock_until: 9999999,
         monero_txid: "abc".to_string(),
+        monero_amount: Some(1_000_000_000),
+        monero_restore_height: Some(1000),
     };
 
     let mut mock_monero = MockMonero::new();
