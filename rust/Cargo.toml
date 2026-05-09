@@ -143,6 +143,10 @@ path = "src/bin/claim_relayer_service.rs"
 name = "derive_claim_address"
 path = "src/bin/derive_claim_address.rs"
 
+[[bin]]
+name = "swap_public_view"
+path = "src/bin/swap_public_view.rs"
+
 [dev-dependencies]
 assert_cmd = "2.0"
 proptest = "=1.4.0"  # Property-based testing for cryptographic code

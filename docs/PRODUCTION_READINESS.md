@@ -88,6 +88,7 @@ cd rust && cargo check -q --bins
 cd rust && cargo check -q --bin claim_revealed_secrets
 cd rust && cargo check -q --bin claim_relayer_service
 cd rust && cargo check -q --bin derive_claim_address
+cd rust && cargo check -q --bin swap_public_view
 cd rust && cargo check -q --features full-integration --bins
 limactl shell monero-stagenet -- bash -lc 'cd ~/atomic-swap-rust && . $HOME/.cargo/env && cargo check -q --bin claim_relayer_service'
 bun build scripts/deploy.ts --outdir /tmp/atomic-deploy-check --target bun
@@ -124,6 +125,9 @@ integration tests left ignored.
 `SwapState`. It is direction-aware for XMR-to-Starknet and Starknet-to-XMR,
 emits stable progress/action enums, and intentionally excludes partial spend
 keys, view scalars, wallet files, and other operator-only recovery material.
+The `swap_public_view` CLI renders that projection from JSON files so the first
+frontend/backend prototype can consume the same schema before an HTTP API is
+introduced.
 
 Legacy `SwapKeyPair` now preserves the raw pre-reduction adaptor secret bytes
 used by Cairo's `SHA-256(raw_secret_bytes)` hashlock check, with explicit
