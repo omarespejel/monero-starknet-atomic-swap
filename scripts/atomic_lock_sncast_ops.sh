@@ -8,6 +8,9 @@ SNCAST_ACCOUNTS_FILE="${SNCAST_ACCOUNTS_FILE:-$HOME/.starknet_accounts/starknet_
 TOKEN="${ATOMIC_SWAP_TOKEN_ADDRESS:-}"
 SECRET_HEX="${ATOMIC_SWAP_SECRET_HEX:-}"
 SECRET_FILE="${ATOMIC_SWAP_SECRET_FILE:-}"
+MAINNET_CONFIRMATION="${ATOMIC_SWAP_ALLOW_MAINNET:-}"
+MAINNET_RELEASE_FILE="${ATOMIC_SWAP_MAINNET_RELEASE_FILE:-}"
+MAINNET_CONFIRMATION_PHRASE="mainnet-release-reviewed"
 
 usage() {
   cat <<'EOF'
@@ -24,6 +27,11 @@ Environment:
   ATOMIC_SWAP_TOKEN_ADDRESS   optional, used for balance_of(contract)
   ATOMIC_SWAP_SECRET_FILE     preferred for reveal; file containing 32-byte hex
   ATOMIC_SWAP_SECRET_HEX      fallback for reveal; 32-byte hex, with or without 0x
+  ATOMIC_SWAP_MAINNET_RELEASE_FILE  required for mainnet reveal/claim/refund;
+                                    JSON must bind starknet_network=mainnet
+                                    and starknet_atomic_lock to <contract>
+  ATOMIC_SWAP_ALLOW_MAINNET         required for mainnet reveal/claim/refund;
+                                    exact value: mainnet-release-reviewed
 EOF
 }
 
@@ -74,15 +82,6 @@ print("0x1", "0x" + secret[:62], "0x" + secret[62:], "0x1")
 PY
 }
 
-if [ "$NETWORK" != "sepolia" ] && [ "$NETWORK" != "mainnet" ]; then
-  echo "STARKNET_NETWORK must be sepolia or mainnet" >&2
-  exit 1
-fi
-if [ "$NETWORK" = "mainnet" ]; then
-  echo "Refusing mainnet operations from this helper. Use an audited release process." >&2
-  exit 1
-fi
-
 ACTION="${1:-}"
 CONTRACT="${2:-${ATOMIC_SWAP_CONTRACT_ADDRESS:-}}"
 
@@ -98,6 +97,76 @@ if [ -z "$CONTRACT" ]; then
 fi
 
 require python3
+
+if [ "$NETWORK" != "sepolia" ] && [ "$NETWORK" != "mainnet" ]; then
+  echo "STARKNET_NETWORK must be sepolia or mainnet" >&2
+  exit 1
+fi
+
+validate_mainnet_release_guard() {
+  if [ "$NETWORK" != "mainnet" ]; then
+    return
+  fi
+
+  if [ "$ACTION" = "state" ]; then
+    return
+  fi
+
+  if [ "$MAINNET_CONFIRMATION" != "$MAINNET_CONFIRMATION_PHRASE" ]; then
+    echo "Refusing mainnet $ACTION. Set ATOMIC_SWAP_ALLOW_MAINNET=$MAINNET_CONFIRMATION_PHRASE after release review." >&2
+    exit 1
+  fi
+
+  if [ -z "$MAINNET_RELEASE_FILE" ]; then
+    echo "Refusing mainnet $ACTION. Set ATOMIC_SWAP_MAINNET_RELEASE_FILE to the reviewed public quote/release JSON." >&2
+    exit 1
+  fi
+
+  python3 - "$MAINNET_RELEASE_FILE" "$CONTRACT" "${TOKEN:-}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+contract = sys.argv[2]
+token = sys.argv[3]
+
+def normalize_hex(value: str) -> int:
+    value = value.strip()
+    if not value.startswith("0x"):
+        raise ValueError(f"{value!r} is not 0x-prefixed hex")
+    return int(value, 16)
+
+if not path.exists():
+    raise SystemExit(f"mainnet release file does not exist: {path}")
+
+with path.open(encoding="utf-8") as handle:
+    release = json.load(handle)
+
+if release.get("starknet_network") != "mainnet":
+    raise SystemExit("mainnet release file must contain starknet_network=mainnet")
+
+contract_fields = ("starknet_atomic_lock", "atomic_lock", "contract_address")
+release_contracts = [
+    release[field]
+    for field in contract_fields
+    if isinstance(release.get(field), str) and release[field].startswith("0x")
+]
+if not release_contracts:
+    raise SystemExit(
+        "mainnet release file must contain starknet_atomic_lock, atomic_lock, or contract_address"
+    )
+if normalize_hex(contract) not in {normalize_hex(value) for value in release_contracts}:
+    raise SystemExit("mainnet release file does not match requested AtomicLock contract")
+
+release_token = release.get("starknet_token")
+if token and token != "0x0" and isinstance(release_token, str):
+    if normalize_hex(token) != normalize_hex(release_token):
+        raise SystemExit("mainnet release file does not match ATOMIC_SWAP_TOKEN_ADDRESS")
+PY
+}
+
+validate_mainnet_release_guard
 
 if [ "$ACTION" = "reveal" ] && [ -z "$SECRET_HEX" ] && [ -z "$SECRET_FILE" ]; then
   echo "Set ATOMIC_SWAP_SECRET_FILE or ATOMIC_SWAP_SECRET_HEX for reveal. It must be 32-byte hex." >&2

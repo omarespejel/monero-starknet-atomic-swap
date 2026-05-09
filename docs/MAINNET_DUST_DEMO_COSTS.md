@@ -50,6 +50,10 @@ URLs here.
 - Relayer dry-run discovery:
   `enabled_locks=1`, `succeeded_locks=1`, `failed_locks=0`,
   `events_seen=1`, `reveals_claimed=0`, `events_skipped=1`.
+- Read-only state check at `2026-05-09T21:06Z`:
+  `is_secret_revealed=false`, `is_unlocked=false`,
+  `get_claimable_after=0`, `get_lock_until=1778435777`, and contract STRK
+  balance `40 STRK`.
 
 ## Current Totals
 

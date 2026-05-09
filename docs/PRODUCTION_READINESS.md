@@ -35,9 +35,11 @@ python3 tools/generate_deploy_calldata.py \
 - `scripts/deploy_with_sncast.sh` supports `ATOMIC_SWAP_CLASS_HASH` to deploy an
   already-declared class and `ATOMIC_SWAP_LOCK_UNTIL` for explicit timelocks.
 - Post-deploy state, reveal, claim, and refund operations should use
-  `scripts/atomic_lock_sncast_ops.sh state|reveal|claim|refund <contract>` for
-  the Sepolia rehearsal path. `reveal` requires `ATOMIC_SWAP_SECRET_HEX` and the
-  helper does not support mainnet.
+  `scripts/atomic_lock_sncast_ops.sh state|reveal|claim|refund <contract>`.
+  Mainnet `state` is read-only. Mainnet `reveal|claim|refund` require
+  `ATOMIC_SWAP_MAINNET_RELEASE_FILE` pointing at reviewed public release JSON
+  that binds `starknet_network=mainnet` and the expected AtomicLock address,
+  plus `ATOMIC_SWAP_ALLOW_MAINNET=mainnet-release-reviewed`.
 - Monero wallet-rpc must run inside the Lima VM. Use
   `scripts/monero_vm_tunnel.sh vm-address|vm-balance|vm-height` for normal
   checks. Use `start|smoke|stop` only for temporary host-side tests against the
@@ -155,6 +157,11 @@ only `ATOMIC_SWAP_SECRET_FILE` to the helper; `ATOMIC_SWAP_SECRET_HEX` remains a
 fallback for manual/test usage. Local wrapper tests verified the secret value is
 not emitted in stdout/stderr and FireHydrant payloads tag reveal failures as
 `component:reveal-relayer`.
+
+Mainnet invoke operations through `scripts/atomic_lock_sncast_ops.sh` are gated
+by both the confirmation phrase and the release JSON contract check. The guard
+fails before `sncast` dependency checks when either is missing, so accidental
+mainnet invokes fail closed.
 
 Sepolia rehearsal:
 

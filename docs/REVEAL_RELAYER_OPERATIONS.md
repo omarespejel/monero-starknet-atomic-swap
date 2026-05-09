@@ -123,7 +123,17 @@ failures.
 
 ## Mainnet
 
-The checked-in `scripts/atomic_lock_sncast_ops.sh` refuses mainnet operations.
-For a mainnet dust demo, cut a reviewed release path that explicitly enables
-mainnet, records the contract/class hash, and uses a funded mainnet account.
-Do not bypass this with ad hoc helper edits on the VM.
+Mainnet reveal uses the same one-shot service, but the helper will only invoke
+after a release-file check passes. The env file must include:
+
+```bash
+STARKNET_NETWORK=mainnet
+STARKNET_RPC_URL=https://api.zan.top/public/starknet-mainnet/rpc/v0_10
+ATOMIC_SWAP_MAINNET_RELEASE_FILE=/opt/monero-starknet-atomic-swap/docs/MAINNET_DUST_DEMO_QUOTE.json
+ATOMIC_SWAP_ALLOW_MAINNET=mainnet-release-reviewed
+```
+
+The release JSON must bind `starknet_network=mainnet` and
+`starknet_atomic_lock` to the exact contract passed to the helper. Keep this
+file public and secret-free. Do not bypass the guard with ad hoc edits on the
+VM.
