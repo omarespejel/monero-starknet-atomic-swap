@@ -48,7 +48,7 @@ Production-grade prototype implementation of a trustless atomic swap protocol en
 | **Core Protocol** | ✅ Complete | Two-party keys, DLEQ proofs, scalar compatibility |
 | **Cairo Contract** | ✅ Complete | DLEQ verification, MSM checks, reentrancy protection |
 | **Rust Library** | ✅ Complete | Key generation, proof generation, Monero integration |
-| **Tests** | ✅ Passing | Cairo full suite: 114 passed, 0 ignored; targeted Rust/relayer suites passing |
+| **Tests** | ✅ Passing | Cairo full suite: 113 passed, 0 ignored; targeted Rust/relayer suites passing |
 | **Starknet Signing** | ⚠️ Maintained signer only | Use `sncast`, `scripts/deploy.ts`, or starknet.js for signed transactions; Rust placeholder signing is disabled |
 | **Deployment** | ⚠️ Sepolia rehearsed | Sepolia deploy/state/reveal/claim/refund paths rehearsed; no mainnet deployment |
 | **External Audit** | 🔄 Pending | Required before mainnet |

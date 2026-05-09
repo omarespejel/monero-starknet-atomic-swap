@@ -73,7 +73,7 @@ python3 -m json.tool ops/claim-relayer/claim-relayer.config.example.json >/tmp/c
 git diff --check
 ```
 
-Known local result for Cairo: `114 passed, 0 failed, 0 ignored`.
+Known local result for Cairo: `113 passed, 0 failed, 0 ignored`.
 
 Sepolia rehearsal:
 
