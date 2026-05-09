@@ -60,6 +60,14 @@ python3 tools/check_secret_hygiene.py --history --report-only
 5. If this branch is pushed to a public remote before rotation, assume the token
    was compromised even if the current tree is clean.
 
+## Current Rotation Record
+
+As of `2026-05-09T17:09:12Z`, the operator reported the historical Alchemy
+Starknet Sepolia provider key revoked. The current tracked tree passes
+`python3 tools/check_secret_hygiene.py`. The historical report still lists
+redacted old Alchemy URL locations, which is expected after revocation and
+should be retained as incident evidence.
+
 ## History Rewrite Policy
 
 Do not rewrite public history casually. If the exposed key has already been

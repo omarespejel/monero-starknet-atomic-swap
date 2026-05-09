@@ -36,10 +36,10 @@ Review these surfaces first:
 
 ## Known Required Follow-Ups
 
-- Rotate any Starknet RPC provider key that was ever committed in historical
-  testnet rehearsal defaults. The latest tree removes tracked provider tokens,
-  but history should be treated as exposed. Use
-  `docs/SECRET_ROTATION_RUNBOOK.md` and attach the redacted
+- Confirm historical Starknet RPC provider-key rotation evidence. The latest
+  tree removes tracked provider tokens; reachable history still reports old
+  token-bearing Alchemy Sepolia URL locations, and the operator reported the
+  affected provider key revoked on `2026-05-09T17:09:12Z`. Attach the redacted
   `tools/check_secret_hygiene.py --history --report-only` output as evidence.
 - Run a second-operator handoff drill using
   `ops/claim-relayer/claim-relayer-handoff-packet.py` and

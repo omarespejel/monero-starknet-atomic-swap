@@ -54,7 +54,6 @@ Testnet-ready prototype implementation of a trustless atomic swap protocol enabl
 | **External Audit** | 🔄 Pending | Required before mainnet |
 
 **Production Blockers:**
-- ⬜ Rotate/revoke historical Starknet RPC provider key exposure before public push or production handoff
 - ⬜ Independent operator handoff signoff
 - ⬜ External security audit
 

@@ -558,9 +558,10 @@ Operations artifacts:
 - `tools/check_secret_hygiene.py --history --report-only` now provides a fast
   redacted historical exposure report for provider-token URLs and sensitive
   local filenames. Current local result: the tracked tree passes, but reachable
-  history still reports old token-bearing Starknet RPC provider URL locations.
-  Follow `docs/SECRET_ROTATION_RUNBOOK.md` and rotate/revoke those provider
-  tokens before any public push or production handoff.
+  history still reports old token-bearing Starknet RPC provider URL locations
+  for the historical Alchemy Sepolia endpoint. Operator reported the affected
+  Alchemy key revoked on `2026-05-09T17:09:12Z`; save the redacted history report
+  as the rotation evidence.
 - Generated Scarb cache files were removed from git tracking and
   `cairo/.scarb_cache/` is ignored going forward.
 - `docs/SETUP.md` now marks Linux VM Monero as the required funded-swap path and
@@ -569,9 +570,10 @@ Operations artifacts:
 ## Remaining Blockers
 
 - Historical Starknet RPC provider-token exposure: current tracked files are
-  clean, but old reachable commits still contain token-bearing provider URL
-  locations. Rotate/revoke the affected provider key and update only local/VM
-  operator config before pushing or handing off this branch.
+  clean, old reachable commits still contain token-bearing Alchemy Sepolia URL
+  locations, and the operator reported the affected provider key revoked on
+  `2026-05-09T17:09:12Z`. Keep the redacted history report with the handoff
+  packet, but this is no longer an active blocker.
 - Automatic lock discovery: factory/registry contract code, registry event
   decoding, relayer discovery config, focused tests, Sepolia factory deployment,
   factory-created lock deployment, discovery dry-run, and VM live Monero claim

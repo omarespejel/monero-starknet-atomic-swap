@@ -120,7 +120,6 @@ def build_report(checks: list[Check]) -> dict[str, Any]:
         "passed": all(item["exit_code"] == 0 for item in results),
         "checks": results,
         "remaining_external_blockers": [
-            "rotate/revoke historical Starknet RPC provider token exposure",
             "second operator handoff drill and signoff",
             "external security review before meaningful-value mainnet use",
         ],
