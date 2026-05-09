@@ -435,6 +435,9 @@ Operations artifacts:
 - `docs/OPERATOR_HANDOFF.md` defines the production-like handoff packet,
   receiver verification, dry-run-first takeover, live claim criteria, Starknet
   token claim closeout, and incident notes.
+- `docs/EXTERNAL_REVIEW_PACKET.md` defines the review scope, explicit
+  non-goals, required commands, VM checks, known follow-ups, and review
+  questions for an external reviewer.
 - `ops/claim-relayer/claim-relayer-handoff-packet.py` generates a redacted JSON
   handoff packet from the VM config, cursor files, systemd state, and deployed
   git commit. It reports partial-key environment variable names only, never
