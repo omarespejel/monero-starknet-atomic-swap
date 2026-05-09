@@ -318,10 +318,14 @@ async fn reveal_with_sncast(args: &Args, secret: &str) -> Result<()> {
         .env("STARKNET_NETWORK", &args.starknet_network)
         .env("STARKNET_RPC_URL", &args.starknet_rpc)
         .env("SNCAST_ACCOUNT", &args.sncast_account)
-        .env("ATOMIC_SWAP_SECRET_HEX", secret)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
+    if let Some(secret_file) = args.secret_file.as_ref() {
+        command.env("ATOMIC_SWAP_SECRET_FILE", secret_file);
+    } else {
+        command.env("ATOMIC_SWAP_SECRET_HEX", secret);
+    }
     if let Some(accounts_file) = args.sncast_accounts_file.as_ref() {
         command.env("SNCAST_ACCOUNTS_FILE", accounts_file);
     }

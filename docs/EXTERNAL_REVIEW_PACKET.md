@@ -20,6 +20,8 @@ Review these surfaces first:
   `rust/src/bin/relay_reveal.rs`,
   `rust/src/bin/claim_revealed_secrets.rs`, and
   `rust/src/bin/claim_relayer_service.rs`.
+- VM operator wrappers in `ops/claim-relayer/`, `ops/reveal-relayer/`, and
+  `ops/systemd/`.
 - Starknet event parsing and registry discovery in `rust/src/starknet.rs`.
 - Operational scripts under `scripts/`, `ops/claim-relayer/`, and
   `ops/systemd/`.
@@ -107,6 +109,8 @@ For a handoff packet generated inside the VM:
 - Does the reveal-side relayer refuse txid-only evidence, wrong-direction
   wallet transfers, short payments, insufficient confirmations, and future
   Monero unlock times before revealing on Starknet?
+- Do reveal-relayer env files and systemd units keep the reveal secret out of
+  command-line args, journald, and alert payloads?
 - Do generated claim-wallet files, partial spend keys, webhook URLs, and
   Starknet account keys stay out of logs, handoff packets, and tracked files?
 - Does the operator runbook give enough information for a second operator to

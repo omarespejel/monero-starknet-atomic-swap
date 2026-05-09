@@ -51,7 +51,9 @@ python3 tools/generate_deploy_calldata.py \
   `ATOMIC_SWAP_SECRET_HEX`, verifies the wallet-rpc transfer is inbound, large
   enough, sufficiently confirmed, and not future-locked, then delegates the
   signed Starknet reveal to `scripts/atomic_lock_sncast_ops.sh reveal`. It does
-  not accept Starknet private keys on the CLI.
+  not accept Starknet private keys on the CLI. The VM operator wrapper and
+  systemd template live under `ops/reveal-relayer/` and
+  `ops/systemd/monero-reveal-relayer@.service`.
 - Product/API code should use explicit `SwapTerms.direction` values for
   `xmr_to_starknet` and `starknet_to_xmr`; do not infer direction from token
   symbols, UI labels, or which party happens to run a given relayer.
@@ -93,6 +95,7 @@ bun build scripts/ts/src/deploy.ts --outdir /tmp/atomic-ts-deploy-check --target
 bash -n scripts/deploy_with_sncast.sh
 bash -n scripts/atomic_lock_sncast_ops.sh
 bash -n scripts/monero_vm_tunnel.sh
+bash -n ops/reveal-relayer/run-reveal-relayer.sh ops/claim-relayer/claim-relayer-alert.sh
 python3 -m json.tool ops/claim-relayer/claim-relayer.config.example.json >/tmp/claim-relayer-config-check.json
 python3 tools/check_secret_hygiene.py
 python3 tools/check_secret_hygiene.py --history --report-only
@@ -138,7 +141,11 @@ commands.
 The reveal-side `relay_reveal` binary no longer uses disabled Rust Starknet
 signing or Starknet private-key CLI args. It waits on wallet-rpc, validates
 inbound payment amount/confirmations/unlock status, and invokes the same sncast
-reveal helper with redacted captured output.
+reveal helper with redacted captured output. In normal operator mode it passes
+only `ATOMIC_SWAP_SECRET_FILE` to the helper; `ATOMIC_SWAP_SECRET_HEX` remains a
+fallback for manual/test usage. Local wrapper tests verified the secret value is
+not emitted in stdout/stderr and FireHydrant payloads tag reveal failures as
+`component:reveal-relayer`.
 
 Sepolia rehearsal:
 
@@ -644,6 +651,10 @@ Operations artifacts:
   Remaining production work is having an independent operator repeat/sign off
   the handoff drill with the redacted packet before timer-backed production
   monitoring is enabled.
+- XMR-to-Starknet reveal ops: the wallet-rpc-gated reveal binary, per-swap
+  wrapper, systemd template, and runbook are in place. Remaining production
+  work is a VM dry-run/live rehearsal for a real funded XMR-to-Starknet swap
+  and independent operator signoff.
 - Starknet test-token finalization: both live-mode STRK locks have been
   claimed and verified on Sepolia.
 - External security review: required before any meaningful-value mainnet use.

@@ -1,0 +1,20 @@
+[Unit]
+Description=Alert for Monero-to-Starknet reveal relayer failure in %i
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/atomic-swap/claim-relayer-healthcheck.env
+Environment=RELAYER_SERVICE=%i
+Environment=WALLET_RPC_SERVICE=monero-claim-wallet-rpc.service
+Environment=RELAYER_ALERT_SUMMARY_PREFIX=Atomic swap reveal relayer failed
+Environment=RELAYER_ALERT_SOURCE_TAG=monero-reveal-relayer
+Environment=RELAYER_ALERT_COMPONENT=reveal-relayer
+ExecStart=/opt/monero-starknet-atomic-swap/ops/claim-relayer/claim-relayer-alert.sh %i
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadOnlyPaths=/etc/atomic-swap /var/lib/atomic-swap
+ReadWritePaths=/var/log/atomic-swap

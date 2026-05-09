@@ -9,6 +9,9 @@ RELAYER_ALERT_FORMAT="${RELAYER_ALERT_FORMAT:-slack}"
 RELAYER_ALERT_LEVEL="${RELAYER_ALERT_LEVEL:-ERROR}"
 RELAYER_ALERT_PRIORITY="${RELAYER_ALERT_PRIORITY:-HIGH}"
 RELAYER_ALERT_SERVICE="${RELAYER_ALERT_SERVICE:-monero-starknet-atomic-swap-relayer}"
+RELAYER_ALERT_SUMMARY_PREFIX="${RELAYER_ALERT_SUMMARY_PREFIX:-Atomic swap relayer healthcheck failed}"
+RELAYER_ALERT_SOURCE_TAG="${RELAYER_ALERT_SOURCE_TAG:-monero-claim-relayer-healthcheck}"
+RELAYER_ALERT_COMPONENT="${RELAYER_ALERT_COMPONENT:-claim-relayer}"
 RELAYER_SERVICE="${RELAYER_SERVICE:-monero-claim-relayer.service}"
 WALLET_RPC_SERVICE="${WALLET_RPC_SERVICE:-monero-claim-wallet-rpc.service}"
 
@@ -33,7 +36,10 @@ payload="$(
     "$RELAYER_ALERT_FORMAT" \
     "$RELAYER_ALERT_LEVEL" \
     "$RELAYER_ALERT_PRIORITY" \
-    "$RELAYER_ALERT_SERVICE" <<'PY'
+    "$RELAYER_ALERT_SERVICE" \
+    "$RELAYER_ALERT_SUMMARY_PREFIX" \
+    "$RELAYER_ALERT_SOURCE_TAG" \
+    "$RELAYER_ALERT_COMPONENT" <<'PY'
 import json
 import sys
 
@@ -48,8 +54,11 @@ import sys
     alert_level,
     alert_priority,
     service,
+    summary_prefix,
+    source_tag,
+    component,
 ) = sys.argv[1:]
-summary = f"Atomic swap relayer healthcheck failed: {failed_unit}"
+summary = f"{summary_prefix}: {failed_unit}"
 text = (
     f"{summary}\n"
     f"environment={environment} host={host} timestamp={timestamp}\n"
@@ -66,12 +75,13 @@ if alert_format == "firehydrant":
             f"service:{service}",
             f"environment:{environment}",
             f"host:{host}",
-            "source:monero-claim-relayer-healthcheck",
-            "component:claim-relayer",
+            f"source:{source_tag}",
+            f"component:{component}",
         ],
         "annotations": {
             "signals.firehydrant.com/notification-priority": alert_priority,
             "failed_unit": failed_unit,
+            "component": component,
             "relayer_state": relayer_state or "unknown",
             "wallet_rpc_state": wallet_state or "unknown",
             "timestamp": timestamp,

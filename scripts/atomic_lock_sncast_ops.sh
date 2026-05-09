@@ -7,6 +7,7 @@ SNCAST_ACCOUNT="${SNCAST_ACCOUNT:-stealth-deployer-2026-01-21}"
 SNCAST_ACCOUNTS_FILE="${SNCAST_ACCOUNTS_FILE:-$HOME/.starknet_accounts/starknet_open_zeppelin_accounts.json}"
 TOKEN="${ATOMIC_SWAP_TOKEN_ADDRESS:-}"
 SECRET_HEX="${ATOMIC_SWAP_SECRET_HEX:-}"
+SECRET_FILE="${ATOMIC_SWAP_SECRET_FILE:-}"
 
 usage() {
   cat <<'EOF'
@@ -21,7 +22,8 @@ Environment:
   SNCAST_ACCOUNT
   SNCAST_ACCOUNTS_FILE
   ATOMIC_SWAP_TOKEN_ADDRESS   optional, used for balance_of(contract)
-  ATOMIC_SWAP_SECRET_HEX      required for reveal; 32-byte hex, with or without 0x
+  ATOMIC_SWAP_SECRET_FILE     preferred for reveal; file containing 32-byte hex
+  ATOMIC_SWAP_SECRET_HEX      fallback for reveal; 32-byte hex, with or without 0x
 EOF
 }
 
@@ -59,9 +61,15 @@ PY
 secret_bytearray_calldata() {
   python3 - <<'PY'
 import os
-secret = os.environ.get("ATOMIC_SWAP_SECRET_HEX", "").removeprefix("0x").lower()
+secret = os.environ.get("ATOMIC_SWAP_SECRET_HEX", "").strip()
+if not secret:
+    secret_file = os.environ.get("ATOMIC_SWAP_SECRET_FILE", "").strip()
+    if secret_file:
+        with open(secret_file, encoding="utf-8") as handle:
+            secret = handle.read().strip()
+secret = secret.removeprefix("0x").lower()
 if len(secret) != 64 or any(c not in "0123456789abcdef" for c in secret):
-    raise SystemExit("ATOMIC_SWAP_SECRET_HEX must be exactly 32 bytes / 64 hex chars")
+    raise SystemExit("Reveal secret must be exactly 32 bytes / 64 hex chars")
 print("0x1", "0x" + secret[:62], "0x" + secret[62:], "0x1")
 PY
 }
@@ -91,8 +99,8 @@ fi
 
 require python3
 
-if [ "$ACTION" = "reveal" ] && [ -z "$SECRET_HEX" ]; then
-  echo "Set ATOMIC_SWAP_SECRET_HEX for reveal. It must be 32-byte hex." >&2
+if [ "$ACTION" = "reveal" ] && [ -z "$SECRET_HEX" ] && [ -z "$SECRET_FILE" ]; then
+  echo "Set ATOMIC_SWAP_SECRET_FILE or ATOMIC_SWAP_SECRET_HEX for reveal. It must be 32-byte hex." >&2
   exit 2
 fi
 

@@ -14,6 +14,8 @@ Run this flow inside the Lima Monero VM or another dedicated Linux host.
 - `claim_relayer_service`: long-running multi-lock service. It reloads a JSON
   inventory, runs each enabled lock with an independent cursor, and keeps later
   locks moving if one lock hits an RPC error.
+- `relay_reveal`: one-shot XMR-to-Starknet reveal relayer. See
+  `docs/REVEAL_RELAYER_OPERATIONS.md`.
 - `derive_claim_address`: stagenet rehearsal helper for deriving the Monero
   address controlled by a partial spend key plus a public Starknet secret.
 
@@ -82,6 +84,7 @@ sudo install -d -o atomic-swap -g atomic-swap /var/log/atomic-swap
 sudo install -d -o atomic-swap -g atomic-swap /home/atomic-swap/.shared-ringdb
 sudo install -d -o root -g root /opt/monero-starknet-atomic-swap/monero-bin
 sudo install -d -o root -g root /opt/monero-starknet-atomic-swap/ops/claim-relayer
+sudo install -d -o root -g root /opt/monero-starknet-atomic-swap/ops/reveal-relayer
 
 sudo cp ops/claim-relayer/claim-relayer.config.example.json \
   /etc/atomic-swap/claim-relayer.config.json
@@ -104,12 +107,16 @@ sudo cp ops/claim-relayer/verify-handoff-packet.py \
   /opt/monero-starknet-atomic-swap/ops/claim-relayer/
 sudo cp ops/claim-relayer/run-handoff-drill.sh \
   /opt/monero-starknet-atomic-swap/ops/claim-relayer/
+sudo cp ops/reveal-relayer/run-reveal-relayer.sh \
+  /opt/monero-starknet-atomic-swap/ops/reveal-relayer/
 
 sudo cp ops/systemd/monero-claim-wallet-rpc.service /etc/systemd/system/
 sudo cp ops/systemd/monero-claim-wallet-rpc.env.example \
   /etc/atomic-swap/monero-claim-wallet-rpc.env
 sudo cp ops/systemd/monero-claim-relayer.service /etc/systemd/system/
+sudo cp ops/systemd/monero-reveal-relayer@.service /etc/systemd/system/
 sudo cp ops/systemd/monero-claim-relayer-alert@.service /etc/systemd/system/
+sudo cp ops/systemd/monero-reveal-relayer-alert@.service /etc/systemd/system/
 sudo cp ops/systemd/monero-claim-relayer-healthcheck.service /etc/systemd/system/
 sudo cp ops/systemd/monero-claim-relayer-healthcheck.timer /etc/systemd/system/
 sudo systemctl daemon-reload
@@ -129,7 +136,10 @@ Build from the checked-out repo inside the VM:
 
 ```bash
 cd /opt/monero-starknet-atomic-swap/rust
-cargo build --release --bin claim_relayer_service --bin claim_revealed_secrets
+cargo build --release \
+  --bin claim_relayer_service \
+  --bin claim_revealed_secrets \
+  --bin relay_reveal
 ```
 
 Dry-run before enabling live claims:
