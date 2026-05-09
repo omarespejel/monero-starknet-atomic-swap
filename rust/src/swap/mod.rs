@@ -1,6 +1,7 @@
 pub mod db;
 pub mod driver;
 pub mod race_monitor;
+pub mod relayer;
 pub mod starknet_manual;
 pub mod state; // Cross-platform Starknet client (macOS compatible)
 

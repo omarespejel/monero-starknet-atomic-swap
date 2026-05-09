@@ -74,13 +74,10 @@ thiserror = "1"
 url = "2.5"
 
 # ===== STARKNET INTEGRATION =====
-# For production (Linux): use official starknet-rs + signing
-[target.'cfg(not(target_os = "macos"))'.dependencies]
-starknet = "0.15"
-starknet-crypto = "0.7"  # For STARK curve transaction signing (non-macOS)
-
-# For macOS dev: use minimal starknet-ff (no size-of dependency)
-[target.'cfg(target_os = "macos")'.dependencies]
+# Read-only relayer paths use direct JSON-RPC plus starknet-ff felt parsing.
+# Signed Starknet transactions are intentionally handled by sncast/starknet.js:
+# the Rust signing crates pull a `size-of` transitive dependency that does not
+# compile on Apple Silicon or Linux/aarch64.
 starknet-ff = "0.3"
 sha3 = "0.10"      # For starknet_keccak selector computation
 
@@ -133,6 +130,14 @@ path = "src/bin/generate_canonical_test_vectors.rs"
 [[bin]]
 name = "relay_reveal"
 path = "src/bin/relay_reveal.rs"
+
+[[bin]]
+name = "claim_revealed_secrets"
+path = "src/bin/claim_revealed_secrets.rs"
+
+[[bin]]
+name = "derive_claim_address"
+path = "src/bin/derive_claim_address.rs"
 
 [dev-dependencies]
 assert_cmd = "2.0"

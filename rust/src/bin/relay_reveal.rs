@@ -20,7 +20,7 @@ struct Args {
     /// Starknet RPC URL (default: Sepolia)
     #[arg(
         long,
-        default_value = "https://starknet-sepolia.public.blastapi.io/rpc/v0_7"
+        default_value = "https://starknet-sepolia.g.alchemy.com/starknet/version/rpc/v0_10/cf52O0RwFy1mEB0uoYsel"
     )]
     starknet_rpc: String,
 

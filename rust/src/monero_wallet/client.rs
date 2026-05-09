@@ -455,6 +455,15 @@ impl MoneroWallet {
     /// Scans the blockchain for outputs belonging to this wallet.
     /// Must be called after generating wallet from keys to detect received funds.
     pub async fn refresh(&self) -> Result<()> {
+        self.refresh_from_height(0).await
+    }
+
+    /// Refresh wallet from a known restore height.
+    ///
+    /// Atomic-swap claim wallets are generated just before sweeping. Scanning from
+    /// the swap funding height keeps wallet-rpc responsive and avoids replaying the
+    /// full Monero chain for every claim attempt.
+    pub async fn refresh_from_height(&self, start_height: u64) -> Result<()> {
         #[derive(Serialize)]
         struct Params {
             start_height: u64,
@@ -467,18 +476,13 @@ impl MoneroWallet {
         }
 
         let resp: Response = self
-            .call_wallet_rpc(
-                "refresh",
-                Params {
-                    start_height: 0, // Scan from beginning
-                },
-            )
+            .call_wallet_rpc("refresh", Params { start_height })
             .await
             .context("Failed to refresh wallet")?;
 
         info!(
-            "Wallet refreshed: {} blocks fetched, received_money: {}",
-            resp.blocks_fetched, resp.received_money
+            "Wallet refreshed from height {}: {} blocks fetched, received_money: {}",
+            start_height, resp.blocks_fetched, resp.received_money
         );
 
         Ok(())

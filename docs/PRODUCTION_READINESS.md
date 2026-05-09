@@ -41,6 +41,10 @@ python3 tools/generate_deploy_calldata.py \
   `scripts/monero_vm_tunnel.sh vm-address|vm-balance|vm-height` for normal
   checks. Use `start|smoke|stop` only for temporary host-side tests against the
   VM wallet.
+- Claim-side secret relaying should use the durable Rust loop in
+  `claim_revealed_secrets`. For live Monero claims, run it inside the Monero VM
+  or another Linux environment that has local access to the wallet-rpc wallet
+  directory; host-side RPC tunneling is only acceptable for dry-runs.
 
 ## Verified Locally
 
@@ -52,13 +56,17 @@ cd rust && cargo test -q --lib
 cd rust && cargo test -q --test dleq_properties
 cd rust && cargo test -q --test integration_test
 cd rust && cargo test -q --test handle_secret_revealed_test
+cd rust && cargo test -q --lib swap::relayer
 cd rust && cargo check -q --bins
+cd rust && cargo check -q --bin claim_revealed_secrets
+cd rust && cargo check -q --bin derive_claim_address
 cd rust && cargo check -q --features full-integration --bins
 bun build scripts/deploy.ts --outdir /tmp/atomic-deploy-check --target bun
 bun build scripts/ts/src/deploy.ts --outdir /tmp/atomic-ts-deploy-check --target node
 bash -n scripts/deploy_with_sncast.sh
 bash -n scripts/atomic_lock_sncast_ops.sh
 bash -n scripts/monero_vm_tunnel.sh
+git diff --check
 ```
 
 Known local result for Cairo: `109 passed, 0 failed, 7 ignored`.
@@ -107,6 +115,29 @@ Sepolia rehearsal:
 - Rust event tooling now has unit coverage for decoding `SecretRevealed` and
   `TokensClaimed`, plus extracting the full 32-byte `reveal_secret` ByteArray
   from both sncast-style and offset-style account calldata.
+- Claim-side relayer dry-run against the live reveal event succeeded:
+  - command shape:
+    `cargo run -q --bin claim_revealed_secrets -- --dry-run --once --contract-address 0x056874c6da7e5d485e337769d2267fc6a024a57df85b529d08f453e86b6a40aa --start-block 9560010 --cursor-path /tmp/atomic-claim-dry-run.json --max-blocks-per-batch 20 --confirmation-depth 1`
+  - observed event id:
+    `9560016:0x32cbac1724052bf1553d7c34dc978b7049749e251e75d9fc8bff0cad642f02:SecretRevealed`
+  - pass result after local secret-hash-word verification:
+    `latest_block=9569262`, `safe_tip=9569261`,
+    `from_block=9560010`, `to_block=9560029`, `events_seen=1`,
+    `reveals_claimed=1`, `events_skipped=0`.
+  - cursor persisted `next_block=9560030`, the processed event id, and
+    retained block hashes for reorg validation.
+- Claim-side relayer live Monero VM rehearsal succeeded against the same
+  Sepolia reveal event:
+  - command shape:
+    `target/debug/claim_revealed_secrets --once --contract-address 0x056874c6da7e5d485e337769d2267fc6a024a57df85b529d08f453e86b6a40aa --start-block 9560010 --cursor-path /tmp/vm-live-claim-cursor.json --max-blocks-per-batch 20 --confirmation-depth 1 --wallet-rpc-url http://127.0.0.1:38091/json_rpc --daemon-rpc-url http://node2.monerodevs.org:38089/json_rpc --wallet-dir /home/espejelomar.linux/monero-wallets --monero-network stagenet --claim-destination 54SCqiAL4qNU3c6RNXFfz16c3EpS8HJehQHCRQXuvJZ3E3UJ5BcneuY6RKcFLUMQZagWvWXDT8r6MCnEotEK4EgKHfP9j43 --restore-height 2115270`
+  - event id:
+    `9560016:0x32cbac1724052bf1553d7c34dc978b7049749e251e75d9fc8bff0cad642f02:SecretRevealed`
+  - pass result:
+    `latest_block=9570047`, `safe_tip=9570046`,
+    `from_block=9560010`, `to_block=9560029`, `events_seen=1`,
+    `reveals_claimed=1`, `events_skipped=0`.
+  - cursor persisted `next_block=9560030`, the processed event id, and
+    retained block hashes for reorg validation.
 - Zero-value refund rehearsal lock deployed with the same class hash:
   - contract:
     `0x0142fbaf19004601c5a6403743e4d86623a8b39b847d6c939dc374e28effbf59`
@@ -130,23 +161,57 @@ Monero VM check:
 
 - Lima VM: `monero-stagenet`
 - Wallet RPC: running inside the VM on `127.0.0.1:38090`
+- Claim rehearsal wallet RPC: used a separate temporary-wallet RPC inside the
+  VM on `127.0.0.1:38091`, so live claim tests did not switch or close the
+  primary funded wallet. It was stopped after the rehearsal.
 - Host tunnel: temporary only; stopped after smoke tests
 - Wallet RPC smoke test: passed
 - Stagenet address:
   `54SCqiAL4qNU3c6RNXFfz16c3EpS8HJehQHCRQXuvJZ3E3UJ5BcneuY6RKcFLUMQZagWvWXDT8r6MCnEotEK4EgKHfP9j43`
-- Wallet balance observed during readiness check: `0`
-- Funding attempt: XMR-TW faucet request returned a request-limit response from
-  the current network path; CypherFaucet is live but requires a captcha. Retry
-  faucet funding from a browser or use a separate stagenet sender.
+- Faucet funding received:
+  `e2e31591f738b1a84ed7763b5d7f8d30cfcb5e9a0f781f2a540e7d4d1bbb85b1`,
+  amount `100000000000` atomic units (`0.1` stagenet XMR).
+- VM-only spend rehearsal succeeded:
+  - destination subaddress:
+    `7AY2sdDv7nqWTjo479rbUfW42xEvf29oPXSeZAau5APjRdechzA8YB3D7yAALwG11LR5UMbAjsHjhaVRqsqyCne4Ni7npJh`
+  - transfer tx:
+    `fe88d22edaaf518e64ba130ea4f6022fe70e92ef5f2addf3295bd375c207740a`
+  - amount `10000000000` atomic units (`0.01` stagenet XMR), fee
+    `33440000` atomic units.
+  - first mined check: block `2115280`, `confirmations=1`,
+    `double_spend_seen=false`, wallet `blocks_to_unlock=9`.
+  - post-submit wallet balance: `99966560000` atomic units total, `0`
+    unlocked until the new outputs mature.
+- VM-only swap-key claim rehearsal succeeded:
+  - derived claim address funded:
+    `56ZNLFB4Bbc18cFbcRSgJaGtaVc8GyisDA1VnanTs7aREB8ZsUxg67uJdX29wqinWfFfcVbbHzShMjbksYBvCj3uQ3xEz4R`
+  - funding tx:
+    `c91bb51f6f8e5a4544d0d267d3b39a0d685c7724fe17ff383a98a2f509c9d1c7`,
+    amount `5000000000` atomic units (`0.005` stagenet XMR), fee
+    `33380000` atomic units, mined at block `2115292`, unlocked at
+    `10` confirmations.
+  - `claim_revealed_secrets` recovered the full key from the Sepolia reveal
+    secret plus the local partial key share inside the VM, generated a
+    temporary wallet, refreshed from restore height `2115270`, swept the funds,
+    closed the wallet, and securely deleted the generated wallet file.
+  - sweep tx:
+    `0d5185346c7dba43ead8db856a13e3a60da8188f5591cd3f84beecc7d3d7ff4a`,
+    amount `4966490000` atomic units, fee `33510000` atomic units.
+  - first mined sweep check: block `2115306`, `confirmations=1`,
+    `double_spend_seen=false`, `locked=true` under the normal Monero recipient
+    maturity window.
+  - post-claim cleanup check: no generated `swap_*` wallet files remained in
+    `/home/espejelomar.linux/monero-wallets`.
+  - readiness finding resolved during rehearsal: claim wallet refresh must use
+    the swap restore height, not height `0`; `refresh_from_height` is now used
+    before `sweep_all`.
 
 ## Remaining Blockers
 
-- Funded Monero stagenet rehearsal: the VM wallet currently needs stagenet XMR
-  before a real claim/spend flow can be exercised.
-- Event watcher/relayer hardening: Rust event watching now decodes AtomicLock
-  event selectors with pagination and can recover the full revealed secret from
-  reveal transaction calldata, but production operation still needs a durable
-  cursor, reorg policy, and integration with `handle_secret_revealed`.
+- Continuous relayer operations: the claim-side one-shot VM rehearsal is done,
+  including a real stagenet sweep. The remaining work is making this a supervised
+  long-running service with alerting, cursor backups, multi-lock discovery, and
+  explicit runbooks for retrying stuck Monero wallet-rpc operations.
 - Monero transaction finalization: `rust/src/monero_full.rs` no longer returns
   placeholder transaction hex. Real spends must go through wallet-rpc/Monero
   transaction tooling.

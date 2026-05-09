@@ -109,7 +109,7 @@ pub async fn claim_monero_after_reveal(
         .await?;
 
     let result = async {
-        wallet.refresh().await?;
+        wallet.refresh_from_height(restore_height).await?;
         wallet.sweep_all(destination).await
     }
     .await;

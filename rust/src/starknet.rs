@@ -102,6 +102,22 @@ impl StarknetClient {
         parse_u64_value(&result, "block number")
     }
 
+    /// Get the canonical block hash for a block number.
+    pub async fn get_block_hash(&self, block_number: u64) -> Result<String> {
+        let result = self
+            .call(
+                "starknet_getBlockWithTxHashes",
+                json!({ "block_id": block_id_from_number(block_number) }),
+            )
+            .await?;
+
+        result
+            .get("block_hash")
+            .and_then(Value::as_str)
+            .map(normalize_hex)
+            .ok_or_else(|| anyhow!("Block {} response missing block_hash", block_number))
+    }
+
     /// Get all events from a contract starting at `from_block`.
     ///
     /// This follows Starknet RPC pagination and returns raw JSON events for

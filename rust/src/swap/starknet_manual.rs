@@ -4,18 +4,15 @@
 //! has macOS compatibility issues (size-of crate uses fastcall ABI).
 //!
 //! Uses starknet-ff for FieldElement type (macOS compatible).
-//! Transaction signing implemented for non-macOS platforms using starknet-crypto.
-//! macOS does not submit placeholder-signed transactions; use the TypeScript
-//! starknet.js deployment path for signed Sepolia/devnet interactions.
+//! This client never submits signed Starknet transactions. Use the TypeScript
+//! starknet.js, sncast, or another maintained signer for Sepolia/devnet
+//! interactions.
 
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use serde_json::{json, Value};
 use sha3::{Digest, Keccak256};
 use tracing;
-
-#[cfg(not(target_os = "macos"))]
-use starknet_crypto::{pedersen_hash, sign, FieldElement, Signature};
 
 use super::driver::StarknetClient;
 
@@ -119,115 +116,16 @@ impl StarknetManualClient {
         felt_from_hex(nonce_str)
     }
 
-    #[cfg(not(target_os = "macos"))]
-    /// Compute Pedersen hash of calldata array.
-    ///
-    /// Uses iterative Pedersen hashing: hash(hash(hash(0, calldata[0]), calldata[1]), ...)
-    fn compute_calldata_hash(&self, calldata: &[Felt]) -> Result<Felt> {
-        if calldata.is_empty() {
-            return Ok(Felt::from(0u64));
-        }
-
-        // Convert Felt to FieldElement for starknet-crypto
-        let mut hash = FieldElement::ZERO;
-        for felt in calldata {
-            let field_elem = felt_to_field_element(felt)?;
-            hash = pedersen_hash(&hash, &field_elem);
-        }
-
-        // Convert back to Felt
-        field_element_to_felt(&hash)
-    }
-
-    #[cfg(not(target_os = "macos"))]
-    /// Compute transaction hash for v1 invoke transaction.
-    ///
-    /// Hash format: H(version, sender_address, calldata_hash, max_fee, nonce, chain_id)
-    fn compute_invoke_tx_hash(
-        &self,
-        calldata: &[Felt],
-        max_fee: Felt,
-        nonce: Felt,
-    ) -> Result<Felt> {
-        let version = FieldElement::ONE; // v1 = 0x1
-        let sender = felt_to_field_element(&self.account_address)?;
-        let calldata_hash = self.compute_calldata_hash(calldata)?;
-        let calldata_hash_fe = felt_to_field_element(&calldata_hash)?;
-        let max_fee_fe = felt_to_field_element(&max_fee)?;
-        let nonce_fe = felt_to_field_element(&nonce)?;
-        let chain_id_fe = felt_to_field_element(&self.chain_id)?;
-
-        // Compute hash: H(version, sender, calldata_hash, max_fee, nonce, chain_id)
-        let mut hash = pedersen_hash(&version, &sender);
-        hash = pedersen_hash(&hash, &calldata_hash_fe);
-        hash = pedersen_hash(&hash, &max_fee_fe);
-        hash = pedersen_hash(&hash, &nonce_fe);
-        hash = pedersen_hash(&hash, &chain_id_fe);
-
-        field_element_to_felt(&hash)
-    }
-
-    #[cfg(not(target_os = "macos"))]
-    /// Sign transaction hash using STARK curve.
-    fn sign_transaction(&self, tx_hash: &Felt) -> Result<(Felt, Felt)> {
-        let tx_hash_fe = felt_to_field_element(tx_hash)?;
-        let private_key_fe = felt_to_field_element(&self.private_key)?;
-
-        let signature = sign(&private_key_fe, &tx_hash_fe)?;
-
-        let r = field_element_to_felt(&signature.r)?;
-        let s = field_element_to_felt(&signature.s)?;
-
-        Ok((r, s))
-    }
-
-    /// Submit v1 invoke transaction with real STARK curve signing on supported platforms.
-    ///
-    /// On non-macOS: Implements full transaction signing for production use.
-    /// On macOS: Refuses to submit because placeholder signatures are not production-safe.
+    /// Refuse to submit invokes from Rust.
     async fn submit_invoke_tx(&self, calls: Vec<Call>) -> Result<String> {
         let nonce = self.get_nonce().await?;
         let calldata = self.build_execute_calldata(&calls);
         let max_fee = Felt::from(0x1000000000000u64); // 0.001 ETH max
 
-        #[cfg(not(target_os = "macos"))]
-        {
-            // Compute transaction hash
-            let tx_hash = self.compute_invoke_tx_hash(&calldata, max_fee, nonce)?;
-
-            // Sign transaction
-            let (r, s) = self.sign_transaction(&tx_hash)?;
-
-            let tx = json!({
-                "type": "INVOKE",
-                "version": "0x1",
-                "sender_address": felt_to_hex(&self.account_address),
-                "calldata": calldata.iter().map(|f| felt_to_hex(f)).collect::<Vec<_>>(),
-                "signature": [felt_to_hex(&r), felt_to_hex(&s)],
-                "max_fee": felt_to_hex(&max_fee),
-                "nonce": felt_to_hex(&nonce),
-            });
-
-            let result = self
-                .rpc_call(
-                    "starknet_addInvokeTransaction",
-                    json!({ "invoke_transaction": tx }),
-                )
-                .await?;
-
-            result["transaction_hash"]
-                .as_str()
-                .map(|s| s.to_string())
-                .context("Missing transaction_hash")
-        }
-
-        #[cfg(target_os = "macos")]
-        {
-            let _ = (calls, nonce, calldata, max_fee);
-            anyhow::bail!(
-                "macOS Rust Starknet invoke signing is disabled because placeholder signatures are forbidden. Use scripts/deploy.ts or another starknet.js signer."
-            )
-        }
+        let _ = (calls, nonce, calldata, max_fee);
+        anyhow::bail!(
+            "Rust Starknet invoke signing is disabled because placeholder signatures are forbidden. Use scripts/deploy.ts, sncast, or another maintained signer."
+        )
     }
 
     /// Build __execute__ calldata for account contract.
@@ -347,22 +245,6 @@ pub struct DeploymentMSMHints {
 
 fn felt_to_hex(f: &Felt) -> String {
     format!("{:#x}", f)
-}
-
-#[cfg(not(target_os = "macos"))]
-/// Convert starknet-ff::FieldElement to starknet-crypto::FieldElement
-fn felt_to_field_element(felt: &Felt) -> Result<FieldElement> {
-    let bytes = felt.to_bytes_be();
-    FieldElement::from_bytes_be(&bytes)
-        .map_err(|e| anyhow!("Failed to convert Felt to FieldElement: {:?}", e))
-}
-
-#[cfg(not(target_os = "macos"))]
-/// Convert starknet-crypto::FieldElement to starknet-ff::FieldElement
-fn field_element_to_felt(fe: &FieldElement) -> Result<Felt> {
-    let bytes = fe.to_bytes_be();
-    Felt::from_bytes_be(&bytes)
-        .map_err(|e| anyhow!("Failed to convert FieldElement to Felt: {:?}", e))
 }
 
 /// Compute starknet_keccak selector from function name.
