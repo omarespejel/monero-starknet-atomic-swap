@@ -121,7 +121,6 @@ def build_report(checks: list[Check]) -> dict[str, Any]:
         "checks": results,
         "remaining_external_blockers": [
             "rotate/revoke historical Starknet RPC provider token exposure",
-            "configure real alert webhook/paging destination and rehearse delivery",
             "second operator handoff drill and signoff",
             "external security review before meaningful-value mainnet use",
         ],
