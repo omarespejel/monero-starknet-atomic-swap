@@ -510,6 +510,13 @@ Operations artifacts:
     `RELAYER_ALERT_FORMAT=firehydrant`; the VM file-sink payload included
     `summary`, `body`, `level=ERROR`, `status=OPEN`, `idempotency_key`,
     `tags`, and `annotations`.
+  - Real FireHydrant manual rehearsal passed from the Monero VM on
+    `2026-05-09T16:19:07Z`: `monero-claim-relayer-alert@manual-firehydrant-live`
+    exited with `Result=success`, `ExecMainStatus=0`, journaled
+    `Sent relayer alert for manual-firehydrant-live`, and the local webhook
+    temp file was deleted after configuration. Redacted VM config check:
+    `webhook_configured=true`, `alert_file_configured=false`,
+    `environment=stagenet`, `format=firehydrant`, env-file mode `0600`.
   - validation: `bash -n` passed locally; VM run with one-shot rehearsal
     services marked inactive passed with `enabled_discoveries=1`,
     `cursor_count=3`, recent journal clean, and fresh cursor age under the
@@ -568,10 +575,11 @@ Operations artifacts:
 - Automatic lock discovery: factory/registry contract code, registry event
   decoding, relayer discovery config, focused tests, Sepolia factory deployment,
   factory-created lock deployment, discovery dry-run, and VM live Monero claim
-  proof are done. The VM handoff drill script passed locally. Remaining
-  production work is configuring the real alert webhook/paging destination and
-  having an independent operator repeat/sign off the handoff drill with the
-  redacted packet.
+  proof are done. FireHydrant alerting is configured and a real manual alert
+  rehearsal from the VM succeeded. The VM handoff drill script passed locally.
+  Remaining production work is having an independent operator repeat/sign off
+  the handoff drill with the redacted packet before timer-backed production
+  monitoring is enabled.
 - Starknet test-token finalization: both live-mode STRK locks have been
   claimed and verified on Sepolia.
 - External security review: required before any meaningful-value mainnet use.

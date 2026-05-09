@@ -45,8 +45,9 @@ Review these surfaces first:
   `ops/claim-relayer/claim-relayer-handoff-packet.py` and
   `ops/claim-relayer/verify-handoff-packet.py --require-artifact`, then attach
   the signoff record from `docs/OPERATOR_HANDOFF.md`.
-- Configure the real alert webhook/paging destination in the Monero VM and
-  rehearse `monero-claim-relayer-healthcheck.timer`.
+- Confirm the FireHydrant alert destination remains configured in the Monero VM
+  and that the latest manual rehearsal alert reached the `Atomic Swap Ops`
+  route before enabling timer-backed production monitoring.
 
 ## Required Commands
 

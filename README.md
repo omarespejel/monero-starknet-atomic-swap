@@ -55,7 +55,7 @@ Testnet-ready prototype implementation of a trustless atomic swap protocol enabl
 
 **Production Blockers:**
 - ⬜ Rotate/revoke historical Starknet RPC provider key exposure before public push or production handoff
-- ⬜ Configure real alert webhook/paging and get independent operator handoff signoff
+- ⬜ Independent operator handoff signoff
 - ⬜ External security audit
 
 ---

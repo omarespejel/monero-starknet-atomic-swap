@@ -245,5 +245,7 @@ the timer is considered production-ready.
 Automatic discovery now exists as a factory/registry event path and has both a
 Sepolia dry-run proof and a VM live Monero claim proof against factory
 `0x053cb8c9c1590253eabf1fdd88ac6db975c5c91f4705c531b8c664a66b2e4c31`.
-Before using it for meaningful value, configure the real alert webhook/paging
-destination and rehearse the same path with production-like operator handoff.
+FireHydrant alerting is configured in the Monero VM and a real manual alert
+rehearsal succeeded. Before using it for meaningful value, complete the
+production-like second-operator handoff and only then enable the healthcheck
+timer in the live operating mode.
