@@ -48,6 +48,10 @@ python3 tools/generate_deploy_calldata.py \
 - Product/API code should use explicit `SwapTerms.direction` values for
   `xmr_to_starknet` and `starknet_to_xmr`; do not infer direction from token
   symbols, UI labels, or which party happens to run a given relayer.
+- `cargo run --bin maker` defaults to the 3-hour minimum lock duration and emits
+  validated `swap_terms` when `--token-address`, `--amount`, and
+  `--expected-monero-amount-piconero` are provided. Treat artifacts without
+  `swap_terms` as demo-only.
 - The Rust swap state machine preserves Monero restore height, txid, and amount
   across finality, reveal, and claim transitions. Old JSON swap files missing
   the new optional fields remain deserializable.
@@ -88,6 +92,7 @@ Additional backend validation for the bidirectional quote/state slice:
 
 ```bash
 cd rust && cargo test -q --test swap_terms_test --test swap_state_test --test swap_driver_test --test swap_security_test --test handle_secret_revealed_test
+cd rust && cargo check -q --bin maker
 cd rust && cargo fmt --check
 python3 tools/check_secret_hygiene.py
 ```

@@ -35,6 +35,27 @@ fn directions_encode_user_intent() {
 }
 
 #[test]
+fn terms_enums_parse_cli_friendly_values() {
+    assert_eq!(
+        "xmr-to-starknet".parse::<SwapDirection>().unwrap(),
+        SwapDirection::XmrToStarknet
+    );
+    assert_eq!(
+        "starknet_to_monero".parse::<SwapDirection>().unwrap(),
+        SwapDirection::StarknetToXmr
+    );
+    assert_eq!(
+        "STAGENET".parse::<MoneroNetwork>().unwrap(),
+        MoneroNetwork::Stagenet
+    );
+    assert_eq!(
+        "private".parse::<StarknetReceiveMode>().unwrap(),
+        StarknetReceiveMode::PrivacyOpenNote
+    );
+    assert!("bad-direction".parse::<SwapDirection>().is_err());
+}
+
+#[test]
 fn terms_roundtrip_serializes_large_starknet_amount_as_string() {
     let terms = valid_terms(SwapDirection::XmrToStarknet);
     let json = serde_json::to_string(&terms).unwrap();

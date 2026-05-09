@@ -5,6 +5,7 @@
 //! frontend code do not infer roles from token names or amounts.
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::str::FromStr;
 use thiserror::Error;
 
 pub const MIN_LOCK_DURATION_SECS: u64 = 3 * 60 * 60;
@@ -40,6 +41,19 @@ pub enum MoneroNetwork {
     Testnet,
 }
 
+impl FromStr for MoneroNetwork {
+    type Err = SwapTermParseError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match normalized(value).as_str() {
+            "mainnet" => Ok(Self::Mainnet),
+            "stagenet" => Ok(Self::Stagenet),
+            "testnet" => Ok(Self::Testnet),
+            _ => Err(SwapTermParseError::InvalidMoneroNetwork(value.to_string())),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum StarknetReceiveMode {
@@ -53,6 +67,20 @@ impl Default for StarknetReceiveMode {
     }
 }
 
+impl FromStr for StarknetReceiveMode {
+    type Err = SwapTermParseError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match normalized(value).as_str() {
+            "public_address" | "public" => Ok(Self::PublicAddress),
+            "privacy_open_note" | "private" | "privacy" => Ok(Self::PrivacyOpenNote),
+            _ => Err(SwapTermParseError::InvalidStarknetReceiveMode(
+                value.to_string(),
+            )),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum SwapDirection {
@@ -60,6 +88,18 @@ pub enum SwapDirection {
     XmrToStarknet,
     /// User locks a Starknet token and receives XMR.
     StarknetToXmr,
+}
+
+impl FromStr for SwapDirection {
+    type Err = SwapTermParseError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match normalized(value).as_str() {
+            "xmr_to_starknet" | "monero_to_starknet" => Ok(Self::XmrToStarknet),
+            "starknet_to_xmr" | "starknet_to_monero" => Ok(Self::StarknetToXmr),
+            _ => Err(SwapTermParseError::InvalidDirection(value.to_string())),
+        }
+    }
 }
 
 impl SwapDirection {
@@ -84,6 +124,10 @@ impl SwapDirection {
     pub fn user_receives_monero_claim(self) -> bool {
         matches!(self, Self::StarknetToXmr)
     }
+}
+
+fn normalized(value: &str) -> String {
+    value.trim().to_ascii_lowercase().replace('-', "_")
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -132,6 +176,16 @@ impl SwapTerms {
         }
         Ok(())
     }
+}
+
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum SwapTermParseError {
+    #[error("invalid swap direction: {0}")]
+    InvalidDirection(String),
+    #[error("invalid monero network: {0}")]
+    InvalidMoneroNetwork(String),
+    #[error("invalid starknet receive mode: {0}")]
+    InvalidStarknetReceiveMode(String),
 }
 
 #[derive(Debug, Error, PartialEq, Eq)]

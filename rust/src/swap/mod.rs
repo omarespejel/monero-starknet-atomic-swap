@@ -14,6 +14,7 @@ pub use driver::{
 pub use starknet_manual::StarknetManualClient;
 pub use state::SwapState;
 pub use terms::{
-    Chain, MoneroNetwork, StarknetReceiveMode, SwapDirection, SwapTerms, SwapTermsError,
-    DEFAULT_MONERO_CONFIRMATIONS as TERMS_DEFAULT_MONERO_CONFIRMATIONS, MIN_LOCK_DURATION_SECS,
+    Chain, MoneroNetwork, StarknetReceiveMode, SwapDirection, SwapTermParseError, SwapTerms,
+    SwapTermsError, DEFAULT_MONERO_CONFIRMATIONS as TERMS_DEFAULT_MONERO_CONFIRMATIONS,
+    MIN_LOCK_DURATION_SECS,
 };
