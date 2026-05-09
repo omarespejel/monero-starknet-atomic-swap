@@ -8,7 +8,7 @@ use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::scalar::Scalar;
 use hex;
 use sha2::{Digest, Sha256};
-use xmr_secret_gen::dleq::generate_dleq_proof;
+use xmr_secret_gen::dleq::{generate_dleq_proof, get_second_generator};
 use zeroize::Zeroizing;
 
 /// Test that hashlock computation matches Cairo's implementation.
@@ -70,9 +70,14 @@ fn test_dleq_challenge_rust_cairo_match() {
     );
 
     // Verify U = t·Y
-    let Y = ED25519_BASEPOINT_POINT * Scalar::from(2u64);
-    let expected_U = Y * *secret_zeroizing;
-    assert_eq!(proof.second_point, expected_U, "U must equal t·Y");
+    let y = get_second_generator();
+    let expected_u = y * *secret_zeroizing;
+    assert_eq!(proof.second_point, expected_u, "U must equal t·Y");
+    assert_ne!(
+        proof.second_point,
+        (ED25519_BASEPOINT_POINT * Scalar::from(2u64)) * *secret_zeroizing,
+        "U must use the domain-separated second generator, not the legacy 2*G placeholder"
+    );
 
     println!("✅ DLEQ proof structure is valid");
 }
@@ -102,11 +107,11 @@ fn test_full_proof_verifies() {
     // s·G = R1 + c·T
     // s·Y = R2 + c·U
 
-    let G = ED25519_BASEPOINT_POINT;
-    let Y = G * Scalar::from(2u64);
+    let g = ED25519_BASEPOINT_POINT;
+    let y = get_second_generator();
 
     // Compute s·G
-    let s_g = G * proof.response;
+    let s_g = g * proof.response;
 
     // Compute R1 + c·T
     let c_t = adaptor_point * proof.challenge;
@@ -116,7 +121,7 @@ fn test_full_proof_verifies() {
     assert_eq!(s_g, r1_plus_ct, "DLEQ equation 1 failed: s·G = R1 + c·T");
 
     // Compute s·Y
-    let s_y = Y * proof.response;
+    let s_y = y * proof.response;
 
     // Compute R2 + c·U
     let c_u = proof.second_point * proof.challenge;

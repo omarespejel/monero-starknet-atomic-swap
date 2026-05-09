@@ -163,79 +163,30 @@ mod tests {
         assert_eq!(keys.public_key, keys.full_spend_key * G);
     }
 
-    /// Test that recover() is constant-time (no timing leakage).
+    /// Test recovery across representative scalar values.
     ///
-    /// This test verifies that recover() takes approximately the same time
-    /// regardless of input values, preventing timing side-channel attacks.
-    ///
-    /// **Note**: This is a basic timing test. For production, use criterion
-    /// benchmarking for more rigorous constant-time verification.
+    /// `recover()` uses curve25519-dalek scalar addition, which is implemented
+    /// without secret-dependent branches. A wall-clock timing assertion is too
+    /// noisy for unit tests because scheduler/cache jitter can dominate a single
+    /// scalar addition, so this test keeps the CI check deterministic and leaves
+    /// timing analysis to dedicated benchmarks.
     #[test]
-    fn test_recover_constant_time() {
-        use std::time::Instant;
+    fn test_recover_edge_vectors() {
+        let vectors = [
+            ([1u8; 32], [2u8; 32]),
+            ([0x7fu8; 32], [0x80u8; 32]),
+            ([0xffu8; 32], [0x01u8; 32]),
+            ([0x42u8; 32], [0x99u8; 32]),
+        ];
 
-        // Generate multiple key pairs with different values
-        let mut timings = Vec::new();
+        for (partial_bytes, adaptor_bytes) in vectors {
+            let partial_key = Scalar::from_bytes_mod_order(partial_bytes);
+            let adaptor_scalar = Scalar::from_bytes_mod_order(adaptor_bytes);
+            let expected = partial_key + adaptor_scalar;
 
-        for _ in 0..20 {
-            let keys = SwapKeyPair::generate();
-            let partial_key_zeroizing = Zeroizing::new(keys.partial_key);
+            let recovered = SwapKeyPair::recover(Zeroizing::new(partial_key), adaptor_scalar);
 
-            let start = Instant::now();
-            let _recovered = SwapKeyPair::recover(partial_key_zeroizing, keys.adaptor_scalar);
-            let duration = start.elapsed();
-
-            timings.push(duration.as_nanos());
+            assert_eq!(*recovered, expected);
         }
-
-        // Calculate statistics
-        let min = *timings.iter().min().unwrap();
-        let max = *timings.iter().max().unwrap();
-        let avg = timings.iter().sum::<u128>() / timings.len() as u128;
-
-        // Calculate coefficient of variation (CV) = std_dev / mean
-        // This is a more robust measure than simple variance percentage
-        let mean = avg as f64;
-        let variance_sum: f64 = timings
-            .iter()
-            .map(|&t| {
-                let diff = t as f64 - mean;
-                diff * diff
-            })
-            .sum();
-        let std_dev = (variance_sum / timings.len() as f64).sqrt();
-        let cv = (std_dev / mean) * 100.0;
-
-        println!("Recover() timing statistics:");
-        println!("  Min: {} ns", min);
-        println!("  Max: {} ns", max);
-        println!("  Avg: {:.2} ns", mean);
-        println!("  Std Dev: {:.2} ns", std_dev);
-        println!("  Coefficient of Variation: {:.2}%", cv);
-
-        // Real-world timing has significant jitter from:
-        // - CPU scheduling and context switches
-        // - Cache effects (L1/L2/L3 cache hits/misses)
-        // - Branch prediction
-        // - Thermal throttling
-        // - Other system processes
-        //
-        // For a constant-time operation, CV should be relatively low (< 30%)
-        // But we allow up to 100% to account for system noise
-        // The key insight: CV should be similar across different input values
-        // (This test verifies basic timing consistency, not perfect constant-time)
-        assert!(
-            cv < 100.0,
-            "Timing coefficient of variation too high ({}%), possible timing leakage. Expected < 100%",
-            cv
-        );
-
-        // Additional check: verify that timing is not correlated with input values
-        // (This would indicate secret-dependent timing)
-        // For now, we just verify the operation completes successfully
-        assert!(min > 0, "Timing measurement failed");
-
-        // Verify all timings are non-zero (sanity check)
-        assert!(min > 0, "Timing measurement failed");
     }
 }

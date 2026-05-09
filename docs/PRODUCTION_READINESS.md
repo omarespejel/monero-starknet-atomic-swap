@@ -92,15 +92,17 @@ Additional backend validation for the bidirectional quote/state slice:
 
 ```bash
 cd rust && cargo test -q --test swap_terms_test --test swap_state_test --test swap_driver_test --test swap_security_test --test handle_secret_revealed_test
+cd rust && cargo test -q --test rust_cairo_compatibility
+cd rust && cargo test -q
 cd rust && cargo check -q --bin maker
 cd rust && cargo fmt --check
 python3 tools/check_secret_hygiene.py
 ```
 
-Known current repo-wide Rust caveat: `cd rust && cargo test -q` still fails in
-`tests/rust_cairo_compatibility.rs` on the existing DLEQ vector assertions
-`test_dleq_challenge_rust_cairo_match` and `test_full_proof_verifies`. The
-state/terms slice above passes independently and does not touch those vectors.
+The stale Rust/Cairo compatibility tests now use the production
+domain-separated DLEQ second generator instead of the legacy `2 * G`
+placeholder. Repo-wide `cd rust && cargo test -q` is green with ignored
+integration tests left ignored.
 
 Sepolia rehearsal:
 
