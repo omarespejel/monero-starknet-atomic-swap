@@ -6,8 +6,8 @@
 
 **Trustless atomic swap protocol between Monero and Starknet using DLEQ proofs and two-party key generation.**
 
-[![Security](https://img.shields.io/badge/security-reviewed-brightgreen)](docs/SECURITY.md)
-[![Tests](https://img.shields.io/badge/tests-136%2B%20passing-brightgreen)](#testing)
+[![Security](https://img.shields.io/badge/external%20audit-pending-yellow)](docs/EXTERNAL_REVIEW_PACKET.md)
+[![Tests](https://img.shields.io/badge/cairo-113%20passing%2C%200%20ignored-brightgreen)](#testing)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 
 > **License: Apache 2.0 — Attribution and citation required.**
@@ -25,7 +25,7 @@
 
 ## Overview
 
-Production-grade prototype implementation of a trustless atomic swap protocol enabling decentralized exchange of Monero (XMR) and Starknet L2 assets without trusted intermediaries.
+Testnet-ready prototype implementation of a trustless atomic swap protocol enabling decentralized exchange of Monero (XMR) and Starknet L2 assets without trusted intermediaries.
 
 **Core Protocol:**
 - **Two-party key generation**: `x = s_a + s_b` (Serai DEX pattern, CypherStack audited)
