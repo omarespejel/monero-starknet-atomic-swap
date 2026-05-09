@@ -5,6 +5,10 @@ FAILED_UNIT="${1:-unknown-unit}"
 RELAYER_ALERT_WEBHOOK_URL="${RELAYER_ALERT_WEBHOOK_URL:-}"
 RELAYER_ALERT_FILE="${RELAYER_ALERT_FILE:-}"
 RELAYER_ALERT_ENVIRONMENT="${RELAYER_ALERT_ENVIRONMENT:-unknown}"
+RELAYER_ALERT_FORMAT="${RELAYER_ALERT_FORMAT:-slack}"
+RELAYER_ALERT_LEVEL="${RELAYER_ALERT_LEVEL:-ERROR}"
+RELAYER_ALERT_PRIORITY="${RELAYER_ALERT_PRIORITY:-HIGH}"
+RELAYER_ALERT_SERVICE="${RELAYER_ALERT_SERVICE:-monero-starknet-atomic-swap-relayer}"
 RELAYER_SERVICE="${RELAYER_SERVICE:-monero-claim-relayer.service}"
 WALLET_RPC_SERVICE="${WALLET_RPC_SERVICE:-monero-claim-wallet-rpc.service}"
 
@@ -19,17 +23,63 @@ relayer_state="$(systemctl show "$RELAYER_SERVICE" -p ActiveState -p SubState -p
 wallet_state="$(systemctl show "$WALLET_RPC_SERVICE" -p ActiveState -p SubState -p Result --value 2>/dev/null | paste -sd '/' - || true)"
 
 payload="$(
-  python3 - "$FAILED_UNIT" "$RELAYER_ALERT_ENVIRONMENT" "$host" "$timestamp" "$relayer_state" "$wallet_state" <<'PY'
+  python3 - \
+    "$FAILED_UNIT" \
+    "$RELAYER_ALERT_ENVIRONMENT" \
+    "$host" \
+    "$timestamp" \
+    "$relayer_state" \
+    "$wallet_state" \
+    "$RELAYER_ALERT_FORMAT" \
+    "$RELAYER_ALERT_LEVEL" \
+    "$RELAYER_ALERT_PRIORITY" \
+    "$RELAYER_ALERT_SERVICE" <<'PY'
 import json
 import sys
 
-failed_unit, environment, host, timestamp, relayer_state, wallet_state = sys.argv[1:]
+(
+    failed_unit,
+    environment,
+    host,
+    timestamp,
+    relayer_state,
+    wallet_state,
+    alert_format,
+    alert_level,
+    alert_priority,
+    service,
+) = sys.argv[1:]
+summary = f"Atomic swap relayer healthcheck failed: {failed_unit}"
 text = (
-    f"Atomic swap relayer healthcheck failed: {failed_unit}\n"
+    f"{summary}\n"
     f"environment={environment} host={host} timestamp={timestamp}\n"
     f"relayer={relayer_state or 'unknown'} wallet_rpc={wallet_state or 'unknown'}"
 )
-print(json.dumps({"text": text}))
+if alert_format == "firehydrant":
+    payload = {
+        "summary": summary,
+        "body": text,
+        "level": alert_level,
+        "status": "OPEN",
+        "idempotency_key": f"atomic-swap-relayer:{environment}:{failed_unit}",
+        "tags": [
+            f"service:{service}",
+            f"environment:{environment}",
+            f"host:{host}",
+            "source:monero-claim-relayer-healthcheck",
+            "component:claim-relayer",
+        ],
+        "annotations": {
+            "signals.firehydrant.com/notification-priority": alert_priority,
+            "failed_unit": failed_unit,
+            "relayer_state": relayer_state or "unknown",
+            "wallet_rpc_state": wallet_state or "unknown",
+            "timestamp": timestamp,
+        },
+    }
+else:
+    payload = {"text": text}
+print(json.dumps(payload))
 PY
 )"
 

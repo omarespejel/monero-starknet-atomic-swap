@@ -205,9 +205,13 @@ set `RELAYER_EXPECT_ACTIVE=0` or `WALLET_RPC_EXPECT_ACTIVE=0` in
 `/etc/atomic-swap/claim-relayer-healthcheck.env` as needed.
 
 `monero-claim-relayer-healthcheck.service` has `OnFailure=` wired to
-`monero-claim-relayer-alert@.service`. Set `RELAYER_ALERT_WEBHOOK_URL` in
-`/etc/atomic-swap/claim-relayer-healthcheck.env` to send failures to the
-operator alerting endpoint. For local rehearsals without a webhook, set
+`monero-claim-relayer-alert@.service`. Set `RELAYER_ALERT_WEBHOOK_URL` and
+`RELAYER_ALERT_FORMAT=firehydrant` in
+`/etc/atomic-swap/claim-relayer-healthcheck.env` to send FireHydrant Signals
+generic-webhook payloads to the operator alerting endpoint. FireHydrant expects
+fields such as `summary`, `body`, `level`, `status`, `idempotency_key`, `tags`,
+and `annotations`; the alert script emits that shape when
+`RELAYER_ALERT_FORMAT=firehydrant`. For local rehearsals without a webhook, set
 `RELAYER_ALERT_FILE=/var/log/atomic-swap/claim-relayer-alerts.jsonl` and invoke
 `claim-relayer-alert.sh <failed-unit>`; the script appends the exact JSON
 payload without sending it over the network. The alert service is hardened with
@@ -223,7 +227,8 @@ printf '%s\n' "$RELAYER_ALERT_WEBHOOK_URL" | sudo \
   /opt/monero-starknet-atomic-swap/ops/claim-relayer/configure-alert-destination.py \
   --webhook-stdin \
   --clear-alert-file \
-  --environment stagenet
+  --environment stagenet \
+  --format firehydrant
 unset RELAYER_ALERT_WEBHOOK_URL
 sudo systemctl daemon-reload
 sudo systemctl start monero-claim-relayer-alert@manual-rehearsal.service

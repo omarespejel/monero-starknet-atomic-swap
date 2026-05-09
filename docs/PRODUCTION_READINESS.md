@@ -494,8 +494,10 @@ Operations artifacts:
   wallet-rpc liveness, stale cursors, and recent relayer/registry failure
   patterns in journald. `monero-claim-relayer-alert@.service` is wired through
   `OnFailure=` and posts to `RELAYER_ALERT_WEBHOOK_URL` when configured.
-  `RELAYER_ALERT_FILE` can be used as a local JSONL sink for alert-payload
-  rehearsals before a real webhook is configured.
+  `RELAYER_ALERT_FORMAT=firehydrant` emits FireHydrant Signals generic-webhook
+  fields (`summary`, `body`, `level`, `status`, `idempotency_key`, `tags`, and
+  `annotations`). `RELAYER_ALERT_FILE` can be used as a local JSONL sink for
+  alert-payload rehearsals before a real webhook is configured.
   - alert payload validation passed locally and inside the Monero VM using
     `RELAYER_ALERT_FILE`; the VM payload captured
     `relayer=success/inactive/dead` and
@@ -504,6 +506,10 @@ Operations artifacts:
     `2026-05-09T15:02:47Z`: `monero-claim-relayer-alert@manual-rehearsal`
     exited with `Result=success`, `ExecMainStatus=0`, and appended the expected
     JSON payload to `/var/log/atomic-swap/claim-relayer-alerts.jsonl`.
+  - FireHydrant payload validation passed locally and inside the Monero VM using
+    `RELAYER_ALERT_FORMAT=firehydrant`; the VM file-sink payload included
+    `summary`, `body`, `level=ERROR`, `status=OPEN`, `idempotency_key`,
+    `tags`, and `annotations`.
   - validation: `bash -n` passed locally; VM run with one-shot rehearsal
     services marked inactive passed with `enabled_discoveries=1`,
     `cursor_count=3`, recent journal clean, and fresh cursor age under the

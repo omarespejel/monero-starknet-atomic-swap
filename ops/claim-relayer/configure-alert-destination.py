@@ -16,6 +16,7 @@ MANAGED_KEYS = (
     "RELAYER_ALERT_WEBHOOK_URL",
     "RELAYER_ALERT_FILE",
     "RELAYER_ALERT_ENVIRONMENT",
+    "RELAYER_ALERT_FORMAT",
 )
 
 
@@ -50,6 +51,11 @@ def parse_args() -> argparse.Namespace:
         help="clear RELAYER_ALERT_FILE",
     )
     parser.add_argument("--environment", help="set RELAYER_ALERT_ENVIRONMENT")
+    parser.add_argument(
+        "--format",
+        choices=("slack", "firehydrant"),
+        help="set RELAYER_ALERT_FORMAT",
+    )
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -153,6 +159,8 @@ def main() -> int:
 
     if args.environment is not None:
         updates["RELAYER_ALERT_ENVIRONMENT"] = args.environment.strip()
+    if args.format is not None:
+        updates["RELAYER_ALERT_FORMAT"] = args.format
 
     if not updates:
         raise SystemExit("no alert destination changes requested")
@@ -171,10 +179,12 @@ def main() -> int:
     if "RELAYER_ALERT_FILE" in updates:
         file_state = "set" if updates["RELAYER_ALERT_FILE"] else "cleared"
     env_state = updates.get("RELAYER_ALERT_ENVIRONMENT", "unchanged")
+    format_state = updates.get("RELAYER_ALERT_FORMAT", "unchanged")
     action = "would update" if args.dry_run else "updated"
     print(
         f"{action} {args.env_file}: "
-        f"webhook={webhook_state} alert_file={file_state} environment={env_state}"
+        f"webhook={webhook_state} alert_file={file_state} "
+        f"environment={env_state} format={format_state}"
     )
     return 0
 
