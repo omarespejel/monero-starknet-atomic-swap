@@ -70,6 +70,8 @@ bash -n scripts/deploy_with_sncast.sh
 bash -n scripts/atomic_lock_sncast_ops.sh
 bash -n scripts/monero_vm_tunnel.sh
 python3 -m json.tool ops/claim-relayer/claim-relayer.config.example.json >/tmp/claim-relayer-config-check.json
+python3 tools/check_secret_hygiene.py
+python3 tools/check_secret_hygiene.py --history --report-only
 git diff --check
 ```
 
@@ -528,6 +530,12 @@ Operations artifacts:
 - `tools/check_secret_hygiene.py` is wired into CI to reject tracked provider
   URLs with embedded API keys, tracked local secret filenames, and literal
   non-devnet private-key assignments.
+- `tools/check_secret_hygiene.py --history --report-only` now provides a fast
+  redacted historical exposure report for provider-token URLs and sensitive
+  local filenames. Current local result: the tracked tree passes, but reachable
+  history still reports old token-bearing Starknet RPC provider URL locations.
+  Follow `docs/SECRET_ROTATION_RUNBOOK.md` and rotate/revoke those provider
+  tokens before any public push or production handoff.
 - Generated Scarb cache files were removed from git tracking and
   `cairo/.scarb_cache/` is ignored going forward.
 - `docs/SETUP.md` now marks Linux VM Monero as the required funded-swap path and
@@ -535,6 +543,10 @@ Operations artifacts:
 
 ## Remaining Blockers
 
+- Historical Starknet RPC provider-token exposure: current tracked files are
+  clean, but old reachable commits still contain token-bearing provider URL
+  locations. Rotate/revoke the affected provider key and update only local/VM
+  operator config before pushing or handing off this branch.
 - Automatic lock discovery: factory/registry contract code, registry event
   decoding, relayer discovery config, focused tests, Sepolia factory deployment,
   factory-created lock deployment, discovery dry-run, and VM live Monero claim

@@ -54,6 +54,7 @@ Testnet-ready prototype implementation of a trustless atomic swap protocol enabl
 | **External Audit** | 🔄 Pending | Required before mainnet |
 
 **Production Blockers:**
+- ⬜ Rotate/revoke historical Starknet RPC provider key exposure before public push or production handoff
 - ⬜ Configure real alert webhook/paging and get independent operator handoff signoff
 - ⬜ External security audit
 
@@ -122,7 +123,10 @@ python3 tools/generate_deploy_calldata.py \
   --amount ...
 ```
 
-See [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md) for the current testnet readiness checklist and the remaining blockers before mainnet.
+See [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md) for the
+current testnet readiness checklist and the remaining blockers before mainnet.
+See [docs/SECRET_ROTATION_RUNBOOK.md](docs/SECRET_ROTATION_RUNBOOK.md) before
+pushing or handing off a branch with historical RPC-provider exposure.
 
 ### Run Tests
 

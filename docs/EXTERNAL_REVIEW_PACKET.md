@@ -38,7 +38,9 @@ Review these surfaces first:
 
 - Rotate any Starknet RPC provider key that was ever committed in historical
   testnet rehearsal defaults. The latest tree removes tracked provider tokens,
-  but history should be treated as exposed.
+  but history should be treated as exposed. Use
+  `docs/SECRET_ROTATION_RUNBOOK.md` and attach the redacted
+  `tools/check_secret_hygiene.py --history --report-only` output as evidence.
 - Run a second-operator handoff drill using
   `ops/claim-relayer/claim-relayer-handoff-packet.py` and
   `ops/claim-relayer/verify-handoff-packet.py --require-artifact`.
@@ -52,6 +54,7 @@ Run these from the repository root unless noted.
 ```bash
 git status --short --branch
 python3 tools/check_secret_hygiene.py
+python3 tools/check_secret_hygiene.py --history --report-only
 git diff --check
 
 cd cairo
@@ -111,3 +114,5 @@ For a handoff packet generated inside the VM:
   `docs/RELAYER_OPERATIONS.md`.
 - Handoff process:
   `docs/OPERATOR_HANDOFF.md`.
+- Secret rotation:
+  `docs/SECRET_ROTATION_RUNBOOK.md`.
