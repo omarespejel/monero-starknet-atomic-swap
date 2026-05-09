@@ -23,6 +23,10 @@ require() {
   }
 }
 
+tmpfile() {
+  mktemp "${TMPDIR:-/tmp}/$1.XXXXXX"
+}
+
 parse_json_field() {
   local file="$1"
   local command="$2"
@@ -102,14 +106,14 @@ echo "Lock until: ${LOCK_UNTIL:-default}"
 
 cd "$ROOT_DIR/cairo"
 
-DEPLOY_LOG="$(mktemp /tmp/atomic-sncast-deploy.XXXXXX.jsonl)"
+DEPLOY_LOG="$(tmpfile atomic-sncast-deploy)"
 
 if [ -n "$CLASS_HASH_OVERRIDE" ]; then
   CLASS_HASH="$CLASS_HASH_OVERRIDE"
   DECLARE_TX=""
 else
   scarb build
-  DECLARE_LOG="$(mktemp /tmp/atomic-sncast-declare.XXXXXX.jsonl)"
+  DECLARE_LOG="$(tmpfile atomic-sncast-declare)"
   sncast --json --accounts-file "$SNCAST_ACCOUNTS_FILE" --account "$SNCAST_ACCOUNT" --wait \
     declare --url "$RPC_URL" --contract-name AtomicLock | tee "$DECLARE_LOG"
 
@@ -118,17 +122,21 @@ else
 fi
 
 cd "$ROOT_DIR"
-CALldata_PATH="$(mktemp /tmp/atomic-constructor-calldata.XXXXXX.txt)"
-LOCK_UNTIL_ARGS=()
+CALldata_PATH="$(tmpfile atomic-constructor-calldata)"
 if [ -n "$LOCK_UNTIL" ]; then
-  LOCK_UNTIL_ARGS=(--lock-until "$LOCK_UNTIL")
+  python3 tools/generate_deploy_calldata.py \
+    --network "$NETWORK" \
+    --lock-until "$LOCK_UNTIL" \
+    --depositor "${DEPOSITOR:-0x0}" \
+    --token "$TOKEN" \
+    --amount "$AMOUNT" > "$CALldata_PATH"
+else
+  python3 tools/generate_deploy_calldata.py \
+    --network "$NETWORK" \
+    --depositor "${DEPOSITOR:-0x0}" \
+    --token "$TOKEN" \
+    --amount "$AMOUNT" > "$CALldata_PATH"
 fi
-python3 tools/generate_deploy_calldata.py \
-  --network "$NETWORK" \
-  "${LOCK_UNTIL_ARGS[@]}" \
-  --depositor "${DEPOSITOR:-0x0}" \
-  --token "$TOKEN" \
-  --amount "$AMOUNT" > "$CALldata_PATH"
 
 cd "$ROOT_DIR/cairo"
 sncast --json --accounts-file "$SNCAST_ACCOUNTS_FILE" --account "$SNCAST_ACCOUNT" --wait \
@@ -144,8 +152,8 @@ CLAIMABLE_AFTER=""
 
 if [ "${ATOMIC_SWAP_DEPOSIT:-0}" = "1" ]; then
   read -r AMOUNT_LOW AMOUNT_HIGH <<< "$(u256_parts "$AMOUNT")"
-  APPROVE_LOG="$(mktemp /tmp/atomic-sncast-approve.XXXXXX.jsonl)"
-  DEPOSIT_LOG="$(mktemp /tmp/atomic-sncast-deposit.XXXXXX.jsonl)"
+  APPROVE_LOG="$(tmpfile atomic-sncast-approve)"
+  DEPOSIT_LOG="$(tmpfile atomic-sncast-deposit)"
 
   sncast --json --accounts-file "$SNCAST_ACCOUNTS_FILE" --account "$SNCAST_ACCOUNT" --wait \
     invoke --url "$RPC_URL" --contract-address "$TOKEN" --function approve \
@@ -159,7 +167,7 @@ fi
 
 if [ "${ATOMIC_SWAP_REVEAL:-0}" = "1" ]; then
   read -r -a SECRET_CALLDATA <<< "$(secret_bytearray_calldata "$SECRET_HEX")"
-  REVEAL_LOG="$(mktemp /tmp/atomic-sncast-reveal.XXXXXX.jsonl)"
+  REVEAL_LOG="$(tmpfile atomic-sncast-reveal)"
   sncast --json --accounts-file "$SNCAST_ACCOUNTS_FILE" --account "$SNCAST_ACCOUNT" --wait \
     invoke --url "$RPC_URL" --contract-address "$CONTRACT_ADDRESS" --function reveal_secret \
     --calldata "${SECRET_CALLDATA[@]}" | tee "$REVEAL_LOG"

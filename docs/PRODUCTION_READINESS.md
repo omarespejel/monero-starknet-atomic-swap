@@ -261,6 +261,76 @@ Operations artifacts:
     owned by `atomic-swap:atomic-swap` with `0600` permissions.
   - both installed units remained `disabled`, and only the primary VM wallet RPC
     on `127.0.0.1:38090` was listening after the dry-run.
+- VM systemd live-mode rehearsal succeeded with a fresh Sepolia STRK lock and a
+  fresh stagenet-funded Monero swap output:
+  - AtomicLock contract:
+    `0x003b8269c53e2844c2d121894758123897f5e4e6bf24ccbf91b7a2e13d592673`
+  - class hash:
+    `0x01bb600e297a2c5daf1a0910221e69c6fe8531b4b35d377faf34a7ca41155750`
+  - STRK token:
+    `0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d`
+  - amount:
+    `100000000000000`
+  - deploy tx:
+    `0x07cd66dbba27a27e9a7d38b27bfc8888866baf079b7979eb796cefc04d90f878`
+  - approve tx:
+    `0x0149e34c91c8dde1102811aeea7b5520a8b751fa7b41ff018751be7f188780a9`
+  - deposit tx:
+    `0x0310cf32f1361c5100f15b7c088c632693b8c415884adcb9573b139ad09a0531`
+  - reveal tx:
+    `0x02a55bf0080b2ff5ace56020bb4468481caba0d3caedfe03a9360b6255a12200`
+  - reveal receipt:
+    `execution_status=SUCCEEDED`, `finality_status=ACCEPTED_ON_L2`,
+    block `9570938`
+  - Starknet token claimable after:
+    `2026-05-09T09:07:47Z`
+  - reveal event id:
+    `9570938:0x2a55bf0080b2ff5ace56020bb4468481caba0d3caedfe03a9360b6255a12200:SecretRevealed`
+  - post-reveal state before claim:
+    `is_secret_revealed=true`, `is_unlocked=false`, contract STRK balance
+    `100000000000000`
+  - derived claim address funded:
+    `59UGws6pmRqExoZcRJaKNyJLSdcDVzUhGNvNW6LNhSZJicFf6YC5xAT3CmeQtPuKS1ZHpNFveYE3PfW4TWTPV4Es6NwPFMf`
+  - funding tx:
+    `892bc303ebb60e9e179b7adfef1f1e1e5bb5647edc5f2a74fa11bfa42a5930ec`,
+    amount `5000000000` atomic units (`0.005` stagenet XMR), fee
+    `48320000` atomic units, mined at block `2115327`, unlocked at
+    `11` confirmations.
+  - supervised claim wallet-rpc:
+    `monero-claim-wallet-rpc.service` ran under the `atomic-swap` system user
+    on `127.0.0.1:38091`.
+  - supervised relayer:
+    `monero-claim-relayer.service` ran without `--dry-run` and exited with
+    `Result=success`, `ExecMainCode=0`, `ExecMainStatus=0`,
+    `ActiveState=inactive`, `SubState=dead`.
+  - live claim pass:
+    `latest_block=9571563`, `safe_tip=9571562`,
+    `from_block=9570929`, `to_block=9570948`, `events_seen=1`,
+    `reveals_claimed=1`, `events_skipped=0`,
+    `enabled_locks=1`, `succeeded_locks=1`, `failed_locks=0`.
+  - sweep tx:
+    `601d913941e88dde5e3856fe51741ed3d711cdea7e281b328af8ed082d3c0401`,
+    amount `4966510000` atomic units, fee `33490000` atomic units.
+  - first mined sweep check: block `2115341`, `confirmations=1`,
+    `double_spend_seen=false`, `locked=true` under the normal Monero recipient
+    maturity window.
+  - systemd cursor:
+    `/var/lib/atomic-swap/claim-relayer/cursors/sepolia-strk-systemd-live-2026-05-09.json`
+    persisted `next_block=9570949` and the processed `SecretRevealed` event id,
+    owned by `atomic-swap:atomic-swap` with `0600` permissions.
+  - post-claim cleanup check: no generated `swap_*` wallet files remained in
+    `/home/atomic-swap/monero-wallets`.
+  - after the proof, `monero-claim-wallet-rpc.service` was stopped and only the
+    primary VM wallet RPC on `127.0.0.1:38090` remained listening.
+  - follow-up heartbeat `claim-fresh-sepolia-strk-atomic-lock` is scheduled to
+    claim the test STRK after the Starknet `claimable_after` time.
+- Live-mode operations fixes from the rehearsal:
+  - `monero-claim-wallet-rpc.service` now executes a root-owned
+    `/opt/monero-starknet-atomic-swap/monero-bin/monero-wallet-rpc` binary
+    instead of a symlink into a human user's home directory.
+  - `/home/atomic-swap/.shared-ringdb` is created and allowed in
+    `ReadWritePaths`, avoiding the non-fatal Monero ringdb initialization
+    warning under `ProtectHome=read-only`.
 - `docs/RELAYER_OPERATIONS.md` now documents install shape, dry-run-first
   startup, cursor backup/restore rules, stuck wallet-rpc triage, and health
   checks.
@@ -269,12 +339,6 @@ Operations artifacts:
 
 ## Remaining Blockers
 
-- Supervised live-mode relayer rehearsal: service code, inventory templates,
-  systemd units, cursor rules, runbook, VM install, and supervised systemd
-  dry-run are done. The remaining proof is a fresh stagenet-funded swap output
-  plus a fresh Starknet reveal, claimed by `monero-claim-relayer.service`
-  without `--dry-run` while `monero-claim-wallet-rpc.service` is supervised by
-  systemd.
 - Automatic lock discovery: current production path is an explicit lock
   inventory. Fully automatic discovery still needs a factory/registry contract
   that emits AtomicLock addresses and off-chain metadata for the matching

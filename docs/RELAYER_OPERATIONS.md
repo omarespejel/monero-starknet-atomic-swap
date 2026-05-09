@@ -57,6 +57,8 @@ id atomic-swap || sudo useradd --system --create-home --shell /usr/sbin/nologin 
 sudo install -d -o atomic-swap -g atomic-swap /etc/atomic-swap
 sudo install -d -o atomic-swap -g atomic-swap /var/lib/atomic-swap/claim-relayer/cursors
 sudo install -d -o atomic-swap -g atomic-swap /var/log/atomic-swap
+sudo install -d -o atomic-swap -g atomic-swap /home/atomic-swap/.shared-ringdb
+sudo install -d -o root -g root /opt/monero-starknet-atomic-swap/monero-bin
 
 sudo cp ops/claim-relayer/claim-relayer.config.example.json \
   /etc/atomic-swap/claim-relayer.config.json
@@ -71,6 +73,16 @@ sudo cp ops/systemd/monero-claim-wallet-rpc.env.example \
   /etc/atomic-swap/monero-claim-wallet-rpc.env
 sudo cp ops/systemd/monero-claim-relayer.service /etc/systemd/system/
 sudo systemctl daemon-reload
+```
+
+Install `monero-wallet-rpc` into the root-owned `/opt` path used by the
+systemd unit. Do not point the service at a symlink into a human user's home
+directory; the `atomic-swap` system user may not be able to traverse it under
+normal home-directory permissions.
+
+```bash
+sudo install -m 0755 -o root -g root /path/to/monero-wallet-rpc \
+  /opt/monero-starknet-atomic-swap/monero-bin/monero-wallet-rpc
 ```
 
 Build from the checked-out repo inside the VM:
