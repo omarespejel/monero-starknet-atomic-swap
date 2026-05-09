@@ -500,6 +500,10 @@ Operations artifacts:
     `RELAYER_ALERT_FILE`; the VM payload captured
     `relayer=success/inactive/dead` and
     `wallet_rpc=success/inactive/dead` without sending network traffic.
+  - VM alert unit sync and manual file-sink rehearsal passed on
+    `2026-05-09T15:02:47Z`: `monero-claim-relayer-alert@manual-rehearsal`
+    exited with `Result=success`, `ExecMainStatus=0`, and appended the expected
+    JSON payload to `/var/log/atomic-swap/claim-relayer-alerts.jsonl`.
   - validation: `bash -n` passed locally; VM run with one-shot rehearsal
     services marked inactive passed with `enabled_discoveries=1`,
     `cursor_count=3`, recent journal clean, and fresh cursor age under the

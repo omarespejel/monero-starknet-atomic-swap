@@ -210,7 +210,9 @@ set `RELAYER_EXPECT_ACTIVE=0` or `WALLET_RPC_EXPECT_ACTIVE=0` in
 operator alerting endpoint. For local rehearsals without a webhook, set
 `RELAYER_ALERT_FILE=/var/log/atomic-swap/claim-relayer-alerts.jsonl` and invoke
 `claim-relayer-alert.sh <failed-unit>`; the script appends the exact JSON
-payload without sending it over the network.
+payload without sending it over the network. The alert service is hardened with
+`ProtectSystem=strict` and allows writes only to `/var/log/atomic-swap` for the
+local rehearsal sink.
 
 Configure the production webhook without putting it in shell history:
 
