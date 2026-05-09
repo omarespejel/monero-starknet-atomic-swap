@@ -442,6 +442,17 @@ Operations artifacts:
   presence/mode without reading or hashing secret contents. If the installed VM
   tree is not a git checkout, the packet can include installed binary checksums
   with `--artifact`.
+- `ops/claim-relayer/verify-handoff-packet.py` verifies the receiver-side
+  packet shape before takeover. It rejects malformed packets, invalid cursor
+  metadata, missing required artifact checksums when `--require-artifact` is
+  set, obvious unredacted token-bearing URLs, and unsafe
+  `claim-relayer.secrets` modes.
+  - validation: local Python compile passed, a generated example handoff packet
+    passed verifier checks, and the script was installed into the Monero VM.
+    VM verification with `--require-artifact` passed against
+    `/tmp/claim-relayer-handoff-verify.json`; the packet contained one expected
+    warning for the installed non-git `/opt` tree and included the relayer
+    artifact checksum.
   - VM validation against `/etc/atomic-swap/claim-relayer.config.json` succeeded:
     the Alchemy RPC key was redacted to `<redacted>`, warnings contained only
     `repo_root did not resolve to a git checkout; verify artifact checksums`,

@@ -49,6 +49,9 @@ On the VM:
 
 ```bash
 python3 -m json.tool /tmp/claim-relayer-handoff.json >/dev/null
+/opt/monero-starknet-atomic-swap/ops/claim-relayer/verify-handoff-packet.py \
+  --require-artifact \
+  /tmp/claim-relayer-handoff.json
 python3 - <<'PY'
 import json
 print(json.load(open("/tmp/claim-relayer-handoff.json"))["warnings"])

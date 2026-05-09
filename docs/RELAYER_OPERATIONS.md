@@ -34,6 +34,9 @@ Use the templates in `ops/claim-relayer/` and `ops/systemd/`.
 For operator takeover, use `docs/OPERATOR_HANDOFF.md`.
 Use `ops/claim-relayer/claim-relayer-handoff-packet.py` to generate a redacted
 handoff packet from the VM config and cursor state.
+Use `ops/claim-relayer/verify-handoff-packet.py` on the receiving side before a
+takeover; pass `--require-artifact` for production-like handoffs so the deployed
+relayer binary checksum is always present.
 
 ## Config Model
 
@@ -94,6 +97,8 @@ sudo cp ops/claim-relayer/claim-relayer-healthcheck.sh \
 sudo cp ops/claim-relayer/claim-relayer-alert.sh \
   /opt/monero-starknet-atomic-swap/ops/claim-relayer/
 sudo cp ops/claim-relayer/claim-relayer-handoff-packet.py \
+  /opt/monero-starknet-atomic-swap/ops/claim-relayer/
+sudo cp ops/claim-relayer/verify-handoff-packet.py \
   /opt/monero-starknet-atomic-swap/ops/claim-relayer/
 
 sudo cp ops/systemd/monero-claim-wallet-rpc.service /etc/systemd/system/

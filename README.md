@@ -48,14 +48,14 @@ Production-grade prototype implementation of a trustless atomic swap protocol en
 | **Core Protocol** | ✅ Complete | Two-party keys, DLEQ proofs, scalar compatibility |
 | **Cairo Contract** | ✅ Complete | DLEQ verification, MSM checks, reentrancy protection |
 | **Rust Library** | ✅ Complete | Key generation, proof generation, Monero integration |
-| **Tests** | ✅ Passing | Cairo full suite: 109 passed, 7 ignored; targeted Rust suites passing |
-| **Starknet Signing** | ⚠️ TS path only | Use `scripts/deploy.ts`/starknet.js for signed transactions; Rust macOS placeholder signing is disabled |
-| **Deployment** | ⚠️ Testnet-ready tooling | Calldata builder and TS deploy scripts build cleanly; use funded testnet account |
+| **Tests** | ✅ Passing | Cairo full suite: 114 passed, 0 ignored; targeted Rust/relayer suites passing |
+| **Starknet Signing** | ⚠️ Maintained signer only | Use `sncast`, `scripts/deploy.ts`, or starknet.js for signed transactions; Rust placeholder signing is disabled |
+| **Deployment** | ⚠️ Sepolia rehearsed | Sepolia deploy/state/reveal/claim/refund paths rehearsed; no mainnet deployment |
 | **External Audit** | 🔄 Pending | Required before mainnet |
 
 **Production Blockers:**
-- ⬜ Live Sepolia deployment/transaction rehearsal with funded testnet account
-- ⬜ Live Monero stagenet swap rehearsal with funded stagenet wallet
+- ⬜ Claim the remaining factory-created Sepolia STRK lock after its `claimable_after` time
+- ⬜ Configure real alert webhook/paging and run a second-operator handoff drill
 - ⬜ External security audit
 
 ---
