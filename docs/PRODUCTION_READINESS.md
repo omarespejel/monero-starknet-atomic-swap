@@ -420,8 +420,19 @@ Operations artifacts:
     `/home/atomic-swap/monero-wallets`.
   - after the proof, `monero-claim-wallet-rpc.service` was stopped and only the
     primary VM wallet RPC on `127.0.0.1:38090` remained listening.
-  - heartbeat `claim-fresh-sepolia-strk-atomic-lock` was updated to claim this
-    factory-created STRK lock after its Starknet `claimable_after` time.
+  - Starknet STRK claim after `claimable_after`:
+    `0x03600762d468555ef180fa417f5f2113e3ae698da67f16e4c85f727b18549ba6`,
+    `execution_status=SUCCEEDED`, `finality_status=ACCEPTED_ON_L2`,
+    block `9575216`.
+  - post-claim Starknet validation:
+    `is_secret_revealed=true`, `is_unlocked=true`, contract STRK balance `0`.
+  - claim receipt included AtomicLock `Unlocked`
+    (`0x0090fc4683624cfc3884e9d8de5eca132f2d0ec062aff75d43c0465d5ceeab24`)
+    and `TokensClaimed`
+    (`0x03fb7926d81fdd796588df95e47590b4d9b2604ee11994401f1ad88e39cb95cb`)
+    events.
+  - heartbeat `claim-fresh-sepolia-strk-atomic-lock` was deleted after the
+    successful claim; no further time-gated Starknet action is pending.
 - Live-mode operations fixes from the rehearsal:
   - `monero-claim-wallet-rpc.service` now executes a root-owned
     `/opt/monero-starknet-atomic-swap/monero-bin/monero-wallet-rpc` binary
@@ -531,9 +542,8 @@ Operations artifacts:
   production work is configuring the real alert webhook/paging destination and
   having an independent operator repeat/sign off the handoff drill with the
   redacted packet.
-- Starknet test-token finalization: the fresh live-mode STRK lock has been
-  claimed and verified on Sepolia; a follow-up heartbeat is scheduled for the
-  remaining factory-created Sepolia STRK lock after its `claimable_after` time.
+- Starknet test-token finalization: both live-mode STRK locks have been
+  claimed and verified on Sepolia.
 - External security review: required before any meaningful-value mainnet use.
 
 ## Explicit Non-Goals For This Stage

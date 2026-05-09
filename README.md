@@ -54,7 +54,6 @@ Testnet-ready prototype implementation of a trustless atomic swap protocol enabl
 | **External Audit** | 🔄 Pending | Required before mainnet |
 
 **Production Blockers:**
-- ⬜ Claim the remaining factory-created Sepolia STRK lock after its `claimable_after` time
 - ⬜ Configure real alert webhook/paging and get independent operator handoff signoff
 - ⬜ External security audit
 
