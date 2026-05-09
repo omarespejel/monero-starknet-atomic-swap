@@ -172,8 +172,8 @@ Minimum checks for an on-call rotation:
 
 ## Remaining Production Gap
 
-Automatic discovery now exists as a factory/registry event path and has a
-Sepolia dry-run proof against factory
+Automatic discovery now exists as a factory/registry event path and has both a
+Sepolia dry-run proof and a VM live Monero claim proof against factory
 `0x053cb8c9c1590253eabf1fdd88ac6db975c5c91f4705c531b8c664a66b2e4c31`.
-Before using it for meaningful value, rehearse a factory-discovered live claim
-inside the Monero VM and add monitoring for registry scan failures.
+Before using it for meaningful value, add monitoring for registry scan failures
+and rehearse the same path with production-like operator handoff.

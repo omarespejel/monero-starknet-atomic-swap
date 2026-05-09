@@ -356,6 +356,67 @@ Operations artifacts:
     primary VM wallet RPC on `127.0.0.1:38090` remained listening.
   - follow-up heartbeat `claim-fresh-sepolia-strk-atomic-lock` is scheduled to
     claim the test STRK after the Starknet `claimable_after` time.
+- VM systemd live-mode rehearsal also succeeded through the new factory
+  discovery path:
+  - factory contract:
+    `0x053cb8c9c1590253eabf1fdd88ac6db975c5c91f4705c531b8c664a66b2e4c31`
+  - factory-created AtomicLock:
+    `0x04eaeaa14eddb36fe12b740b4837fc038f928a21b6fce1a20cb086e8f67bb7ea`
+  - registry metadata:
+    `partial_key_id=factorylive1`, `restore_height=2115351`,
+    `monero_network=stagenet`, `metadata_hash=0x2`
+  - `deploy_lock` tx:
+    `0x0363aef8cef3b90254b19748b2df5c033b3561889650945cedc9f1fe37aa679e`,
+    block `9572346`
+  - approve tx:
+    `0x03747e9c26e4dcebc0d1ec7cf335b227c514e09472a4d2f49d3419a4afa211bd`
+  - deposit tx:
+    `0x00fe3092e1d25a0fd0c7736abf55cc87cda3ce9052f36d8aed3994b009f9c5b6`
+  - reveal tx:
+    `0x01c50ece662542eed45d4401b0dfec1d1047a2dbd2093f361df8ed56563d0ff8`,
+    block `9572395`
+  - Starknet token claimable after:
+    `2026-05-09T10:09:49Z`
+  - post-reveal state before token claim:
+    `is_secret_revealed=true`, `is_unlocked=false`, contract STRK balance
+    `100000000000000`
+  - derived claim address funded:
+    `529P2hogkScV4QqzFhUtm9RtLYe6chC6b3cTNGG4gLKQK2CeTHnApZTMrxkHkus4RH3apPkFca7EeRUGHMvyP4Jf1wRnyhU`
+  - funding tx:
+    `3e93a79a3353f1faa7291750422fe305bf8942710c231d7e8623a714e08fda81`,
+    amount `5000000000` atomic units (`0.005` stagenet XMR), fee
+    `48210000` atomic units, mined at block `2115353`, unlocked at
+    `11` confirmations.
+  - supervised claim wallet-rpc:
+    `monero-claim-wallet-rpc.service` ran under the `atomic-swap` system user
+    on `127.0.0.1:38091`.
+  - supervised discovery relayer:
+    `monero-claim-relayer.service` ran without `--dry-run`, discovered the
+    lock from `AtomicLockRegistered`, and exited with `Result=success`,
+    `ExecMainCode=0`, `ExecMainStatus=0`, `ActiveState=inactive`,
+    `SubState=dead`.
+  - live discovery claim pass:
+    `latest_block=9572764`, `safe_tip=9572763`,
+    `from_block=9572366`, `to_block=9572465`, `events_seen=1`,
+    `reveals_claimed=1`, `events_skipped=0`,
+    `enabled_locks=1`, `succeeded_locks=1`, `failed_locks=0`.
+  - reveal event id:
+    `9572395:0x1c50ece662542eed45d4401b0dfec1d1047a2dbd2093f361df8ed56563d0ff8:SecretRevealed`
+  - sweep tx:
+    `29da7541963a473bb1f3f45953c6bc4fd825c795c6887916ac4eb40ce733e884`,
+    amount `4966510000` atomic units, fee `33490000` atomic units.
+  - first mined sweep check: block `2115364`, `confirmations=1`,
+    `double_spend_seen=false`, `locked=true` under the normal Monero recipient
+    maturity window.
+  - systemd cursor:
+    `/var/lib/atomic-swap/claim-relayer/cursors/sepolia-factory-live-2026-05-09_0x4eaeaa14eddb36fe12b740b4837fc038f928a21b6fce1a20cb086e8f67bb7ea.json`
+    persisted `next_block=9572466` and the processed `SecretRevealed` event id.
+  - post-claim cleanup check: no generated `swap_*` wallet files remained in
+    `/home/atomic-swap/monero-wallets`.
+  - after the proof, `monero-claim-wallet-rpc.service` was stopped and only the
+    primary VM wallet RPC on `127.0.0.1:38090` remained listening.
+  - heartbeat `claim-fresh-sepolia-strk-atomic-lock` was updated to claim this
+    factory-created STRK lock after its Starknet `claimable_after` time.
 - Live-mode operations fixes from the rehearsal:
   - `monero-claim-wallet-rpc.service` now executes a root-owned
     `/opt/monero-starknet-atomic-swap/monero-bin/monero-wallet-rpc` binary
@@ -373,9 +434,12 @@ Operations artifacts:
 
 - Automatic lock discovery: factory/registry contract code, registry event
   decoding, relayer discovery config, focused tests, Sepolia factory deployment,
-  factory-created lock deployment, and discovery dry-run proof are done.
-  Remaining proof is an end-to-end factory-discovered live claim inside the
-  Monero VM, plus monitoring for registry scan failures.
+  factory-created lock deployment, discovery dry-run, and VM live Monero claim
+  proof are done. Remaining production work is monitoring/alerting for registry
+  scan failures and operational runbook hardening.
+- Starknet test-token finalization: follow-up heartbeat is scheduled to call
+  `claim_tokens` for the remaining revealed Sepolia STRK locks after their
+  `claimable_after` times.
 - Monero transaction finalization: `rust/src/monero_full.rs` no longer returns
   placeholder transaction hex. Real spends must go through wallet-rpc/Monero
   transaction tooling.
