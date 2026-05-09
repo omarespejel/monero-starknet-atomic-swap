@@ -148,6 +148,10 @@ Stored in contract as compressed Edwards point (32 bytes) with sqrt hint for dec
 - `V = (v_a + v_b)·G`: Combined view public key
 - `x = s_a + s_b`: Full spend key (recovered after `s_b` revealed)
 
+View-share scalars (`v_a`, `v_b`, and `v_a + v_b`) are not public quote data.
+They let an operator scan the Monero output history, so artifacts must keep them
+under local secret sections only.
+
 **Security Properties**:
 - Neither party can spend alone (requires both shares)
 - Zero-scalar rejection (P0 audit fix)

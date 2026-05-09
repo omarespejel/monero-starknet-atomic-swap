@@ -5,7 +5,7 @@
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT as G;
 use xmr_secret_gen::crypto::scalar_compat::verify_scalar_bn254_compatible;
 use xmr_secret_gen::monero::two_party_keys::{
-    recover_spend_key, AliceKeys, AlicePublicData, BobKeys, BobPublicData, SharedOutput,
+    recover_spend_key, AliceKeys, AlicePublicData, BobKeys, SharedOutput,
 };
 
 // ============================================================
@@ -172,17 +172,36 @@ fn test_serialization() {
     assert_eq!(alice.public_data().S_a, restored.S_a);
 }
 
-/// Test SharedOutput::from_public
+/// Test public shared output derivation
 #[test]
-fn test_shared_from_public() {
+fn test_shared_public_from_public_data() {
     let alice = AliceKeys::generate();
     let bob = BobKeys::generate();
 
     let direct = SharedOutput::new(&alice, &bob);
-    let from_public = SharedOutput::from_public(&alice.public_data(), &bob.public_data()).unwrap();
+    let from_public =
+        SharedOutput::public_from_public_data(&alice.public_data(), &bob.public_data()).unwrap();
 
     assert_eq!(direct.S, from_public.S);
     assert_eq!(direct.V, from_public.V);
+}
+
+#[test]
+fn test_public_data_serialization_excludes_view_scalars() {
+    let alice = AliceKeys::generate();
+    let bob = BobKeys::generate();
+
+    let alice_json = serde_json::to_value(alice.public_data()).unwrap();
+    let bob_json = serde_json::to_value(bob.public_data()).unwrap();
+
+    assert!(alice_json.get("S_a").is_some());
+    assert!(alice_json.get("V_a").is_some());
+    assert!(alice_json.get("v_a").is_none());
+
+    assert!(bob_json.get("S_b").is_some());
+    assert!(bob_json.get("V_b").is_some());
+    assert!(bob_json.get("hashlock").is_some());
+    assert!(bob_json.get("v_b").is_none());
 }
 
 /// Test AlicePublicData validation (P2 audit fix)
@@ -219,17 +238,6 @@ fn test_bob_public_data_validation() {
         public_data.validate().is_ok(),
         "Valid BobPublicData should pass validation"
     );
-
-    // Invalid point should fail
-    // Use a point that's guaranteed to not decompress (Ed25519 has specific format)
-    // Pattern: all 0xFF except last byte = 0 (invalid sign bit + invalid y-coordinate)
-    let mut invalid = public_data.clone();
-    let mut invalid_bytes = [0xFFu8; 32];
-    invalid_bytes[31] = 0x00; // Invalid compressed point format
-    invalid.S_b = invalid_bytes;
-    // This should fail decompression (not a valid compressed Edwards point)
-    // Note: Some invalid patterns might still decompress (edge case), but zero hashlock always fails
-    // So we primarily test zero hashlock which is guaranteed to fail
 
     // Zero hashlock should fail
     let mut zero_hashlock = public_data.clone();
@@ -298,7 +306,8 @@ fn test_malicious_alice_attack_prevention() {
     fake_alice_data.S_a = fake_s_a_point.compress().to_bytes();
 
     // Try to create shared output with fake data
-    let fake_shared = SharedOutput::from_public(&fake_alice_data, &bob.public_data()).unwrap();
+    let fake_shared =
+        SharedOutput::public_from_public_data(&fake_alice_data, &bob.public_data()).unwrap();
 
     // Fake shared output should produce DIFFERENT address
     assert_ne!(

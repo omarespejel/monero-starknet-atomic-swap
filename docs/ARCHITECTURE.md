@@ -117,6 +117,11 @@ Uses the Serai DEX pattern (CypherStack audited): `x = s_a + s_b` where:
 - Combined keys: `S = (s_a + s_b)·G`, `V = (v_a + v_b)·G`
 - Full spend key: `x = s_a + s_b` (recovered after `s_b` revealed)
 
+Only the public curve points `S_a`, `V_a`, `S_b`, and `V_b` belong in public
+key-exchange data. View-share scalars and the combined view scalar are
+wallet-scanning material and must stay in local secret artifacts or an explicit
+operator handoff.
+
 **Security Properties**:
 - Neither party can spend alone (requires both shares)
 - Zero-scalar rejection (P0 audit fix)

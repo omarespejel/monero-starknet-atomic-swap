@@ -84,13 +84,17 @@ fn generate_integration_vectors() {
                 "alice_public": {
                     "S_a": hex::encode(alice.S_a.compress().to_bytes()),
                     "V_a": hex::encode(alice.V_a.compress().to_bytes()),
+                },
+                "alice_private_local": {
                     "v_a": hex::encode(alice.view_share().to_bytes()),
                 },
                 "bob_public": {
                     "S_b": hex::encode(bob.S_b.compress().to_bytes()),
                     "V_b": hex::encode(bob.V_b.compress().to_bytes()),
-                    "v_b": hex::encode(bob.view_share().to_bytes()),
                     "hashlock": hex::encode(bob.hashlock()),
+                },
+                "bob_private_local": {
+                    "v_b": hex::encode(bob.view_share().to_bytes()),
                 },
                 "shared_address": hex::encode(shared.S.compress().to_bytes()),
             },

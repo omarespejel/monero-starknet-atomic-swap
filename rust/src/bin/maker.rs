@@ -208,15 +208,15 @@ async fn main() -> Result<()> {
     println!("\n💾 Step 4: Saving swap state...");
     let swap_state = json!({
         "role": "maker",
-        "artifact_version": 2,
+        "artifact_version": 3,
         "protocol": "two_party_key_generation_v1",
         "secret_warning": "local-only reveal preimage; do not share before Starknet claim",
+        "privacy_warning": "view-share scalars and shared view scalar are local wallet-scanning material; do not share them as public quote data",
         "secret_hex": swap_secret.secret_hex,
         "monero_key_exchange": {
             "alice_public": {
                 "spend_share_point": hex::encode(alice_public.S_a),
                 "view_share_point": hex::encode(alice_public.V_a),
-                "view_share_scalar": hex::encode(alice_public.v_a),
             },
             "alice_private_local": {
                 "spend_share_scalar": hex::encode(alice_keys.spend_share().to_bytes()),
@@ -225,12 +225,16 @@ async fn main() -> Result<()> {
             "bob_public": {
                 "spend_share_point": hex::encode(bob_public.S_b),
                 "view_share_point": hex::encode(bob_public.V_b),
-                "view_share_scalar": hex::encode(bob_public.v_b),
                 "hashlock": hex::encode(bob_public.hashlock),
+            },
+            "bob_private_local": {
+                "view_share_scalar": hex::encode(bob_keys.view_share().to_bytes()),
             },
             "shared_output": {
                 "spend_public_key": hex::encode(shared_output.S.compress().to_bytes()),
                 "view_public_key": hex::encode(shared_output.V.compress().to_bytes()),
+            },
+            "shared_view_material_local": {
                 "view_scalar": hex::encode(shared_output.v.to_bytes()),
             },
         },

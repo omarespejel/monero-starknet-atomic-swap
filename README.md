@@ -152,7 +152,7 @@ python3 tools/readiness_preflight.py --output /tmp/atomic-swap-readiness-preflig
 
 ### Protocol Flow
 
-1. **Alice (Maker)** generates spend share `s_a` and view share `v_a`, publishes `S_a = s_a·G`, `V_a = v_a·G`
+1. **Alice (Maker)** generates spend share `s_a` and view share `v_a`, shares public points `S_a = s_a·G`, `V_a = v_a·G`, and keeps `v_a` local unless an explicit wallet-scanning handoff needs it
 2. **Bob (Taker)** generates spend share `s_b`, computes hashlock `H = SHA-256(s_b)`, creates DLEQ proof binding `H` to `S_b = s_b·G`
 3. **Bob** deploys AtomicLock contract on Starknet with hashlock, adaptor point, and DLEQ proof
 4. **Bob** reveals `s_b` on Starknet when ready, unlocking tokens

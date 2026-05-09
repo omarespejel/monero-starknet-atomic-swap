@@ -24,4 +24,5 @@ pub use key_splitting::SwapKeyPair;
 pub use transaction::claim_monero_after_reveal;
 pub use two_party_keys::{
     recover_spend_key, AliceKeys, AlicePublicData, BobKeys, BobPublicData, SharedOutput,
+    SharedPublicOutput,
 };

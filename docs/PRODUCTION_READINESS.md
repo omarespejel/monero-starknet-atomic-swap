@@ -120,7 +120,9 @@ Maker artifacts now derive their Starknet DLEQ package from the same raw Bob
 reveal bytes used by the two-party Monero key path, and stdout secret printing
 is gated behind `--print-secret`. DLEQ proof generation no longer logs raw or
 canonical secret bytes when scalar reduction changes the reveal preimage. The
-artifact writer forces `0600` permissions on Unix.
+artifact writer forces `0600` permissions on Unix. Artifact v3 also keeps
+view-share scalars out of `alice_public`/`bob_public`; they live only in local
+secret sections because they are Monero wallet-scanning material.
 
 The taker CLI now validates but does not echo reveal secrets, and it points to
 `scripts/atomic_lock_sncast_ops.sh reveal` instead of raw placeholder invoke

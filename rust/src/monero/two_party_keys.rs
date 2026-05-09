@@ -105,22 +105,24 @@ impl AliceKeys {
         self.view_share
     }
 
-    /// Get public data for serialization (P0.2: Auditor requirement)
+    /// Get public key-exchange data for serialization (P0.2: Auditor requirement).
+    ///
+    /// This intentionally contains only public curve points. View-share scalars
+    /// are local wallet-scanning material and must not be labeled or shared as
+    /// public data.
     pub fn public_data(&self) -> AlicePublicData {
         AlicePublicData {
             S_a: self.S_a.compress().to_bytes(),
             V_a: self.V_a.compress().to_bytes(),
-            v_a: self.view_share.to_bytes(),
         }
     }
 }
 
-/// Alice's public data for serialization
+/// Alice's public key-exchange data for serialization.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct AlicePublicData {
     pub S_a: [u8; 32],
     pub V_a: [u8; 32],
-    pub v_a: [u8; 32],
 }
 
 impl AlicePublicData {
@@ -272,23 +274,25 @@ impl BobKeys {
         self.raw_secret_bytes
     }
 
-    /// Get public data for serialization (P0.2: Auditor requirement)
+    /// Get public key-exchange data for serialization (P0.2: Auditor requirement).
+    ///
+    /// This intentionally contains only public curve points plus the public
+    /// hashlock. Bob's derived view-share scalar is local wallet-scanning
+    /// material and must not be labeled or shared as public data.
     pub fn public_data(&self) -> BobPublicData {
         BobPublicData {
             S_b: self.S_b.compress().to_bytes(),
             V_b: self.V_b.compress().to_bytes(),
-            v_b: self.view_share.to_bytes(),
             hashlock: self.hashlock,
         }
     }
 }
 
-/// Bob's public data for serialization
+/// Bob's public key-exchange data for serialization.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct BobPublicData {
     pub S_b: [u8; 32],
     pub V_b: [u8; 32],
-    pub v_b: [u8; 32],
     pub hashlock: [u8; 32],
 }
 
@@ -338,6 +342,13 @@ pub struct SharedOutput {
     pub v: Scalar,
 }
 
+/// Shared public Monero output points derived from the public key exchange.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SharedPublicOutput {
+    pub S: EdwardsPoint,
+    pub V: EdwardsPoint,
+}
+
 impl SharedOutput {
     /// Create shared output from Alice and Bob keys.
     pub fn new(alice: &AliceKeys, bob: &BobKeys) -> Self {
@@ -364,8 +375,13 @@ impl SharedOutput {
         Self { S, V, v }
     }
 
-    /// Create shared output from public data (P0.2: Auditor requirement)
-    pub fn from_public(alice: &AlicePublicData, bob: &BobPublicData) -> Result<Self> {
+    /// Create public shared output points from public data (P0.2: Auditor requirement).
+    ///
+    /// The private view scalar is intentionally unavailable from public data.
+    pub fn public_from_public_data(
+        alice: &AlicePublicData,
+        bob: &BobPublicData,
+    ) -> Result<SharedPublicOutput> {
         let S_a = CompressedEdwardsY(alice.S_a)
             .decompress()
             .ok_or_else(|| anyhow::anyhow!("Invalid S_a"))?;
@@ -379,10 +395,9 @@ impl SharedOutput {
             .decompress()
             .ok_or_else(|| anyhow::anyhow!("Invalid V_b"))?;
 
-        Ok(Self {
+        Ok(SharedPublicOutput {
             S: S_a + S_b,
             V: V_a + V_b,
-            v: Scalar::from_bytes_mod_order(alice.v_a) + Scalar::from_bytes_mod_order(bob.v_b),
         })
     }
 }

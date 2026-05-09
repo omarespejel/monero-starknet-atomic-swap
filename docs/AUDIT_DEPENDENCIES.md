@@ -79,6 +79,9 @@ This codebase uses **audited cryptographic libraries** for all critical operatio
   hashlock/DLEQ package from Bob's raw reveal bytes.
 - Does not deploy, sign, or broadcast transactions. The local artifact still
   contains reveal/key-share material and must be treated as a secret file.
+- Artifact v3 keeps view-share scalars out of `alice_public`/`bob_public`; they
+  live only in local secret sections because they are Monero wallet-scanning
+  material.
 
 ---
 
