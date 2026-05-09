@@ -47,8 +47,7 @@ except ImportError:
 # Try multiple RPC endpoints for reliability
 RPC_URLS = [
     "https://starknet-sepolia.public.blastapi.io",
-    "https://api.zan.top/public/starknet-sepolia",
-    "https://starknet-sepolia.g.alchemy.com/starknet/version/rpc/v0_7/cf52O0RwFy1mEB0uoYsel",
+    "https://api.zan.top/public/starknet-sepolia/rpc/v0_10",
 ]
 RPC_URL = RPC_URLS[0]  # Default to Blast API (most reliable)
 
@@ -314,4 +313,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-

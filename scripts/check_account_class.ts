@@ -5,7 +5,7 @@
 import { RpcProvider } from "starknet";
 
 const OZ_ACCOUNT_CLASS_HASH = "0x01bd7c78bd731400989b0f6eb4f0e0b6e471f7b5ee0030f5bca87d1e4b61c0e";
-const RPC_URL = "https://api.zan.top/public/starknet-sepolia";
+const RPC_URL = "https://api.zan.top/public/starknet-sepolia/rpc/v0_10";
 
 async function main() {
   console.log("Checking Account class status on Sepolia...\n");

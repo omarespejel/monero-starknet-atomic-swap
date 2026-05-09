@@ -30,7 +30,7 @@ PRIVATE_KEY=$(cat "$KEY_FILE" | tr -d '\n')
 echo "✅ Loaded private key from $KEY_FILE"
 
 # RPC URL
-RPC_URL="${STARKNET_RPC_URL:-https://api.zan.top/public/starknet-sepolia}"
+RPC_URL="${STARKNET_RPC_URL:-https://api.zan.top/public/starknet-sepolia/rpc/v0_10}"
 echo "📡 Using RPC: $RPC_URL"
 echo ""
 

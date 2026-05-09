@@ -1,6 +1,6 @@
 {
   "defaults": {
-    "starknet_rpc": "https://starknet-sepolia.g.alchemy.com/starknet/version/rpc/v0_10/REPLACE_ME",
+    "starknet_rpc": "https://api.zan.top/public/starknet-sepolia/rpc/v0_10",
     "wallet_rpc_url": "http://127.0.0.1:38091/json_rpc",
     "daemon_rpc_url": "http://node2.monerodevs.org:38089/json_rpc",
     "wallet_dir": "/home/atomic-swap/monero-wallets",

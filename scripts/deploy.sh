@@ -7,7 +7,7 @@ set -euo pipefail
 # ============================================================================
 # Configuration
 NETWORK="${1:-sepolia}"
-RPC_URL="${STARKNET_RPC_URL:-https://api.zan.top/public/starknet-sepolia}"
+RPC_URL="${STARKNET_RPC_URL:-https://api.zan.top/public/starknet-sepolia/rpc/v0_10}"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 DEPLOY_DIR="deployments/${NETWORK}/${TIMESTAMP}"
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"

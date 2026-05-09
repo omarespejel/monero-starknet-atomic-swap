@@ -34,6 +34,6 @@ echo "After funding, deploy the account with:"
 echo "starkli account deploy \\"
 echo "  --keystore ~/.starkli-wallets/deployer/keystore.json \\"
 echo "  ~/.starkli-wallets/deployer/account.json \\"
-echo "  --rpc https://api.zan.top/public/starknet-sepolia"
+echo "  --rpc https://api.zan.top/public/starknet-sepolia/rpc/v0_10"
 echo "=========================================="
 

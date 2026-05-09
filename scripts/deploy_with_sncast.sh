@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 NETWORK="${STARKNET_NETWORK:-sepolia}"
-RPC_URL="${STARKNET_RPC_URL:-https://starknet-sepolia.g.alchemy.com/starknet/version/rpc/v0_10/cf52O0RwFy1mEB0uoYsel}"
+RPC_URL="${STARKNET_RPC_URL:-https://api.zan.top/public/starknet-sepolia/rpc/v0_10}"
 SNCAST_ACCOUNT="${SNCAST_ACCOUNT:-stealth-deployer-2026-01-21}"
 SNCAST_ACCOUNTS_FILE="${SNCAST_ACCOUNTS_FILE:-$HOME/.starknet_accounts/starknet_open_zeppelin_accounts.json}"
 CLASS_HASH_OVERRIDE="${ATOMIC_SWAP_CLASS_HASH:-}"
@@ -21,6 +21,30 @@ require() {
     echo "Missing required command: $1" >&2
     exit 1
   }
+}
+
+redact_url() {
+  python3 - "$1" <<'PY'
+import re
+import sys
+from urllib.parse import urlsplit, urlunsplit
+
+value = sys.argv[1]
+if "://" not in value:
+    print(value)
+    raise SystemExit
+parts = urlsplit(value)
+netloc = parts.hostname or ""
+if parts.port:
+    netloc = f"{netloc}:{parts.port}"
+if parts.username:
+    netloc = f"{parts.username}:<redacted>@{netloc}"
+path_parts = parts.path.split("/")
+if path_parts and len(path_parts[-1]) >= 20 and re.fullmatch(r"[A-Za-z0-9_-]+", path_parts[-1]):
+    path_parts[-1] = "<redacted>"
+query = "<redacted>" if parts.query else ""
+print(urlunsplit((parts.scheme, netloc, "/".join(path_parts), query, "")))
+PY
 }
 
 tmpfile() {
@@ -94,8 +118,10 @@ require scarb
 require sncast
 require python3
 
+RPC_URL_REDACTED="$(redact_url "$RPC_URL")"
+
 echo "=== AtomicLock Sepolia Rehearsal (sncast) ==="
-echo "RPC: $RPC_URL"
+echo "RPC: $RPC_URL_REDACTED"
 echo "Account: $SNCAST_ACCOUNT"
 echo "Accounts file: $SNCAST_ACCOUNTS_FILE"
 echo "Class hash override: ${CLASS_HASH_OVERRIDE:-none}"
@@ -184,7 +210,7 @@ cd "$ROOT_DIR"
 mkdir -p "deployments/$NETWORK"
 CLASS_HASH="$CLASS_HASH" DECLARE_TX="$DECLARE_TX" CONTRACT_ADDRESS="$CONTRACT_ADDRESS" DEPLOY_TX="$DEPLOY_TX" \
 APPROVE_TX="$APPROVE_TX" DEPOSIT_TX="$DEPOSIT_TX" REVEAL_TX="$REVEAL_TX" CLAIMABLE_AFTER="$CLAIMABLE_AFTER" \
-RPC_URL="$RPC_URL" SNCAST_ACCOUNT="$SNCAST_ACCOUNT" TOKEN="$TOKEN" AMOUNT="$AMOUNT" DEPOSITOR="${DEPOSITOR:-0x0}" \
+RPC_URL="$RPC_URL_REDACTED" SNCAST_ACCOUNT="$SNCAST_ACCOUNT" TOKEN="$TOKEN" AMOUNT="$AMOUNT" DEPOSITOR="${DEPOSITOR:-0x0}" \
 LOCK_UNTIL="$LOCK_UNTIL" \
 python3 - <<'PY'
 import json

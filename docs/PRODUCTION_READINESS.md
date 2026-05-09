@@ -493,6 +493,9 @@ Operations artifacts:
   `l2_gas: ~20334837`.
 - CI now pins Cairo jobs to Scarb `2.14.0` and Starknet Foundry `0.56.0`,
   runs the full Cairo suite, and fails if any ignored Cairo tests return.
+- Tracked Starknet RPC defaults no longer embed private provider keys. Sepolia
+  examples use the public Zan RPC v0.10 suffix, and operator scripts redact
+  token-bearing RPC URLs before printing or writing deployment records.
 - `docs/SETUP.md` now marks Linux VM Monero as the required funded-swap path and
   demotes Docker/local Monero to legacy development use.
 

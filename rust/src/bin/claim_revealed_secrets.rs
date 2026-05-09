@@ -28,7 +28,7 @@ struct Args {
     /// Starknet RPC URL.
     #[arg(
         long,
-        default_value = "https://starknet-sepolia.g.alchemy.com/starknet/version/rpc/v0_10/cf52O0RwFy1mEB0uoYsel"
+        default_value = "https://api.zan.top/public/starknet-sepolia/rpc/v0_10"
     )]
     starknet_rpc: String,
 

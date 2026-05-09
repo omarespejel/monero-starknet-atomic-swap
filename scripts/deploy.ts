@@ -33,8 +33,7 @@ const RPC_URLS =
     ? [process.env.STARKNET_RPC_URL]
     : NETWORK === "sepolia"
       ? [
-          "https://starknet-sepolia.g.alchemy.com/starknet/version/rpc/v0_10/cf52O0RwFy1mEB0uoYsel",
-          "https://api.zan.top/public/starknet-sepolia",
+          "https://api.zan.top/public/starknet-sepolia/rpc/v0_10",
           "https://free-rpc.nethermind.io/sepolia-juno",
         ]
       : [];
@@ -70,6 +69,24 @@ interface DeploymentResult {
 const PUBLIC_CANONICAL_TEST_SECRET =
   "1212121212121212121212121212121212121212121212121212121212121212";
 
+function redactRpcUrl(raw: string): string {
+  try {
+    const url = new URL(raw);
+    const pathParts = url.pathname.split("/");
+    const last = pathParts[pathParts.length - 1];
+    if (/^[A-Za-z0-9_-]{20,}$/.test(last)) {
+      pathParts[pathParts.length - 1] = "<redacted>";
+      url.pathname = pathParts.join("/");
+    }
+    if (url.search) {
+      url.search = "?<redacted>";
+    }
+    return url.toString();
+  } catch {
+    return raw;
+  }
+}
+
 function parseBoolEnv(name: string): boolean {
   return process.env[name] === "1" || process.env[name]?.toLowerCase() === "true";
 }
@@ -79,16 +96,17 @@ function parseBoolEnv(name: string): boolean {
  */
 async function initializeProvider(): Promise<RpcProvider> {
   for (const rpcUrl of RPC_URLS) {
+    const safeRpcUrl = redactRpcUrl(rpcUrl);
     try {
-      console.log(`Trying RPC: ${rpcUrl}...`);
+      console.log(`Trying RPC: ${safeRpcUrl}...`);
       const provider = new RpcProvider({ nodeUrl: rpcUrl });
 
       // Test connection
       const chainId = await provider.getChainId();
-      console.log(`✅ Connected to ${rpcUrl} (Chain ID: ${chainId})`);
+      console.log(`✅ Connected to ${safeRpcUrl} (Chain ID: ${chainId})`);
       return provider;
     } catch (error: any) {
-      console.log(`❌ Failed: ${error.message?.substring(0, 100) || error}`);
+      console.log(`❌ Failed via ${safeRpcUrl}: ${error.message?.substring(0, 100) || error}`);
       if (rpcUrl === RPC_URLS[RPC_URLS.length - 1]) {
         throw new Error("All RPC endpoints failed");
       }

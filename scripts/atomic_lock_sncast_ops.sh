@@ -2,7 +2,7 @@
 set -euo pipefail
 
 NETWORK="${STARKNET_NETWORK:-sepolia}"
-RPC_URL="${STARKNET_RPC_URL:-https://starknet-sepolia.g.alchemy.com/starknet/version/rpc/v0_10/cf52O0RwFy1mEB0uoYsel}"
+RPC_URL="${STARKNET_RPC_URL:-https://api.zan.top/public/starknet-sepolia/rpc/v0_10}"
 SNCAST_ACCOUNT="${SNCAST_ACCOUNT:-stealth-deployer-2026-01-21}"
 SNCAST_ACCOUNTS_FILE="${SNCAST_ACCOUNTS_FILE:-$HOME/.starknet_accounts/starknet_open_zeppelin_accounts.json}"
 TOKEN="${ATOMIC_SWAP_TOKEN_ADDRESS:-}"
@@ -29,6 +29,30 @@ require() {
   }
 }
 
+redact_url() {
+  python3 - "$1" <<'PY'
+import re
+import sys
+from urllib.parse import urlsplit, urlunsplit
+
+value = sys.argv[1]
+if "://" not in value:
+    print(value)
+    raise SystemExit
+parts = urlsplit(value)
+netloc = parts.hostname or ""
+if parts.port:
+    netloc = f"{netloc}:{parts.port}"
+if parts.username:
+    netloc = f"{parts.username}:<redacted>@{netloc}"
+path_parts = parts.path.split("/")
+if path_parts and len(path_parts[-1]) >= 20 and re.fullmatch(r"[A-Za-z0-9_-]+", path_parts[-1]):
+    path_parts[-1] = "<redacted>"
+query = "<redacted>" if parts.query else ""
+print(urlunsplit((parts.scheme, netloc, "/".join(path_parts), query, "")))
+PY
+}
+
 if [ "$NETWORK" != "sepolia" ] && [ "$NETWORK" != "mainnet" ]; then
   echo "STARKNET_NETWORK must be sepolia or mainnet" >&2
   exit 1
@@ -53,6 +77,7 @@ if [ -z "$CONTRACT" ]; then
 fi
 
 require sncast
+require python3
 
 sncast_base() {
   sncast --json --accounts-file "$SNCAST_ACCOUNTS_FILE" --account "$SNCAST_ACCOUNT" "$@"
@@ -67,7 +92,7 @@ call_lock() {
 print_state() {
   echo "=== AtomicLock state ==="
   echo "network=$NETWORK"
-  echo "rpc=$RPC_URL"
+  echo "rpc=$(redact_url "$RPC_URL")"
   echo "account=$SNCAST_ACCOUNT"
   echo "contract=$CONTRACT"
   echo

@@ -26,7 +26,7 @@ use xmr_secret_gen::swap::relayer::{
 };
 
 const DEFAULT_STARKNET_RPC: &str =
-    "https://starknet-sepolia.g.alchemy.com/starknet/version/rpc/v0_10/cf52O0RwFy1mEB0uoYsel";
+    "https://api.zan.top/public/starknet-sepolia/rpc/v0_10";
 
 #[derive(Parser, Debug)]
 #[command(name = "claim_relayer_service")]
