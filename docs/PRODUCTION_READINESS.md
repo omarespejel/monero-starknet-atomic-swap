@@ -502,6 +502,10 @@ Operations artifacts:
     configured threshold.
   - `systemd-analyze verify` passed in the VM after installing the scripts at
     `/opt/monero-starknet-atomic-swap/ops/claim-relayer/`.
+- `ops/claim-relayer/configure-alert-destination.py` configures the real alert
+  destination by reading the webhook from stdin, updating the root-owned
+  healthcheck env file without printing the webhook, enforcing non-world-readable
+  permissions, and supporting a dry-run redacted summary.
 - Legacy Monero demo transaction finalization is fail-closed:
   `rust/src/monero_full.rs` is gated behind `full-integration`, production
   claims use wallet-rpc, and the regression test

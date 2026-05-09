@@ -96,6 +96,8 @@ sudo cp ops/claim-relayer/claim-relayer-healthcheck.sh \
   /opt/monero-starknet-atomic-swap/ops/claim-relayer/
 sudo cp ops/claim-relayer/claim-relayer-alert.sh \
   /opt/monero-starknet-atomic-swap/ops/claim-relayer/
+sudo cp ops/claim-relayer/configure-alert-destination.py \
+  /opt/monero-starknet-atomic-swap/ops/claim-relayer/
 sudo cp ops/claim-relayer/claim-relayer-handoff-packet.py \
   /opt/monero-starknet-atomic-swap/ops/claim-relayer/
 sudo cp ops/claim-relayer/verify-handoff-packet.py \
@@ -209,6 +211,27 @@ operator alerting endpoint. For local rehearsals without a webhook, set
 `RELAYER_ALERT_FILE=/var/log/atomic-swap/claim-relayer-alerts.jsonl` and invoke
 `claim-relayer-alert.sh <failed-unit>`; the script appends the exact JSON
 payload without sending it over the network.
+
+Configure the production webhook without putting it in shell history:
+
+```bash
+read -rsp 'Relayer alert webhook URL: ' RELAYER_ALERT_WEBHOOK_URL
+printf '\n'
+printf '%s\n' "$RELAYER_ALERT_WEBHOOK_URL" | sudo \
+  /opt/monero-starknet-atomic-swap/ops/claim-relayer/configure-alert-destination.py \
+  --webhook-stdin \
+  --clear-alert-file \
+  --environment stagenet
+unset RELAYER_ALERT_WEBHOOK_URL
+sudo systemctl daemon-reload
+sudo systemctl start monero-claim-relayer-alert@manual-rehearsal.service
+sudo journalctl -u monero-claim-relayer-alert@manual-rehearsal.service -n 50 --no-pager
+```
+
+The helper updates `/etc/atomic-swap/claim-relayer-healthcheck.env` with mode
+`0600` when the existing file is too permissive and prints only redacted status.
+The manual rehearsal should deliver one alert to the real destination before
+the timer is considered production-ready.
 
 ## Remaining Production Gap
 
