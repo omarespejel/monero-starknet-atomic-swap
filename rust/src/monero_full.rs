@@ -163,3 +163,23 @@ impl MoneroTransactionBuilder {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::adaptor::create_adaptor_signature;
+    use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
+    use serde_json::json;
+
+    #[test]
+    fn transaction_finalizer_fails_closed() {
+        let base_key = Scalar::from_bytes_mod_order([7u8; 32]);
+        let secret_scalar = Scalar::from_bytes_mod_order([9u8; 32]);
+        let adaptor_point = &secret_scalar * &ED25519_BASEPOINT_POINT;
+        let adaptor_sig = create_adaptor_signature(&base_key, &adaptor_point, b"demo tx");
+        let mut builder = MoneroTransactionBuilder::new(adaptor_sig, json!({"demo": true}));
+
+        let err = builder.finalize(&secret_scalar).unwrap_err().to_string();
+        assert!(err.contains("placeholder transaction hex is forbidden"));
+    }
+}

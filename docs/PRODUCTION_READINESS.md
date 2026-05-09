@@ -442,6 +442,11 @@ Operations artifacts:
     configured threshold.
   - `systemd-analyze verify` passed in the VM after installing the scripts at
     `/opt/monero-starknet-atomic-swap/ops/claim-relayer/`.
+- Legacy Monero demo transaction finalization is fail-closed:
+  `rust/src/monero_full.rs` is gated behind `full-integration`, production
+  claims use wallet-rpc, and the regression test
+  `transaction_finalizer_fails_closed` confirms it refuses placeholder
+  transaction hex.
 - `docs/SETUP.md` now marks Linux VM Monero as the required funded-swap path and
   demotes Docker/local Monero to legacy development use.
 
@@ -455,9 +460,6 @@ Operations artifacts:
 - Starknet test-token finalization: follow-up heartbeat is scheduled to call
   `claim_tokens` for the remaining revealed Sepolia STRK locks after their
   `claimable_after` times.
-- Monero transaction finalization: `rust/src/monero_full.rs` no longer returns
-  placeholder transaction hex. Real spends must go through wallet-rpc/Monero
-  transaction tooling.
 - Remaining ignored Cairo tests: gas profile, multi-vector DLEQ expansion,
   deterministic-address malicious token harness, and one diagnostic constructor
   flow.
