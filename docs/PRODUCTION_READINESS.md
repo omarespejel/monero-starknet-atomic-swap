@@ -446,8 +446,8 @@ Operations artifacts:
   startup, cursor backup/restore rules, stuck wallet-rpc triage, and health
   checks.
 - `docs/OPERATOR_HANDOFF.md` defines the production-like handoff packet,
-  receiver verification, dry-run-first takeover, live claim criteria, Starknet
-  token claim closeout, and incident notes.
+  receiver verification, dry-run-first takeover, signoff record, live claim
+  criteria, Starknet token claim closeout, and incident notes.
 - `ops/claim-relayer/run-handoff-drill.sh` runs the receiver-side handoff
   rehearsal in the Monero VM: packet generation, verifier checks, healthcheck
   rehearsal, and a `claim_relayer_service --dry-run --once` pass using a

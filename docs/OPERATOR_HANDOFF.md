@@ -94,6 +94,49 @@ and does not touch production cursors during the dry-run pass. By default, the
 packet and temporary dry-run cursors are preserved under `/tmp` so the receiver
 can attach them to the handoff notes.
 
+## Signoff Record
+
+Copy this into the handoff ticket. Do not paste secrets, private keys, wallet
+files, or webhook URLs.
+
+```text
+Atomic swap relayer handoff signoff
+
+Date UTC:
+Outgoing operator:
+Receiving operator:
+VM host:
+Repo commit deployed:
+Relayer artifact sha256:
+Handoff packet path:
+Handoff packet sha256:
+
+Receiver verification:
+- verify-handoff-packet --require-artifact result:
+- packet warnings reviewed:
+- healthcheck result:
+- temporary-cursor dry-run result:
+- enabled_locks:
+- succeeded_locks:
+- failed_locks:
+- cursor backup path:
+- generated swap_* wallet cleanup checked:
+
+Alerting:
+- alert destination configured: yes/no
+- manual alert rehearsal delivered: yes/no
+- alert ticket/message id:
+
+Secret handling:
+- partial spend keys stayed in VM-local env file: yes/no
+- webhook URL not pasted into chat/ticket: yes/no
+- handoff packet contains no unredacted token-bearing URLs: yes/no
+
+Decision:
+- takeover approved: yes/no
+- remaining blockers:
+```
+
 ## Dry-Run First
 
 For a registry-discovered lock, use a temporary cursor directory before touching

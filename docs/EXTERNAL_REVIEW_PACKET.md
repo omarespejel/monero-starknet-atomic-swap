@@ -43,7 +43,8 @@ Review these surfaces first:
   `tools/check_secret_hygiene.py --history --report-only` output as evidence.
 - Run a second-operator handoff drill using
   `ops/claim-relayer/claim-relayer-handoff-packet.py` and
-  `ops/claim-relayer/verify-handoff-packet.py --require-artifact`.
+  `ops/claim-relayer/verify-handoff-packet.py --require-artifact`, then attach
+  the signoff record from `docs/OPERATOR_HANDOFF.md`.
 - Configure the real alert webhook/paging destination in the Monero VM and
   rehearse `monero-claim-relayer-healthcheck.timer`.
 
