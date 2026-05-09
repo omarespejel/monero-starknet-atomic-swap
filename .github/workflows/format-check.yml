@@ -42,6 +42,7 @@ jobs:
       - name: Check Ops Python Syntax
         run: |
           python -m py_compile ops/claim-relayer/*.py
+          python -m py_compile tools/check_secret_hygiene.py
       
       # Check Cairo formatting
       - name: Setup Scarb

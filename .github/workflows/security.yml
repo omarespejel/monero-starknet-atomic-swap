@@ -15,6 +15,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Check tracked secret hygiene
+        run: python3 tools/check_secret_hygiene.py
       
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -33,4 +36,3 @@ jobs:
         run: |
           cargo audit --version || echo "cargo-audit installed"
           cargo audit || echo "Audit completed (may have found issues)"
-

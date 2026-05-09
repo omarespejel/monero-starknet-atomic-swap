@@ -496,6 +496,9 @@ Operations artifacts:
 - Tracked Starknet RPC defaults no longer embed private provider keys. Sepolia
   examples use the public Zan RPC v0.10 suffix, and operator scripts redact
   token-bearing RPC URLs before printing or writing deployment records.
+- `tools/check_secret_hygiene.py` is wired into CI to reject tracked provider
+  URLs with embedded API keys, tracked local secret filenames, and literal
+  non-devnet private-key assignments.
 - `docs/SETUP.md` now marks Linux VM Monero as the required funded-swap path and
   demotes Docker/local Monero to legacy development use.
 
