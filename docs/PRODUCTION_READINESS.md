@@ -107,7 +107,7 @@ Known local result for Cairo: `113 passed, 0 failed, 0 ignored`.
 Additional backend validation for the bidirectional quote/state slice:
 
 ```bash
-cd rust && cargo test -q --test swap_terms_test --test swap_state_test --test swap_driver_test --test swap_security_test --test handle_secret_revealed_test
+cd rust && cargo test -q --test swap_terms_test --test swap_state_test --test swap_view_test --test swap_driver_test --test swap_security_test --test handle_secret_revealed_test
 cd rust && cargo test -q --test rust_cairo_compatibility
 cd rust && cargo test -q
 cd rust && cargo check -q --bin maker
@@ -119,6 +119,11 @@ The stale Rust/Cairo compatibility tests now use the production
 domain-separated DLEQ second generator instead of the legacy `2 * G`
 placeholder. Repo-wide `cd rust && cargo test -q` is green with ignored
 integration tests left ignored.
+
+`SwapPublicView` is the frontend/API-safe projection over `SwapTerms` and
+`SwapState`. It is direction-aware for XMR-to-Starknet and Starknet-to-XMR,
+emits stable progress/action enums, and intentionally excludes partial spend
+keys, view scalars, wallet files, and other operator-only recovery material.
 
 Legacy `SwapKeyPair` now preserves the raw pre-reduction adaptor secret bytes
 used by Cairo's `SHA-256(raw_secret_bytes)` hashlock check, with explicit

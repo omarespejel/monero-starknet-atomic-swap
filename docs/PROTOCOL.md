@@ -44,6 +44,9 @@ leaving Starknet into Monero.
 
 Both directions use the same Starknet contract. The difference is product role
 assignment, quote terms, and which side controls the Monero claim automation.
+Frontend/API code should render swaps from `SwapPublicView`, not directly from
+raw `SwapState`, because the raw state contains protocol/operator fields whose
+meaning changes by direction and may include local recovery metadata.
 
 ## Protocol Parameters
 

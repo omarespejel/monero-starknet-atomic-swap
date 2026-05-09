@@ -5,6 +5,7 @@ pub mod relayer;
 pub mod starknet_manual; // Cross-platform Starknet client (macOS compatible)
 pub mod state;
 pub mod terms;
+pub mod view;
 
 pub use db::{JsonFileDb, SwapDb};
 pub use driver::{
@@ -17,4 +18,7 @@ pub use terms::{
     Chain, MoneroNetwork, StarknetReceiveMode, SwapDirection, SwapTermParseError, SwapTerms,
     SwapTermsError, DEFAULT_MONERO_CONFIRMATIONS as TERMS_DEFAULT_MONERO_CONFIRMATIONS,
     MIN_LOCK_DURATION_SECS,
+};
+pub use view::{
+    SwapPublicView, SwapUiAction, SwapUiProgressStep, SwapUiStep, SwapUiStepStatus, SwapViewError,
 };
