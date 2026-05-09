@@ -31,6 +31,7 @@ Run this flow inside the Lima Monero VM or another dedicated Linux host.
   `/var/log/atomic-swap/claim-wallet-rpc.log`
 
 Use the templates in `ops/claim-relayer/` and `ops/systemd/`.
+For operator takeover, use `docs/OPERATOR_HANDOFF.md`.
 
 ## Config Model
 

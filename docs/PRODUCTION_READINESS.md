@@ -427,6 +427,9 @@ Operations artifacts:
 - `docs/RELAYER_OPERATIONS.md` now documents install shape, dry-run-first
   startup, cursor backup/restore rules, stuck wallet-rpc triage, and health
   checks.
+- `docs/OPERATOR_HANDOFF.md` defines the production-like handoff packet,
+  receiver verification, dry-run-first takeover, live claim criteria, Starknet
+  token claim closeout, and incident notes.
 - `ops/claim-relayer/claim-relayer-healthcheck.sh` plus
   `monero-claim-relayer-healthcheck.{service,timer}` add a VM-side monitoring
   hook for config parse failures, missing enabled inventory/discovery,
@@ -448,7 +451,7 @@ Operations artifacts:
   decoding, relayer discovery config, focused tests, Sepolia factory deployment,
   factory-created lock deployment, discovery dry-run, and VM live Monero claim
   proof are done. Remaining production work is configuring the real alert
-  webhook/paging destination and production-like operator handoff drills.
+  webhook/paging destination and running a second-operator handoff drill.
 - Starknet test-token finalization: follow-up heartbeat is scheduled to call
   `claim_tokens` for the remaining revealed Sepolia STRK locks after their
   `claimable_after` times.
