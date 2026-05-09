@@ -435,6 +435,15 @@ Operations artifacts:
 - `docs/OPERATOR_HANDOFF.md` defines the production-like handoff packet,
   receiver verification, dry-run-first takeover, live claim criteria, Starknet
   token claim closeout, and incident notes.
+- `ops/claim-relayer/run-handoff-drill.sh` runs the receiver-side handoff
+  rehearsal in the Monero VM: packet generation, verifier checks, healthcheck
+  rehearsal, and a `claim_relayer_service --dry-run --once` pass using a
+  temporary cursor directory.
+  - VM validation succeeded: packet verification passed with the expected
+    installed-copy warning, healthcheck rehearsal passed with `cursor_count=3`,
+    relayer dry-run processed the factory-created STRK lock from temporary
+    cursors, and the pass reported `enabled_locks=1`, `succeeded_locks=1`,
+    `failed_locks=0`.
 - `docs/EXTERNAL_REVIEW_PACKET.md` defines the review scope, explicit
   non-goals, required commands, VM checks, known follow-ups, and review
   questions for an external reviewer.

@@ -78,6 +78,22 @@ Expected pre-claim state for a revealed funded lock:
 - `token balance_of(contract)` equals the escrow amount
 - `get_claimable_after` is in the future or already passed
 
+## Drill Script
+
+For a production-like takeover rehearsal, run this inside the Monero VM:
+
+```bash
+/opt/monero-starknet-atomic-swap/ops/claim-relayer/run-handoff-drill.sh
+```
+
+The drill generates a redacted handoff packet, verifies it with
+`--require-artifact`, runs the healthcheck with service-active checks disabled
+for one-shot rehearsal mode, and runs `claim_relayer_service --dry-run --once`
+against a temporary cursor directory. It does not read or print secret values
+and does not touch production cursors during the dry-run pass. By default, the
+packet and temporary dry-run cursors are preserved under `/tmp` so the receiver
+can attach them to the handoff notes.
+
 ## Dry-Run First
 
 For a registry-discovered lock, use a temporary cursor directory before touching

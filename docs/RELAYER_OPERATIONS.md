@@ -100,6 +100,8 @@ sudo cp ops/claim-relayer/claim-relayer-handoff-packet.py \
   /opt/monero-starknet-atomic-swap/ops/claim-relayer/
 sudo cp ops/claim-relayer/verify-handoff-packet.py \
   /opt/monero-starknet-atomic-swap/ops/claim-relayer/
+sudo cp ops/claim-relayer/run-handoff-drill.sh \
+  /opt/monero-starknet-atomic-swap/ops/claim-relayer/
 
 sudo cp ops/systemd/monero-claim-wallet-rpc.service /etc/systemd/system/
 sudo cp ops/systemd/monero-claim-wallet-rpc.env.example \
