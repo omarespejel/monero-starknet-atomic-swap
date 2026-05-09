@@ -499,6 +499,8 @@ Operations artifacts:
 - `tools/check_secret_hygiene.py` is wired into CI to reject tracked provider
   URLs with embedded API keys, tracked local secret filenames, and literal
   non-devnet private-key assignments.
+- Generated Scarb cache files were removed from git tracking and
+  `cairo/.scarb_cache/` is ignored going forward.
 - `docs/SETUP.md` now marks Linux VM Monero as the required funded-swap path and
   demotes Docker/local Monero to legacy development use.
 

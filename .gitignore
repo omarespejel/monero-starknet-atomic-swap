@@ -5,6 +5,7 @@ watchtower/target/
 
 # Cairo
 cairo/target/
+cairo/.scarb_cache/
 cairo/**/*.sierra.json
 
 # Python
@@ -51,6 +52,16 @@ monero-swap-context-*.txt
 deployments/
 .deployer_key
 .deployerkey
+.env
+.env.*
+!.env.example
+!*.env.example
+*.secrets
+!*.secrets.example
+*.pem
+*.token
+starknet_open_zeppelin_accounts.json
+.starknet_accounts/
 
 # Node/TypeScript
 node_modules/
