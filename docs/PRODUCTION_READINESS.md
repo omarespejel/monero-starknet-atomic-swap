@@ -447,6 +447,10 @@ Operations artifacts:
   claims use wallet-rpc, and the regression test
   `transaction_finalizer_fails_closed` confirms it refuses placeholder
   transaction hex.
+- Stale ignored unlock gas test was removed from
+  `test_integration_atomic_lock.cairo`; the active real-vector unlock/MSM test
+  `test_msm_check_with_real_data` passes and reports
+  `l2_gas: ~18449527`.
 - `docs/SETUP.md` now marks Linux VM Monero as the required funded-swap path and
   demotes Docker/local Monero to legacy development use.
 
@@ -460,7 +464,7 @@ Operations artifacts:
 - Starknet test-token finalization: follow-up heartbeat is scheduled to call
   `claim_tokens` for the remaining revealed Sepolia STRK locks after their
   `claimable_after` times.
-- Remaining ignored Cairo tests: gas profile, multi-vector DLEQ expansion,
+- Remaining ignored Cairo tests: multi-vector DLEQ expansion,
   deterministic-address malicious token harness, and one diagnostic constructor
   flow.
 - External security review: required before any meaningful-value mainnet use.
