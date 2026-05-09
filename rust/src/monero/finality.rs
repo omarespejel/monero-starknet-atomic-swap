@@ -51,7 +51,7 @@ pub async fn wait_for_finality<C: MoneroWalletClient>(
 ) -> Result<TransferInfo> {
     let start = std::time::Instant::now();
     let mut consecutive_errors = 0u32;
-    
+
     loop {
         // Check timeout
         if timeout_secs > 0 && start.elapsed().as_secs() > timeout_secs {
@@ -67,7 +67,7 @@ pub async fn wait_for_finality<C: MoneroWalletClient>(
             Ok(info) => {
                 // Reset error counter on successful poll
                 consecutive_errors = 0;
-                
+
                 if info.confirmations >= min_confirmations {
                     return Ok(info);
                 }
@@ -82,7 +82,7 @@ pub async fn wait_for_finality<C: MoneroWalletClient>(
                     MAX_CONSECUTIVE_ERRORS,
                     e
                 );
-                
+
                 // Abort if too many consecutive errors (prevents log flooding)
                 if consecutive_errors >= MAX_CONSECUTIVE_ERRORS {
                     return Err(anyhow!(
@@ -113,4 +113,3 @@ pub async fn wait_for_default_finality<C: MoneroWalletClient>(
     )
     .await
 }
-

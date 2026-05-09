@@ -9,10 +9,9 @@
 
 use anyhow::{Context, Result};
 use serde_json::{json, Value};
-use std::collections::HashMap;
-use tokio::time::{sleep, Duration};
 
 /// Starknet JSON-RPC client with account support.
+#[allow(dead_code)]
 pub struct StarknetAccount {
     rpc_url: String,
     account_address: String,
@@ -32,6 +31,7 @@ impl StarknetAccount {
     }
 
     /// Call Starknet JSON-RPC method.
+    #[allow(dead_code)]
     async fn call(&self, method: &str, params: Value) -> Result<Value> {
         let payload = json!({
             "jsonrpc": "2.0",
@@ -66,16 +66,10 @@ impl StarknetAccount {
         contract_class: &Value, // Sierra/CASM contract class
         constructor_calldata: Vec<String>,
     ) -> Result<String> {
-        // In production, this would:
-        // 1. Sign the deployment transaction
-        // 2. Broadcast via addInvokeTransaction
-        // 3. Wait for confirmation
-
-        println!("⚠️  Contract deployment requires account signing");
-        println!("   Use Starknet CLI or implement full signing flow");
-
-        // Placeholder for now
-        Ok("0x0".to_string())
+        let _ = (contract_class, constructor_calldata);
+        anyhow::bail!(
+            "Rust Starknet deployment is not implemented safely in starknet_full.rs. Use scripts/deploy.ts or tools/generate_deploy_calldata.py with a signed account; returning a fake 0x0 address is forbidden."
+        )
     }
 
     /// Call a contract function (verify_and_unlock).
@@ -98,20 +92,10 @@ impl StarknetAccount {
             calldata.push(format!("0x{}", chunk_hex));
         }
 
-        // In production, this would:
-        // 1. Create invoke transaction
-        // 2. Sign with account
-        // 3. Broadcast via addInvokeTransaction
-        // 4. Return transaction hash
-
-        println!("⚠️  Contract call requires account signing");
-        println!("   Function: verify_and_unlock");
-        println!("   Contract: {}", contract_address);
-        println!("   Secret: {}...", &secret_hex[..16]);
-        println!("   Calldata: {:?}", calldata);
-
-        // Placeholder
-        Ok("0x0".to_string())
+        let _ = (contract_address, secret_hex, calldata);
+        anyhow::bail!(
+            "Rust Starknet signed invoke is not implemented safely in starknet_full.rs. Use the TypeScript/starknet.js path for reveal transactions; returning a fake 0x0 transaction hash is forbidden."
+        )
     }
 
     /// Watch for Unlocked events from a contract.
@@ -120,53 +104,14 @@ impl StarknetAccount {
         contract_address: &str,
         poll_interval_secs: u64,
     ) -> Result<String> {
-        println!("👀 Watching for Unlocked events from: {}", contract_address);
-
-        // Get Unlocked event key (hash of "Unlocked")
-        // In production, compute: pedersen_hash("Unlocked")
-        let unlocked_event_key = "0x0"; // Placeholder
-
-        let mut last_block = self.get_block_number().await?;
-
-        loop {
-            sleep(Duration::from_secs(poll_interval_secs)).await;
-
-            let current_block = self.get_block_number().await?;
-
-            // Query events
-            let filter = json!({
-                "address": contract_address,
-                "keys": [unlocked_event_key],
-                "from_block": format!("0x{:x}", last_block),
-                "to_block": format!("0x{:x}", current_block),
-            });
-
-            let events_result = self
-                .call("starknet_getEvents", json!({ "filter": filter }))
-                .await;
-
-            if let Ok(events) = events_result {
-                if let Some(events_array) = events.get("events").and_then(|v| v.as_array()) {
-                    for event in events_array {
-                        if let Some(data) = event.get("data").and_then(|v| v.as_array()) {
-                            if data.len() >= 2 {
-                                // First element is unlocker, second is secret_hash
-                                if let Some(secret_hash) = data.get(1).and_then(|v| v.as_str()) {
-                                    println!("✅ Unlocked event detected!");
-                                    println!("   Secret hash: {}", secret_hash);
-                                    return Ok(secret_hash.to_string());
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            last_block = current_block;
-        }
+        let _ = (contract_address, poll_interval_secs);
+        anyhow::bail!(
+            "Rust event watching in starknet_full.rs is not production-safe yet because ABI event selectors and pagination are not implemented. Use Starknet RPC tooling or explorer queries until this module decodes events from the compiled ABI."
+        )
     }
 
     /// Get current block number.
+    #[allow(dead_code)]
     async fn get_block_number(&self) -> Result<u64> {
         let result = self.call("starknet_blockNumber", json!([])).await?;
         let block_num_str = result.as_str().context("Invalid block number format")?;

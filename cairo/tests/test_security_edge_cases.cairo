@@ -28,7 +28,7 @@ mod dleq_edge_cases_tests {
     /// Test: Scalar value near order
     #[test]
     fn test_scalar_near_order() {
-        // Use order - 1 (truncated to 128 bits)
+        // Use order - 1 (full to 128 bits)
         let near_order: felt252 = 0xffffffffffffffffffffffffffffffff; // Max 128-bit value
         let scalar_u256 = reduce_felt_to_scalar(near_order);
         

@@ -1,7 +1,7 @@
-use anyhow::{Context, Result};
-use std::path::{Path, PathBuf};
-use std::fs;
 use super::state::SwapState;
+use anyhow::{Context, Result};
+use std::fs;
+use std::path::{Path, PathBuf};
 
 pub trait SwapDb: Send + Sync {
     fn save(&self, state: &SwapState) -> Result<()>;
@@ -47,4 +47,3 @@ impl SwapDb for JsonFileDb {
         Ok(Some(state))
     }
 }
-

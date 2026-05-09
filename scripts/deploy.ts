@@ -13,18 +13,7 @@
  *   bun run scripts/deploy.ts
  */
 
-import {
-  Account,
-  CallData,
-  Contract,
-  RpcProvider,
-  cairo,
-  hash,
-  ec,
-  num,
-  stark,
-  constants,
-} from "starknet";
+import { Account, CallData, RpcProvider, hash, ec, constants } from "starknet";
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
@@ -32,13 +21,27 @@ import { fileURLToPath } from "url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, "..");
 
-// RPC Configuration - Multiple endpoints for reliability
-// Alchemy v0.10 RPC (compatible with sncast and starknet.js v6)
-const RPC_URLS = [
-  "https://starknet-sepolia.g.alchemy.com/starknet/version/rpc/v0_10/cf52O0RwFy1mEB0uoYsel",
-  "https://api.zan.top/public/starknet-sepolia",
-  "https://free-rpc.nethermind.io/sepolia-juno",
-];
+type NetworkName = "sepolia" | "mainnet";
+
+const NETWORK = (process.env.STARKNET_NETWORK || "sepolia") as NetworkName;
+if (NETWORK !== "sepolia" && NETWORK !== "mainnet") {
+  throw new Error("STARKNET_NETWORK must be 'sepolia' or 'mainnet'");
+}
+
+const RPC_URLS =
+  process.env.STARKNET_RPC_URL
+    ? [process.env.STARKNET_RPC_URL]
+    : NETWORK === "sepolia"
+      ? [
+          "https://starknet-sepolia.g.alchemy.com/starknet/version/rpc/v0_10/cf52O0RwFy1mEB0uoYsel",
+          "https://api.zan.top/public/starknet-sepolia",
+          "https://free-rpc.nethermind.io/sepolia-juno",
+        ]
+      : [];
+
+if (NETWORK === "mainnet" && RPC_URLS.length === 0) {
+  throw new Error("Mainnet deployment requires STARKNET_RPC_URL");
+}
 
 // OpenZeppelin Account class hash for Sepolia
 // Note: If this class is not declared, use a pre-deployed account instead
@@ -50,6 +53,25 @@ interface DeploymentConfig {
   account: Account;
   accountAddress: string;
   privateKey: string;
+}
+
+interface AtomicLockConfig {
+  token: string;
+  amount: bigint;
+  depositor: string;
+  allowZeroLock: boolean;
+}
+
+interface DeploymentResult {
+  contractAddress: string;
+  lockUntil: number;
+}
+
+const PUBLIC_CANONICAL_TEST_SECRET =
+  "1212121212121212121212121212121212121212121212121212121212121212";
+
+function parseBoolEnv(name: string): boolean {
+  return process.env[name] === "1" || process.env[name]?.toLowerCase() === "true";
 }
 
 /**
@@ -101,8 +123,14 @@ function getPrivateKey(): string | null {
     return null; // Signal to use pre-deployed account
   }
 
-  // Generate new key if needed
+  // Generate new key only when explicitly requested. Silent deployer-key
+  // generation is risky for production rehearsals and can leave secrets on disk.
   if (!privateKey) {
+    if (!parseBoolEnv("STARKNET_GENERATE_DEPLOYER")) {
+      throw new Error(
+        "Set STARKNET_ACCOUNT_ADDRESS and STARKNET_PRIVATE_KEY for signing, or set STARKNET_GENERATE_DEPLOYER=1 to create a new unfunded deployer key."
+      );
+    }
     console.log("🔑 Generating new private key...");
     // Generate a valid Starknet private key using starknet.js
     // randomPrivateKey() returns Uint8Array, convert to hex
@@ -137,7 +165,7 @@ function computeAccountAddress(publicKey: string): string {
     publicKey, // salt
     OZ_ACCOUNT_CLASS_HASH,
     constructorCalldata,
-    constants.StarknetChainId.SN_SEPOLIA
+    "0x0"
   );
 
   return address;
@@ -181,7 +209,13 @@ async function initializeAccount(
     accountAddress = computeAccountAddress(publicKey);
   }
 
-  const account = new Account(provider, accountAddress, privateKeyHex, "1");
+  const account = new Account(
+    provider,
+    accountAddress,
+    privateKeyHex,
+    "1",
+    constants.TRANSACTION_VERSION.V3
+  );
 
   console.log("\n📍 Account Configuration:");
   console.log(`   Address: ${accountAddress}`);
@@ -352,55 +386,184 @@ async function declareContract(config: DeploymentConfig): Promise<string> {
   }
 }
 
+function normalizeHex(value: string | number | bigint): string {
+  if (typeof value === "bigint") {
+    return `0x${value.toString(16)}`;
+  }
+  if (typeof value === "number") {
+    return `0x${BigInt(value).toString(16)}`;
+  }
+  const trimmed = value.trim();
+  if (trimmed.startsWith("0x")) {
+    return `0x${BigInt(trimmed).toString(16)}`;
+  }
+  return `0x${BigInt(trimmed).toString(16)}`;
+}
+
+function leBytesHexToBigInt(hexValue: string): bigint {
+  const clean = hexValue.replace(/^0x/, "");
+  const bytes = clean.match(/../g) || [];
+  return BigInt(`0x${bytes.reverse().join("") || "0"}`);
+}
+
+function leBytesHexToU256Felts(hexValue: string): [string, string] {
+  const clean = hexValue.replace(/^0x/, "").padStart(64, "0");
+  const low = leBytesHexToBigInt(clean.slice(0, 32));
+  const high = leBytesHexToBigInt(clean.slice(32, 64));
+  return [normalizeHex(low), normalizeHex(high)];
+}
+
+function u256FromParts(value: { low: string; high: string }): [string, string] {
+  return [normalizeHex(value.low), normalizeHex(value.high)];
+}
+
+function bigintToU256(value: bigint): [string, string] {
+  const mask128 = (1n << 128n) - 1n;
+  return [normalizeHex(value & mask128), normalizeHex(value >> 128n)];
+}
+
+function parseHashlockWords(hashlockHex: string): string[] {
+  const clean = hashlockHex.replace(/^0x/, "");
+  if (clean.length !== 64) {
+    throw new Error("hashlock must be 32 bytes");
+  }
+  const words: string[] = [];
+  for (let i = 0; i < clean.length; i += 8) {
+    words.push(`0x${clean.slice(i, i + 8)}`);
+  }
+  return words;
+}
+
+function parseHintArray(cairoArray: string): string[] {
+  const values = cairoArray.match(/0x[0-9a-fA-F]+/g);
+  if (!values || values.length !== 10) {
+    throw new Error(`expected 10 hint felts, got ${values?.length ?? 0}`);
+  }
+  return values.map(normalizeHex);
+}
+
+function loadJson(relativePath: string): any {
+  const fullPath = join(rootDir, relativePath);
+  if (!existsSync(fullPath)) {
+    throw new Error(`Missing ${relativePath}. Run: uv run --project tools python tools/regenerate_dleq_hints.py`);
+  }
+  return JSON.parse(readFileSync(fullPath, "utf-8"));
+}
+
+function getAtomicLockConfig(defaultDepositor = "0x0"): AtomicLockConfig {
+  const token = normalizeHex(process.env.ATOMIC_SWAP_TOKEN_ADDRESS || "0x0");
+  const amount = BigInt(process.env.ATOMIC_SWAP_AMOUNT || "0");
+  const depositor = normalizeHex(process.env.ATOMIC_SWAP_DEPOSITOR || defaultDepositor);
+  const allowZeroLock = parseBoolEnv("ATOMIC_SWAP_ALLOW_ZERO_LOCK");
+  return { token, amount, depositor, allowZeroLock };
+}
+
+function buildAtomicLockConstructorCalldata(lockUntil: number, depositor: string): string[] {
+  const testVectors = loadJson("rust/test_vectors.json");
+  const generated = loadJson("cairo/generated_dleq_vectors.json");
+  const hints = loadJson("cairo/test_hints.json");
+  const adaptorHint = loadJson("cairo/adaptor_point_hint.json");
+
+  const { token, amount, allowZeroLock } = getAtomicLockConfig(depositor);
+  if (!allowZeroLock && (token === "0x0" || amount === 0n)) {
+    throw new Error(
+      "Set ATOMIC_SWAP_TOKEN_ADDRESS and ATOMIC_SWAP_AMOUNT, or set ATOMIC_SWAP_ALLOW_ZERO_LOCK=1 for a zero-value test deployment"
+    );
+  }
+
+  const calldata: string[] = [];
+  const pushSpan = (values: string[]) => {
+    calldata.push(normalizeHex(values.length));
+    calldata.push(...values.map(normalizeHex));
+  };
+  const pushU256 = ([low, high]: [string, string]) => {
+    calldata.push(normalizeHex(low), normalizeHex(high));
+  };
+
+  pushSpan(parseHashlockWords(testVectors.hashlock));
+  calldata.push(normalizeHex(lockUntil));
+  calldata.push(normalizeHex(depositor));
+  calldata.push(token);
+  pushU256(bigintToU256(amount));
+
+  pushU256(leBytesHexToU256Felts(testVectors.adaptor_point_compressed));
+  pushU256(u256FromParts(generated.sqrt_hints.adaptor_point_sqrt_hint));
+  pushU256(leBytesHexToU256Felts(testVectors.second_point_compressed));
+  pushU256(u256FromParts(generated.sqrt_hints.second_point_sqrt_hint));
+
+  calldata.push(normalizeHex(generated.challenge));
+  pushU256(u256FromParts(generated.response));
+
+  pushSpan(parseHintArray(adaptorHint.cairo_format));
+  pushSpan(parseHintArray(hints.cairo_hints.s_hint_for_g));
+  pushSpan(parseHintArray(hints.cairo_hints.s_hint_for_y));
+  pushSpan(parseHintArray(hints.cairo_hints.c_neg_hint_for_t));
+  pushSpan(parseHintArray(hints.cairo_hints.c_neg_hint_for_u));
+
+  pushU256(leBytesHexToU256Felts(testVectors.r1_compressed));
+  pushU256(u256FromParts(generated.sqrt_hints.r1_sqrt_hint));
+  pushU256(leBytesHexToU256Felts(testVectors.r2_compressed));
+  pushU256(u256FromParts(generated.sqrt_hints.r2_sqrt_hint));
+
+  return calldata;
+}
+
+function u256FeltsToBigint(values: string[]): bigint {
+  if (values.length < 2) {
+    throw new Error(`expected u256 response, got ${values.length} felts`);
+  }
+  return BigInt(values[0]) + (BigInt(values[1]) << 128n);
+}
+
+async function erc20BalanceOf(
+  provider: RpcProvider,
+  token: string,
+  account: string
+): Promise<bigint> {
+  const result = await provider.callContract({
+    contractAddress: token,
+    entrypoint: "balance_of",
+    calldata: [account],
+  });
+  return u256FeltsToBigint(result as string[]);
+}
+
+function byteArrayCalldataFromHex(secretHex: string): string[] {
+  const clean = secretHex.replace(/^0x/, "").toLowerCase();
+  if (!/^[0-9a-f]+$/.test(clean) || clean.length !== 64) {
+    throw new Error("ATOMIC_SWAP_SECRET_HEX must be exactly 32 bytes / 64 hex chars");
+  }
+
+  const fullWord = `0x${clean.slice(0, 62)}`;
+  const pendingWord = `0x${clean.slice(62)}`;
+  return ["0x1", normalizeHex(fullWord), normalizeHex(pendingWord), "0x1"];
+}
+
+function deploymentJsonPath(): string {
+  return join(rootDir, "deployments/starknetjs_deployment.json");
+}
+
+function mergeDeploymentInfo(extra: Record<string, any>) {
+  const deploymentPath = deploymentJsonPath();
+  const current = existsSync(deploymentPath)
+    ? JSON.parse(readFileSync(deploymentPath, "utf-8"))
+    : {};
+  writeFileSync(deploymentPath, JSON.stringify({ ...current, ...extra }, null, 2));
+}
+
 /**
  * Deploy contract instance (requires calldata)
  */
 async function deployContract(
   config: DeploymentConfig,
   classHash: string
-): Promise<string> {
+): Promise<DeploymentResult> {
   console.log("\n🚀 Deploying contract instance...");
 
-  // Load test vectors for constructor
-  // Try multiple possible paths
-  const testVectorsPaths = [
-    join(rootDir, "rust/test_vectors.json"),
-    join(rootDir, "rust/deployment_vector.json"),
-  ];
-  
-  let testVectors: any = null;
-  for (const path of testVectorsPaths) {
-    if (existsSync(path)) {
-      testVectors = JSON.parse(readFileSync(path, "utf-8"));
-      console.log(`✅ Loaded test vectors from ${path}`);
-      break;
-    }
-  }
-  
-  if (!testVectors) {
-    throw new Error("Test vectors not found. Generate with: cd rust && cargo run --bin generate_test_vector");
-  }
-
-  // Prepare constructor calldata
   const lockUntil = Math.floor(Date.now() / 1000) + 3600 * 4; // 4 hours
-
-  // Handle different test vector formats
-  const hashlock = testVectors.hashlock || testVectors.hashlock_words;
-  const adaptorPointCompressed = testVectors.adaptor_point_compressed || testVectors.adaptor_point;
-  const adaptorPointHint = testVectors.adaptor_point_sqrt_hint || testVectors.adaptor_point_hint;
-  const challenge = testVectors.challenge || testVectors.challenge_low;
-  const response = testVectors.response || testVectors.response_low;
-
-  const constructorCalldata = CallData.compile({
-    hashlock: hashlock,
-    lock_until: cairo.uint256(lockUntil),
-    token: "0x0", // Zero address for testing
-    amount: cairo.uint256(0), // Zero amount for testing
-    adaptor_point_compressed: adaptorPointCompressed,
-    adaptor_point_hint: adaptorPointHint,
-    challenge: challenge,
-    response: response,
-  });
+  const depositor = getAtomicLockConfig(config.accountAddress).depositor;
+  const constructorCalldata = buildAtomicLockConstructorCalldata(lockUntil, depositor);
+  console.log(`✅ Built constructor calldata (${constructorCalldata.length} felts) for ${NETWORK}`);
 
   try {
     const deployResponse = await config.account.deployContract({
@@ -417,10 +580,7 @@ async function deployContract(
     console.log(`✅ Contract deployed! Address: ${contractAddress}`);
 
     // Save deployment info
-    const deploymentPath = join(
-      rootDir,
-      "deployments/starknetjs_deployment.json"
-    );
+    const deploymentPath = deploymentJsonPath();
     const deploymentDir = dirname(deploymentPath);
     if (!existsSync(deploymentDir)) {
       const { mkdirSync } = await import("fs");
@@ -435,7 +595,10 @@ async function deployContract(
           classHash,
           transactionHash: deployResponse.transaction_hash,
           lockUntil,
-          network: "sepolia",
+          network: NETWORK,
+          depositor,
+          token: getAtomicLockConfig().token,
+          amount: getAtomicLockConfig().amount.toString(),
           timestamp: new Date().toISOString(),
         },
         null,
@@ -445,10 +608,115 @@ async function deployContract(
 
     console.log(`💾 Saved to ${deploymentPath}`);
 
-    return contractAddress;
+    return { contractAddress, lockUntil };
   } catch (error: any) {
     console.error("❌ Deployment failed:", error.message);
     throw error;
+  }
+}
+
+async function approveAndDepositIfRequested(
+  config: DeploymentConfig,
+  contractAddress: string
+): Promise<Record<string, any> | null> {
+  if (!parseBoolEnv("ATOMIC_SWAP_DEPOSIT")) {
+    return null;
+  }
+
+  const { token, amount } = getAtomicLockConfig();
+  if (token === "0x0" || amount === 0n) {
+    throw new Error("ATOMIC_SWAP_DEPOSIT=1 requires non-zero ATOMIC_SWAP_TOKEN_ADDRESS and ATOMIC_SWAP_AMOUNT");
+  }
+
+  console.log("\n💰 Approving and depositing tokens...");
+  console.log(`   Token: ${token}`);
+  console.log(`   Amount: ${amount.toString()}`);
+
+  const balanceBefore = await erc20BalanceOf(config.provider, token, config.accountAddress);
+  console.log(`   Account token balance before: ${balanceBefore.toString()}`);
+  if (balanceBefore < amount) {
+    throw new Error(`insufficient token balance for deposit: have ${balanceBefore}, need ${amount}`);
+  }
+
+  const approveTx = await config.account.execute({
+    contractAddress: token,
+    entrypoint: "approve",
+    calldata: [contractAddress, ...bigintToU256(amount)],
+  });
+  console.log(`📤 Approve TX: ${approveTx.transaction_hash}`);
+  await config.provider.waitForTransaction(approveTx.transaction_hash);
+
+  const depositTx = await config.account.execute({
+    contractAddress,
+    entrypoint: "deposit",
+    calldata: [],
+  });
+  console.log(`📤 Deposit TX: ${depositTx.transaction_hash}`);
+  await config.provider.waitForTransaction(depositTx.transaction_hash);
+
+  const contractBalance = await erc20BalanceOf(config.provider, token, contractAddress);
+  console.log(`✅ Contract token balance after deposit: ${contractBalance.toString()}`);
+
+  return {
+    deposit: {
+      approveTx: approveTx.transaction_hash,
+      depositTx: depositTx.transaction_hash,
+      token,
+      amount: amount.toString(),
+      contractTokenBalance: contractBalance.toString(),
+    },
+  };
+}
+
+async function revealIfRequested(
+  config: DeploymentConfig,
+  contractAddress: string
+): Promise<Record<string, any> | null> {
+  if (!parseBoolEnv("ATOMIC_SWAP_REVEAL")) {
+    return null;
+  }
+
+  const secretHex = (process.env.ATOMIC_SWAP_SECRET_HEX || PUBLIC_CANONICAL_TEST_SECRET).replace(/^0x/, "");
+  console.log("\n🔓 Revealing secret on Starknet...");
+  const revealTx = await config.account.execute({
+    contractAddress,
+    entrypoint: "reveal_secret",
+    calldata: byteArrayCalldataFromHex(secretHex),
+  });
+  console.log(`📤 Reveal TX: ${revealTx.transaction_hash}`);
+  await config.provider.waitForTransaction(revealTx.transaction_hash);
+
+  const revealed = await config.provider.callContract({
+    contractAddress,
+    entrypoint: "is_secret_revealed",
+    calldata: [],
+  });
+  const claimableAfter = await config.provider.callContract({
+    contractAddress,
+    entrypoint: "get_claimable_after",
+    calldata: [],
+  });
+  console.log(`✅ Secret revealed. claimable_after=${claimableAfter[0]}`);
+
+  return {
+    reveal: {
+      revealTx: revealTx.transaction_hash,
+      secretHex,
+      isSecretRevealed: revealed[0],
+      claimableAfter: claimableAfter[0],
+    },
+  };
+}
+
+function enforcePublicTestSecretGuard() {
+  const { amount } = getAtomicLockConfig();
+  const secretHex = (process.env.ATOMIC_SWAP_SECRET_HEX || PUBLIC_CANONICAL_TEST_SECRET).replace(/^0x/, "");
+  const usesPublicSecret = secretHex === PUBLIC_CANONICAL_TEST_SECRET;
+  const touchesTokens = amount > 0n || parseBoolEnv("ATOMIC_SWAP_DEPOSIT");
+  if (usesPublicSecret && touchesTokens && !parseBoolEnv("ATOMIC_SWAP_CONFIRM_PUBLIC_TEST_SECRET")) {
+    throw new Error(
+      "This deployment uses the public canonical test secret. For any non-zero token rehearsal, set ATOMIC_SWAP_CONFIRM_PUBLIC_TEST_SECRET=1 and use only a tiny test amount, or provide ATOMIC_SWAP_SECRET_HEX with a private per-swap vector package."
+    );
   }
 }
 
@@ -461,6 +729,8 @@ async function main() {
   console.log("=".repeat(70));
 
   try {
+    enforcePublicTestSecretGuard();
+
     // 1. Initialize provider
     const provider = await initializeProvider();
 
@@ -474,14 +744,22 @@ async function main() {
     const classHash = await declareContract(config);
 
     // 5. Deploy contract
-    const contractAddress = await deployContract(config, classHash);
+    const deployment = await deployContract(config, classHash);
+
+    const postDeploy: Record<string, any> = {};
+    Object.assign(postDeploy, await approveAndDepositIfRequested(config, deployment.contractAddress));
+    Object.assign(postDeploy, await revealIfRequested(config, deployment.contractAddress));
+    if (Object.keys(postDeploy).length > 0) {
+      mergeDeploymentInfo({ postDeploy });
+    }
 
     console.log("\n" + "=".repeat(70));
     console.log("✅ DEPLOYMENT COMPLETE!");
     console.log("=".repeat(70));
-    console.log(`Contract Address: ${contractAddress}`);
+    console.log(`Contract Address: ${deployment.contractAddress}`);
     console.log(`Class Hash: ${classHash}`);
-    console.log(`Explorer: https://sepolia.starkscan.co/contract/${contractAddress}`);
+    const explorerPrefix = NETWORK === "mainnet" ? "https://starkscan.co" : "https://sepolia.starkscan.co";
+    console.log(`Explorer: ${explorerPrefix}/contract/${deployment.contractAddress}`);
     console.log("=".repeat(70));
   } catch (error: any) {
     console.error("\n❌ Deployment failed:", error.message);
@@ -494,4 +772,3 @@ async function main() {
 
 // Run main
 main();
-

@@ -1,5 +1,5 @@
 //! Production-grade Monero Wallet RPC Client
-//! 
+//!
 //! Based on COMIT Network's battle-tested implementation for atomic swaps.
 //! Provides secure wallet operations for Monero atomic swap protocol.
 
@@ -16,13 +16,13 @@ use crate::monero_wallet::error::MoneroWalletError;
 use crate::monero_wallet::types::{TransferInfo, TransferResult};
 
 /// Production-grade Monero wallet RPC client
-/// 
+///
 /// Based on COMIT Network's 3+ years of mainnet atomic swap experience.
 /// Provides secure wallet operations for atomic swap protocol.
 pub struct MoneroWallet {
     /// HTTP client for JSON-RPC calls
     http_client: HttpClient,
-    /// Wallet RPC endpoint (e.g., http://localhost:38088/json_rpc)
+    /// Wallet RPC endpoint (e.g., VM tunnel http://127.0.0.1:38090/json_rpc)
     wallet_rpc_url: String,
     /// Daemon RPC endpoint for blockchain queries
     #[allow(dead_code)]
@@ -35,9 +35,10 @@ pub struct MoneroWallet {
 
 impl MoneroWallet {
     /// Create new wallet client
-    /// 
+    ///
     /// # Production Requirements
-    /// 1. wallet-rpc must be running: `monero-wallet-rpc --stagenet --rpc-bind-port 38088`
+    /// 1. wallet-rpc must be running in the isolated Monero VM; use an SSH tunnel to
+    ///    `http://127.0.0.1:38090/json_rpc` for host-side manual tests.
     /// 2. Daemon must be synced and accessible
     /// 3. Wallet must be opened or created
     pub async fn new(
@@ -46,8 +47,18 @@ impl MoneroWallet {
         wallet_name: String,
         wallet_dir: String,
     ) -> Result<Self> {
+        let request_timeout_secs = std::env::var("MONERO_WALLET_RPC_TIMEOUT_SECS")
+            .ok()
+            .and_then(|value| value.parse::<u64>().ok())
+            .unwrap_or(30);
+        let connect_timeout_secs = std::env::var("MONERO_WALLET_RPC_CONNECT_TIMEOUT_SECS")
+            .ok()
+            .and_then(|value| value.parse::<u64>().ok())
+            .unwrap_or(5);
+
         let http_client = HttpClient::builder()
-            .timeout(Duration::from_secs(30))
+            .timeout(Duration::from_secs(request_timeout_secs))
+            .connect_timeout(Duration::from_secs(connect_timeout_secs))
             .build()
             .context("Failed to create HTTP client")?;
 
@@ -60,7 +71,9 @@ impl MoneroWallet {
         };
 
         // Verify wallet-rpc is reachable
-        wallet.get_version().await
+        wallet
+            .get_version()
+            .await
             .context("Failed to connect to monero-wallet-rpc")?;
 
         Ok(wallet)
@@ -91,7 +104,8 @@ impl MoneroWallet {
             method: "get_version".to_string(),
         };
 
-        let resp: Response = self.http_client
+        let resp: Response = self
+            .http_client
             .post(&self.wallet_rpc_url)
             .json(&req)
             .send()
@@ -116,10 +130,15 @@ impl MoneroWallet {
         #[derive(Deserialize)]
         struct EmptyResponse {}
 
-        let _: EmptyResponse = self.call_wallet_rpc("open_wallet", Params {
-            filename: self.wallet_name.clone(),
-            password: password.to_string(),
-        }).await?;
+        let _: EmptyResponse = self
+            .call_wallet_rpc(
+                "open_wallet",
+                Params {
+                    filename: self.wallet_name.clone(),
+                    password: password.to_string(),
+                },
+            )
+            .await?;
 
         Ok(())
     }
@@ -136,11 +155,16 @@ impl MoneroWallet {
         #[derive(Deserialize)]
         struct EmptyResponse {}
 
-        let _: EmptyResponse = self.call_wallet_rpc("create_wallet", Params {
-            filename: self.wallet_name.clone(),
-            password: password.to_string(),
-            language: "English".to_string(),
-        }).await?;
+        let _: EmptyResponse = self
+            .call_wallet_rpc(
+                "create_wallet",
+                Params {
+                    filename: self.wallet_name.clone(),
+                    password: password.to_string(),
+                    language: "English".to_string(),
+                },
+            )
+            .await?;
 
         Ok(())
     }
@@ -157,9 +181,9 @@ impl MoneroWallet {
             address: String,
         }
 
-        let resp: Response = self.call_wallet_rpc("get_address", Params {
-            account_index: 0,
-        }).await?;
+        let resp: Response = self
+            .call_wallet_rpc("get_address", Params { account_index: 0 })
+            .await?;
 
         Ok(resp.address)
     }
@@ -178,9 +202,9 @@ impl MoneroWallet {
             unlocked_balance: u64,
         }
 
-        let resp: Response = self.call_wallet_rpc("get_balance", Params {
-            account_index: 0,
-        }).await?;
+        let resp: Response = self
+            .call_wallet_rpc("get_balance", Params { account_index: 0 })
+            .await?;
 
         Ok((resp.balance, resp.unlocked_balance))
     }
@@ -200,10 +224,10 @@ impl MoneroWallet {
     }
 
     /// Create locked transaction (CRITICAL FOR ATOMIC SWAPS)
-    /// 
+    ///
     /// This is the CORE method for atomic swap implementation
     /// COMIT pattern: Lock XMR with timelock + view key
-    /// 
+    ///
     /// # Arguments
     /// * `destination` - Monero address as string
     /// * `amount_piconero` - Amount in piconero (atomic units, 1 XMR = 10^12 piconero)
@@ -239,16 +263,21 @@ impl MoneroWallet {
             fee: u64,
         }
 
-        let resp: Response = self.call_wallet_rpc("transfer", Params {
-            destinations: vec![Destination {
-                address: destination.to_string(),
-                amount: amount_piconero,
-            }],
-            account_index: 0,
-            unlock_time,
-            get_tx_key: true,
-            get_tx_hex: true,
-        }).await?;
+        let resp: Response = self
+            .call_wallet_rpc(
+                "transfer",
+                Params {
+                    destinations: vec![Destination {
+                        address: destination.to_string(),
+                        amount: amount_piconero,
+                    }],
+                    account_index: 0,
+                    unlock_time,
+                    get_tx_key: true,
+                    get_tx_hex: true,
+                },
+            )
+            .await?;
 
         Ok(TransferResult {
             tx_hash: resp.tx_hash,
@@ -259,7 +288,7 @@ impl MoneroWallet {
     }
 
     /// Get transaction information (PREVENTS DOUBLE-SPENDING)
-    /// 
+    ///
     /// Key images are CRITICAL for atomic swap security
     /// COMIT uses this to verify XMR is truly locked
     pub async fn get_transfer_by_txid(&self, txid: &str) -> Result<TransferInfo> {
@@ -281,9 +310,14 @@ impl MoneroWallet {
             unlock_time: u64,
         }
 
-        let resp: Response = self.call_wallet_rpc("get_transfer_by_txid", Params {
-            txid: txid.to_string(),
-        }).await?;
+        let resp: Response = self
+            .call_wallet_rpc(
+                "get_transfer_by_txid",
+                Params {
+                    txid: txid.to_string(),
+                },
+            )
+            .await?;
 
         Ok(TransferInfo {
             txid: txid.to_string(),
@@ -306,18 +340,14 @@ impl MoneroWallet {
             if info.confirmations >= required_confirmations {
                 info!(
                     "Transaction {} has {} confirmations (required: {})",
-                    txid,
-                    info.confirmations,
-                    required_confirmations
+                    txid, info.confirmations, required_confirmations
                 );
                 return Ok(());
             }
 
             debug!(
                 "Waiting for confirmations: {}/{} for tx {}",
-                info.confirmations,
-                required_confirmations,
-                txid
+                info.confirmations, required_confirmations, txid
             );
 
             sleep(Duration::from_secs(120)).await; // ~2 min per block
@@ -325,14 +355,14 @@ impl MoneroWallet {
     }
 
     /// Get random outputs for decoy selection (ring members)
-    /// 
+    ///
     /// This is used for building ring signatures in Monero transactions.
     /// The wallet-rpc node must be synced to provide valid outputs.
-    /// 
+    ///
     /// # Arguments
     /// * `amounts` - List of amounts to match (in piconero)
     /// * `count` - Number of outputs to return per amount (usually 16 for ring size)
-    /// 
+    ///
     /// # Returns
     /// Vector of output information: (amount, global_index, tx_pub_key)
     pub async fn get_outputs(
@@ -352,30 +382,29 @@ impl MoneroWallet {
             outputs: Vec<serde_json::Value>,
         }
 
-        let resp: Response = self.call_wallet_rpc("get_outs", Params {
-            amounts,
-            count,
-        }).await?;
+        let resp: Response = self
+            .call_wallet_rpc("get_outs", Params { amounts, count })
+            .await?;
 
         Ok(resp.outputs)
     }
 
     /// Generate wallet from spend key (import recovered key)
-    /// 
+    ///
     /// This creates a new wallet using the recovered full spend key.
     /// Used after secret revelation to claim Monero funds.
-    /// 
+    ///
     /// # Arguments
     /// * `spend_key_hex` - Full spend key as hex string (32 bytes)
     /// * `view_key_hex` - View key as hex string (REQUIRED - derived via keccak256)
     /// * `address` - Monero address (REQUIRED by wallet-rpc - must be valid address)
     ///   NOTE: For now, this must be provided. In production, derive from keys using monero-rs.
     /// * `restore_height` - Block height to restore from (optimized, not 0!)
-    /// 
+    ///
     /// # Security
     /// CRITICAL: Both spend key AND view key are REQUIRED by wallet-rpc.
     /// The spend key must be zeroized after use. This function does NOT handle zeroization.
-    /// 
+    ///
     /// # Limitations
     /// Current wallet-rpc version requires a valid address. For production, derive address
     /// from spend/view keys using proper Monero crypto libraries (e.g., monero-rs).
@@ -387,9 +416,9 @@ impl MoneroWallet {
         restore_height: u64,
     ) -> Result<String> {
         use uuid::Uuid;
-        
+
         let wallet_name = format!("swap_{}", Uuid::new_v4());
-        
+
         #[derive(Deserialize)]
         struct Response {
             #[allow(dead_code)]
@@ -407,21 +436,22 @@ impl MoneroWallet {
             "restore_height": restore_height,
             "autosave_current": false,
         });
-        
-        let _resp: Response = self.call_wallet_rpc("generate_from_keys", params).await
-        .context("Failed to generate wallet from keys")?;
+
+        let _resp: Response = self
+            .call_wallet_rpc("generate_from_keys", params)
+            .await
+            .context("Failed to generate wallet from keys")?;
 
         info!(
             "Generated wallet from keys (restore_height: {}, wallet: {})",
-            restore_height,
-            wallet_name
+            restore_height, wallet_name
         );
 
         Ok(wallet_name)
     }
 
     /// Refresh wallet (sync with blockchain)
-    /// 
+    ///
     /// Scans the blockchain for outputs belonging to this wallet.
     /// Must be called after generating wallet from keys to detect received funds.
     pub async fn refresh(&self) -> Result<()> {
@@ -436,28 +466,32 @@ impl MoneroWallet {
             received_money: bool,
         }
 
-        let resp: Response = self.call_wallet_rpc("refresh", Params {
-            start_height: 0, // Scan from beginning
-        }).await
-        .context("Failed to refresh wallet")?;
+        let resp: Response = self
+            .call_wallet_rpc(
+                "refresh",
+                Params {
+                    start_height: 0, // Scan from beginning
+                },
+            )
+            .await
+            .context("Failed to refresh wallet")?;
 
         info!(
             "Wallet refreshed: {} blocks fetched, received_money: {}",
-            resp.blocks_fetched,
-            resp.received_money
+            resp.blocks_fetched, resp.received_money
         );
 
         Ok(())
     }
 
     /// Sweep all funds to destination (send entire balance)
-    /// 
+    ///
     /// This is the standard way to claim funds after key recovery in atomic swaps.
     /// Sends all available balance to the destination address.
-    /// 
+    ///
     /// # Arguments
     /// * `destination` - Monero address to send funds to
-    /// 
+    ///
     /// # Returns
     /// Transaction hash of the sweep transaction
     pub async fn sweep_all(&self, destination: &str) -> Result<String> {
@@ -480,16 +514,21 @@ impl MoneroWallet {
             fee_list: Vec<u64>,
         }
 
-        let resp: Response = self.call_wallet_rpc("sweep_all", Params {
-            address: destination.to_string(),
-            account_index: 0,
-            subaddr_indices: vec![], // Empty = all subaddresses
-            priority: 1, // Normal priority
-            ring_size: 16, // Standard ring size
-            get_tx_keys: true,
-            get_tx_hex: true,
-        }).await
-        .context("Failed to sweep all funds")?;
+        let resp: Response = self
+            .call_wallet_rpc(
+                "sweep_all",
+                Params {
+                    address: destination.to_string(),
+                    account_index: 0,
+                    subaddr_indices: vec![], // Empty = all subaddresses
+                    priority: 1,             // Normal priority
+                    ring_size: 16,           // Standard ring size
+                    get_tx_keys: true,
+                    get_tx_hex: true,
+                },
+            )
+            .await
+            .context("Failed to sweep all funds")?;
 
         if resp.tx_hash_list.is_empty() {
             anyhow::bail!("Sweep returned no transactions (no funds to sweep?)");
@@ -507,11 +546,13 @@ impl MoneroWallet {
     }
 
     /// Close wallet (cleanup after operations)
-    /// 
+    ///
     /// Closes the currently opened wallet. Useful for cleanup after
     /// temporary wallet operations like claiming funds after key recovery.
     pub async fn close_wallet(&self) -> Result<()> {
-        let _: serde_json::Value = self.call_wallet_rpc("close_wallet", json!({})).await
+        let _: serde_json::Value = self
+            .call_wallet_rpc("close_wallet", json!({}))
+            .await
             .context("Failed to close wallet")?;
 
         info!("Wallet closed successfully");
@@ -519,22 +560,22 @@ impl MoneroWallet {
     }
 
     /// Securely delete wallet files from disk
-    /// 
+    ///
     /// Overwrites wallet files with zeros before deletion to prevent
     /// recovery of sensitive key material from disk.
-    /// 
+    ///
     /// # Arguments
     /// * `wallet_name` - Name of the wallet to delete
     pub async fn secure_delete_wallet(&self, wallet_name: &str) -> Result<()> {
         use std::fs;
         use std::path::Path;
-        
+
         let files = vec![
             format!("{}/{}", self.wallet_dir, wallet_name),
             format!("{}/{}.keys", self.wallet_dir, wallet_name),
             format!("{}/{}.address.txt", self.wallet_dir, wallet_name),
         ];
-        
+
         for path in files {
             let path_obj = Path::new(&path);
             if path_obj.exists() {
@@ -550,7 +591,7 @@ impl MoneroWallet {
                 debug!("Securely deleted wallet file: {}", path);
             }
         }
-        
+
         info!("Securely deleted wallet: {}", wallet_name);
         Ok(())
     }
@@ -578,12 +619,8 @@ impl MoneroWallet {
         #[derive(Deserialize)]
         #[serde(untagged)]
         enum JsonRpcResponse<R> {
-            Success {
-                result: R,
-            },
-            Error {
-                error: RpcError,
-            },
+            Success { result: R },
+            Error { error: RpcError },
         }
 
         let req = Request {
@@ -593,7 +630,8 @@ impl MoneroWallet {
             params,
         };
 
-        let resp: JsonRpcResponse<R> = self.http_client
+        let resp: JsonRpcResponse<R> = self
+            .http_client
             .post(&self.wallet_rpc_url)
             .json(&req)
             .send()
@@ -605,12 +643,11 @@ impl MoneroWallet {
 
         match resp {
             JsonRpcResponse::Success { result } => Ok(result),
-            JsonRpcResponse::Error { error } => {
-                Err(MoneroWalletError::RpcCallFailed(format!(
-                    "RPC error {}: {}",
-                    error.code, error.message
-                )).into())
-            }
+            JsonRpcResponse::Error { error } => Err(MoneroWalletError::RpcCallFailed(format!(
+                "RPC error {}: {}",
+                error.code, error.message
+            ))
+            .into()),
         }
     }
 }
@@ -623,4 +660,3 @@ impl MoneroWalletClient for MoneroWallet {
         MoneroWallet::get_transfer_by_txid(self, txid).await
     }
 }
-

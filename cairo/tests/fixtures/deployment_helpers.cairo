@@ -21,12 +21,12 @@ const TESTVECTOR_T_SQRT_HINT: u256 = u256 {
     high: 0x17611da35f39a2a5e3a9fddb8d978e4f,
 };
 const TESTVECTOR_U_COMPRESSED: u256 = u256 {
-    low: 0xd893b3476bdf09770b7616f84c5c7bbe,
-    high: 0x5c79d0fa84d6440908e2e2065e60d1cd,
+    low: 0x9244eb3a3699efed3106c6ae0afdf28,
+    high: 0xb6e0bfc0d9fbb8a4c8ef08cb5da2eff3,
 };
 const TESTVECTOR_U_SQRT_HINT: u256 = u256 {
-    low: 0xdcad2173817c163b5405cec7698eb4b8,
-    high: 0x742bb3c44b13553c8ddff66565b44cac,
+    low: 0xcffea6b3bffe746de20fdd0734b30845,
+    high: 0x5e4a3b18b41199f9389ded8696067271,
 };
 const TESTVECTOR_R1_COMPRESSED: u256 = u256 {
     low: 0x3cb02521d7a17fedca11c02ea41fe334,
@@ -37,15 +37,15 @@ const TESTVECTOR_R1_SQRT_HINT: u256 = u256 {
     high: 0x0a2d15cdfbfcf6181e92f0b7c74b477e,
 };
 const TESTVECTOR_R2_COMPRESSED: u256 = u256 {
-    low: 0xb4fb26c272cbe6b84d65d4f908aff02f,
-    high: 0xf58498fd33c0fbca066f3fdff2f49225,
+    low: 0xe66ca975ef303c032fcc18a952325162,
+    high: 0xc5d2eb608176c8b79dfa55289c35b35f,
 };
 const TESTVECTOR_R2_SQRT_HINT: u256 = u256 {
-    low: 0x598521e3f6d818ed84721901f0d87f89,
-    high: 0x09d2fd2811966933dff4c8ab0d9059fc,
+    low: 0xd8b08d5ec3d265b83e5e333d750d6b37,
+    high: 0x0e41fbdbbf62b47c511e0a5aa04059de,
 };
-const TESTVECTOR_CHALLENGE_LOW: felt252 = 0x8d664bb70810bdab323a44354d98f94a;
-const TESTVECTOR_RESPONSE_LOW: felt252 = 0x1e741f8fec4161ea41b23ce6d007ba12;
+const TESTVECTOR_CHALLENGE: felt252 = 0x47c760eb9b6a8797680bef6218e06aacc6570f8be11819d2268bb024f816108;
+const TESTVECTOR_RESPONSE: u256 = u256 { low: 0xbe3ffdd10e06b50b800feb45877b787b, high: 0x2f0ceba8a8c56d6f6b4ed3ae98db234 };
 
 /// Deploy contract with test vector data (recommended for most tests).
 ///
@@ -88,8 +88,8 @@ pub fn deploy_with_test_vectors(
         TESTVECTOR_T_SQRT_HINT,
         TESTVECTOR_U_COMPRESSED,
         TESTVECTOR_U_SQRT_HINT,
-        TESTVECTOR_CHALLENGE_LOW,  // Truncated challenge (128 bits)
-        TESTVECTOR_RESPONSE_LOW,   // Truncated response (128 bits)
+        TESTVECTOR_CHALLENGE,  // Full Poseidon challenge felt
+        TESTVECTOR_RESPONSE,   // Full Ed25519 response scalar
         fake_glv_hint,
         s_hint_for_g,
         s_hint_for_y,
@@ -104,114 +104,69 @@ pub fn deploy_with_test_vectors(
 
 /// Get real MSM hints generated from test vectors.
 ///
-/// These hints are production-grade and match the truncated scalars used in Cairo.
-/// CRITICAL: Hints generated with TRUNCATED scalars (128-bit) to match Cairo's behavior.
+/// These hints are production-grade and match the full scalars used in Cairo.
+/// CRITICAL: Hints are generated from the full challenge/response, not legacy 128-bit truncations.
 fn get_real_msm_hints() -> (
     Span<felt252>,
     Span<felt252>,
     Span<felt252>,
     Span<felt252>,
 ) {
-    // s_hint_for_g: Fake-GLV hint for s·G (with truncated s)
+    // s_hint_for_g: Fake-GLV hint for s·G (with full s)
     let s_hint_for_g = array![
+            0xceeec4a90f34e45c033e2ff5,
+            0xb419479f38f86b2b114d2ff1,
+            0x256941d7d54e7beb,
+            0x0,
+            0xaa6ddc025eb012317a89612a,
+            0x6e9d804e52cb98594f552df2,
+            0x47244d9888c072a3,
+            0x0,
+            0xcd234e4105b9809a3f4f0dde019dac1,
+            0x1268c27967bf37239a1bdcad1722144e1
+        ].span();
 
-        0x52f522935135e7c5474d3b99,
-
-        0x7ff7e65231c434008a0c02f8,
-
-        0x41a3962ca5bba9db,
-
-        0x0,
-
-        0xa144206dc24b7180d05200e0,
-
-        0xe8a798301a354777473cd98e,
-
-        0x7ca5add375ea088,
-
-        0x0,
-
-        0x1e741f8fec4161ea41b23ce6d007ba12,
-
-        0x100000000000000000000000000000001
-
-    ].span();
-
-    // s_hint_for_y: Fake-GLV hint for s·Y (with truncated s)
+    // s_hint_for_y: Fake-GLV hint for s·Y (with full s)
     let s_hint_for_y = array![
+            0x872011d1a9f20fc5fbed65ec,
+            0xd36e4710d58461cfe9c9ee1d,
+            0x686f29bbaf2b952f,
+            0x0,
+            0xf350a6f8bc8acbb1d5c40cd5,
+            0x4b256a3dba76a0bc779c811,
+            0x43f41814a3eefa59,
+            0x0,
+            0xcd234e4105b9809a3f4f0dde019dac1,
+            0x1268c27967bf37239a1bdcad1722144e1
+        ].span();
 
-        0x3b81c211fd322bb7dbcb711c,
-
-        0x2082c0dd34f9225f2eb5e0b0,
-
-        0x311b02be49202932,
-
-        0x0,
-
-        0x18c0245425f95187b10e1913,
-
-        0x922be9d1d5313d1c7a4cb499,
-
-        0x51d9b0eb8a969e37,
-
-        0x0,
-
-        0x1e741f8fec4161ea41b23ce6d007ba12,
-
-        0x100000000000000000000000000000001
-
-    ].span();
-
-    // c_neg_hint_for_t: Fake-GLV hint for (-c)·T (with truncated c)
+    // c_neg_hint_for_t: Fake-GLV hint for (-c)·T (with full c)
     let c_neg_hint_for_t = array![
+            0xfbeb7a88a7204a3109847933,
+            0xd7bd766f54592bfb04b8a0bf,
+            0x36adfbd5b292a10e,
+            0x0,
+            0xb1cb68d66c0170146df52bb2,
+            0x7ad50b1ffcd1293f12940e01,
+            0x665e063c6d4ac0f6,
+            0x0,
+            0x4d5cf08f2a0aee991f621d5e4e15728,
+            0x1148705832ba97f2b70dec32979f4f785
+        ].span();
 
-        0xcb63575f3729fe6cbe7f8496,
-
-        0x9dc314d92447fddbfc1be6cd,
-
-        0x7d6caff1e7cdaa02,
-
-        0x0,
-
-        0x78dc46b41742aa135083e2da,
-
-        0xecafad9bd49fe98686457cc6,
-
-        0x592bb6f3eaf7ca3,
-
-        0x0,
-
-        0x34a3efff5488d0dfc135bf37e3357b53,
-
-        0x1cf7b1760ae5d3463a08a196fd625720
-
-    ].span();
-
-    // c_neg_hint_for_u: Fake-GLV hint for (-c)·U (with truncated c)
+    // c_neg_hint_for_u: Fake-GLV hint for (-c)·U (with full c)
     let c_neg_hint_for_u = array![
-
-        0x61ebcae684d8530622e29b45,
-
-        0x694dbc34734f56c0e29f5240,
-
-        0x1913755501e61b9a,
-
-        0x0,
-
-        0x2a37ba10878046ff378a7d73,
-
-        0x25857fe5ce7f65cea1bbc1e0,
-
-        0xca82b2053c5e43e,
-
-        0x0,
-
-        0x34a3efff5488d0dfc135bf37e3357b53,
-
-        0x1cf7b1760ae5d3463a08a196fd625720
-
-    ].span();
+            0x16ecdc108960cb810ed61451,
+            0x28bf80201d67e2f4728ba74b,
+            0x63f872f4f71e1950,
+            0x0,
+            0xe94caf1beb68a19f34eb98a4,
+            0x48bcbcb46602eeea1b043d0d,
+            0x52e390f474357096,
+            0x0,
+            0x4d5cf08f2a0aee991f621d5e4e15728,
+            0x1148705832ba97f2b70dec32979f4f785
+        ].span();
 
     (s_hint_for_g, s_hint_for_y, c_neg_hint_for_t, c_neg_hint_for_u)
 }
-

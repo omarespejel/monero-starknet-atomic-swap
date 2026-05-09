@@ -3,11 +3,15 @@
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 
-use super::state::SwapState;
 use super::db::SwapDb;
-use crate::monero::{wait_for_finality, MoneroWalletClient, DEFAULT_CONFIRMATIONS, DEFAULT_POLL_INTERVAL_SECS, claim_monero_after_reveal};
+use super::state::SwapState;
+use crate::monero::{
+    claim_monero_after_reveal, wait_for_finality, MoneroWalletClient, DEFAULT_CONFIRMATIONS,
+    DEFAULT_POLL_INTERVAL_SECS,
+};
 use crate::monero_wallet::MoneroWallet;
 use curve25519_dalek::scalar::Scalar;
+use monero::Network;
 use zeroize::{Zeroize, Zeroizing};
 
 /// Trait for Starknet operations (enables mocking).
@@ -61,9 +65,16 @@ where
     }
 
     let new_state = match state {
-        SwapState::Created { swap_id, lock_duration_secs, amount, expected_monero_amount, hashlock, monero_restore_height } => {
+        SwapState::Created {
+            swap_id,
+            lock_duration_secs,
+            amount,
+            expected_monero_amount,
+            hashlock,
+            monero_restore_height,
+        } => {
             tracing::info!("[{}] Deploying Starknet contract...", swap_id);
-            
+
             let (contract_address, lock_until) = starknet
                 .deploy_and_deposit(*hashlock, *lock_duration_secs, *amount)
                 .await
@@ -85,18 +96,34 @@ where
             return Ok(None);
         }
 
-        SwapState::XmrSent { swap_id, contract_address, lock_until, monero_txid, .. } => {
-            tracing::info!("[{}] Waiting for {} confirmations...", swap_id, DEFAULT_CONFIRMATIONS);
-            
+        SwapState::XmrSent {
+            swap_id,
+            contract_address,
+            lock_until,
+            monero_txid,
+            ..
+        } => {
+            tracing::info!(
+                "[{}] Waiting for {} confirmations...",
+                swap_id,
+                DEFAULT_CONFIRMATIONS
+            );
+
             let info = wait_for_finality(
                 monero,
                 monero_txid,
                 DEFAULT_CONFIRMATIONS,
                 DEFAULT_POLL_INTERVAL_SECS,
                 0, // no timeout (swap timeout handled separately)
-            ).await.context("XMR finality wait failed")?;
+            )
+            .await
+            .context("XMR finality wait failed")?;
 
-            tracing::info!("[{}] XMR confirmed ({} confirmations)", swap_id, info.confirmations);
+            tracing::info!(
+                "[{}] XMR confirmed ({} confirmations)",
+                swap_id,
+                info.confirmations
+            );
 
             SwapState::XmrConfirmed {
                 swap_id: swap_id.clone(),
@@ -106,9 +133,13 @@ where
             }
         }
 
-        SwapState::XmrConfirmed { swap_id, contract_address, .. } => {
+        SwapState::XmrConfirmed {
+            swap_id,
+            contract_address,
+            ..
+        } => {
             tracing::info!("[{}] Revealing secret on Starknet...", swap_id);
-            
+
             let _tx = starknet
                 .reveal_secret(contract_address, secret)
                 .await
@@ -124,23 +155,32 @@ where
                 contract_address: contract_address.clone(),
                 reveal_timestamp,
                 monero_restore_height: None, // Should be preserved from earlier states
-                partial_spend_key: None, // Must be set before claiming
-                claim_destination: None, // Must be set before claiming
+                partial_spend_key: None,     // Must be set before claiming
+                claim_destination: None,     // Must be set before claiming
             }
         }
 
-        SwapState::SecretRevealed { swap_id, contract_address, reveal_timestamp, .. } => {
+        SwapState::SecretRevealed {
+            swap_id,
+            contract_address,
+            reveal_timestamp,
+            ..
+        } => {
             let now = starknet.get_block_timestamp().await?;
-            
+
             if now < reveal_timestamp + GRACE_PERIOD_SECS {
                 // Still in grace period
                 let remaining = (reveal_timestamp + GRACE_PERIOD_SECS) - now;
-                tracing::info!("[{}] Grace period: {} seconds remaining", swap_id, remaining);
+                tracing::info!(
+                    "[{}] Grace period: {} seconds remaining",
+                    swap_id,
+                    remaining
+                );
                 return Ok(None);
             }
 
             tracing::info!("[{}] Claiming tokens...", swap_id);
-            
+
             let tx = starknet
                 .claim_tokens(contract_address)
                 .await
@@ -180,7 +220,14 @@ pub fn resume_with_xmr_txid(
     monero_amount: u64,
 ) -> Result<SwapState> {
     match current {
-        SwapState::StarknetLocked { swap_id, contract_address, lock_until, expected_monero_amount, hashlock: _, .. } => {
+        SwapState::StarknetLocked {
+            swap_id,
+            contract_address,
+            lock_until,
+            expected_monero_amount,
+            hashlock: _,
+            ..
+        } => {
             // SECURITY: Validate amount matches expected (from state)
             if monero_amount < *expected_monero_amount {
                 return Err(anyhow!(
@@ -199,7 +246,10 @@ pub fn resume_with_xmr_txid(
                 monero_amount,
             })
         }
-        _ => Err(anyhow!("Can only resume from StarknetLocked state, got {:?}", current)),
+        _ => Err(anyhow!(
+            "Can only resume from StarknetLocked state, got {:?}",
+            current
+        )),
     }
 }
 
@@ -217,22 +267,34 @@ fn get_lock_until(state: &SwapState) -> Option<u64> {
 fn can_refund(state: &SwapState) -> bool {
     matches!(
         state,
-        SwapState::StarknetLocked { .. } | SwapState::XmrSent { .. } | SwapState::XmrConfirmed { .. }
+        SwapState::StarknetLocked { .. }
+            | SwapState::XmrSent { .. }
+            | SwapState::XmrConfirmed { .. }
     )
 }
 
 async fn handle_refund<S: StarknetClient>(state: &SwapState, starknet: &S) -> Result<SwapState> {
     let (swap_id, contract_address) = match state {
-        SwapState::StarknetLocked { swap_id, contract_address, .. }
-        | SwapState::XmrSent { swap_id, contract_address, .. }
-        | SwapState::XmrConfirmed { swap_id, contract_address, .. } => {
-            (swap_id.clone(), contract_address.clone())
+        SwapState::StarknetLocked {
+            swap_id,
+            contract_address,
+            ..
         }
+        | SwapState::XmrSent {
+            swap_id,
+            contract_address,
+            ..
+        }
+        | SwapState::XmrConfirmed {
+            swap_id,
+            contract_address,
+            ..
+        } => (swap_id.clone(), contract_address.clone()),
         _ => return Err(anyhow!("Cannot refund from state: {:?}", state)),
     };
 
     tracing::warn!("[{}] Timeout exceeded, initiating refund...", swap_id);
-    
+
     let refund_tx = starknet.refund(&contract_address).await?;
 
     Ok(SwapState::Refunded {
@@ -253,6 +315,7 @@ async fn handle_refund<S: StarknetClient>(state: &SwapState, starknet: &S) -> Re
 /// * `wallet_rpc_url` - Monero wallet-rpc URL
 /// * `daemon_rpc_url` - Monero daemon RPC URL
 /// * `wallet_dir` - Directory for temporary wallet files
+/// * `network` - Explicit Monero network for recovered wallet address derivation
 ///
 /// # Returns
 /// Transaction hash of the Monero claim transaction
@@ -262,6 +325,7 @@ pub async fn handle_secret_revealed(
     wallet_rpc_url: &str,
     daemon_rpc_url: &str,
     wallet_dir: &str,
+    network: Network,
 ) -> Result<String> {
     let (swap_id, partial_spend_key, claim_destination, restore_height) = match state {
         SwapState::SecretRevealed {
@@ -314,6 +378,7 @@ pub async fn handle_secret_revealed(
         *t,
         &claim_destination,
         restore_height,
+        network,
     )
     .await
     .context("Failed to claim Monero funds")?;
@@ -350,4 +415,3 @@ pub async fn get_current_monero_height(daemon_url: &str) -> Result<u64> {
     // Subtract safety margin (10 blocks ≈ 20 minutes)
     Ok(height.saturating_sub(10))
 }
-

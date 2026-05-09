@@ -23,8 +23,7 @@ fn main() {
 
     for (name, hex_str) in points {
         let bytes: [u8; 32] = hex::decode(hex_str).unwrap().try_into().unwrap();
-        let x_bytes = sqrt_hint_from_compressed(&bytes)
-            .expect("Failed to derive sqrt hint");
+        let x_bytes = sqrt_hint_from_compressed(&bytes).expect("Failed to derive sqrt hint");
 
         let low = u128::from_le_bytes(x_bytes[..16].try_into().unwrap());
         let high = u128::from_le_bytes(x_bytes[16..].try_into().unwrap());

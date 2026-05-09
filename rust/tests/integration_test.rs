@@ -7,9 +7,7 @@
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::scalar::Scalar;
 use sha2::{Digest, Sha256};
-use xmr_secret_gen::adaptor::{
-    create_adaptor_signature, finalize_signature, verify_signature,
-};
+use xmr_secret_gen::adaptor::{create_adaptor_signature, finalize_signature, verify_signature};
 use xmr_secret_gen::generate_swap_secret;
 
 #[test]
@@ -28,14 +26,9 @@ fn test_full_swap_round() {
     // For this test, we'll use the adaptor_scalar from swap_secret
     let full_monero_key = Scalar::from_bytes_mod_order([0x42u8; 32]);
 
-    // Create key pair with the same adaptor_scalar that Cairo will use
-    // Use SwapKeyPair from monero module (production approach)
-    use xmr_secret_gen::monero::SwapKeyPair;
     let base_key = full_monero_key - adaptor_scalar;
-    // Note: SwapKeyPair::generate() creates a new pair, so we construct manually for this test
+    // Construct the partial key directly so this test keeps the Cairo/Monero scalar fixed.
     let partial_key = base_key;
-    let adaptor_point = &adaptor_scalar * &ED25519_BASEPOINT_POINT;
-    let public_key = &full_monero_key * &ED25519_BASEPOINT_POINT;
 
     // ========== STEP 2: Create adaptor point (goes to Cairo) ==========
     let adaptor_point = &adaptor_scalar * &ED25519_BASEPOINT_POINT;

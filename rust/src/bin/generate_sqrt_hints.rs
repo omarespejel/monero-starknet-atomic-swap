@@ -32,10 +32,8 @@ fn main() {
         .try_into()
         .expect("R2 must be 32 bytes");
 
-    let r1_x_bytes =
-        sqrt_hint_from_compressed(&r1_bytes).expect("Failed to derive R1 sqrt hint");
-    let r2_x_bytes =
-        sqrt_hint_from_compressed(&r2_bytes).expect("Failed to derive R2 sqrt hint");
+    let r1_x_bytes = sqrt_hint_from_compressed(&r1_bytes).expect("Failed to derive R1 sqrt hint");
+    let r2_x_bytes = sqrt_hint_from_compressed(&r2_bytes).expect("Failed to derive R2 sqrt hint");
 
     // Convert to u256 format (low/high u128)
     let r1_x_low = u128::from_le_bytes(r1_x_bytes[..16].try_into().unwrap());

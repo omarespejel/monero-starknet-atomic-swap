@@ -15,9 +15,9 @@
 //! This module fetches decoys via wallet-rpc's `get_outputs` method,
 //! which returns random outputs suitable for ring members.
 
-use anyhow::{Context, Result};
-use crate::monero_wallet::MoneroWallet;
 use super::transaction::{DecoySet, RingMember};
+use crate::monero_wallet::MoneroWallet;
+use anyhow::{Context, Result};
 
 /// Fetch decoys for a transaction input.
 ///
@@ -34,11 +34,12 @@ use super::transaction::{DecoySet, RingMember};
 pub async fn fetch_decoys(
     wallet: &MoneroWallet,
     amount: u64,
-    ring_size: usize,  // Usually 16 for current Monero
+    ring_size: usize, // Usually 16 for current Monero
 ) -> Result<DecoySet> {
-
     // Call wallet-rpc get_outs method
-    let outputs = wallet.get_outputs(vec![amount], ring_size as u64).await
+    let outputs = wallet
+        .get_outputs(vec![amount], ring_size as u64)
+        .await
         .context("Failed to fetch decoys from wallet-rpc")?;
 
     if outputs.len() < ring_size {
@@ -61,8 +62,8 @@ pub async fn fetch_decoys(
         let tx_pub_key_hex = output["tx_pub_key"]
             .as_str()
             .context("Missing tx_pub_key in output")?;
-        let output_key = parse_hex_to_32_bytes(tx_pub_key_hex)
-            .context("Invalid tx_pub_key format")?;
+        let output_key =
+            parse_hex_to_32_bytes(tx_pub_key_hex).context("Invalid tx_pub_key format")?;
 
         // Parse key_image (commitment) - note: wallet-rpc handles this automatically
         // The actual commitment is computed from the amount and blinding factor
@@ -82,9 +83,8 @@ pub async fn fetch_decoys(
 /// Parse hex string to 32-byte array
 fn parse_hex_to_32_bytes(hex: &str) -> Result<[u8; 32]> {
     let hex = hex.strip_prefix("0x").unwrap_or(hex);
-    let bytes = hex::decode(hex)
-        .context("Invalid hex string")?;
-    
+    let bytes = hex::decode(hex).context("Invalid hex string")?;
+
     if bytes.len() != 32 {
         anyhow::bail!("Expected 32 bytes, got {}", bytes.len());
     }
@@ -104,7 +104,7 @@ pub async fn fetch_decoys_batch(
 ) -> Result<Vec<DecoySet>> {
     // TODO: Implement batch decoy fetching
     // This can be more efficient than individual calls
-    
+
     let mut decoy_sets = Vec::new();
     for amount in amounts {
         decoy_sets.push(fetch_decoys(wallet, amount, ring_size).await?);
@@ -114,8 +114,6 @@ pub async fn fetch_decoys_batch(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[tokio::test]
     #[ignore] // Requires wallet-rpc connection
     async fn test_fetch_decoys_placeholder() {
@@ -123,4 +121,3 @@ mod tests {
         // For now, it documents the expected interface
     }
 }
-

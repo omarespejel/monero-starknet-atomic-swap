@@ -26,8 +26,8 @@ pub const SQRT_HINT_T: u256 = u256 {
 /// Second Point U sqrt hint
 /// VALIDATED: 2025-12-09 via test_unit_point_decompression
 pub const SQRT_HINT_U: u256 = u256 {
-    low: 0xdcad2173817c163b5405cec7698eb4b8,
-    high: 0x742bb3c44b13553c8ddff66565b44cac,
+    low: 0xcffea6b3bffe746de20fdd0734b30845,
+    high: 0x5e4a3b18b41199f9389ded8696067271,
 };
 
 /// Commitment Point R1 sqrt hint
@@ -40,7 +40,7 @@ pub const SQRT_HINT_R1: u256 = u256 {
 /// Commitment Point R2 sqrt hint
 /// VALIDATED: 2025-12-09 via test_unit_point_decompression
 pub const SQRT_HINT_R2: u256 = u256 {
-    low: 0x598521e3f6d818ed84721901f0d87f89,
-    high: 0x09d2fd2811966933dff4c8ab0d9059fc,
+    low: 0xd8b08d5ec3d265b83e5e333d750d6b37,
+    high: 0x0e41fbdbbf62b47c511e0a5aa04059de,
 };
 

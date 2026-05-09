@@ -13,7 +13,7 @@ pub mod monero_wallet;
 pub mod starknet;
 pub mod swap;
 
-pub use dleq::{generate_dleq_proof, DleqProof, DleqError};
+pub use dleq::{generate_dleq_proof, DleqError, DleqProof};
 pub use monero::SwapKeyPair;
 #[cfg(feature = "full-integration")]
 pub mod monero_full;
@@ -27,6 +27,7 @@ use std::process::Command;
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar;
+use num_bigint::BigUint;
 use rand::rngs::OsRng;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
@@ -42,11 +43,25 @@ pub struct SwapSecret {
     pub cairo_secret_literal: String,
     pub adaptor_point_x_limbs: [String; 4],
     pub adaptor_point_y_limbs: [String; 4],
-    pub dleq_second_point_x_limbs: [String; 4],
-    pub dleq_second_point_y_limbs: [String; 4],
+    pub adaptor_point_compressed: U256Hex,
+    pub adaptor_point_sqrt_hint: U256Hex,
+    pub dleq_second_point_compressed: U256Hex,
+    pub dleq_second_point_sqrt_hint: U256Hex,
     pub dleq_challenge: String,
-    pub dleq_response: String,
+    pub dleq_response: U256Hex,
+    pub dleq_r1_compressed: U256Hex,
+    pub dleq_r1_sqrt_hint: U256Hex,
+    pub dleq_r2_compressed: U256Hex,
+    pub dleq_r2_sqrt_hint: U256Hex,
     pub fake_glv_hint: [String; 10],
+}
+
+/// u256 serialized both as a single little-endian integer and Cairo low/high limbs.
+#[derive(Clone, Serialize)]
+pub struct U256Hex {
+    pub value: String,
+    pub low: String,
+    pub high: String,
 }
 
 /// Python tool output structure (partial, for adaptor point/hint extraction).
@@ -75,17 +90,17 @@ where
     use serde::de::Error;
     // Parse as Value first to get raw access
     let value = serde_json::Value::deserialize(deserializer)?;
-    
+
     // Extract the raw JSON string and parse manually to preserve large integers
     let _json_str = serde_json::to_string(&value).map_err(D::Error::custom)?;
-    
+
     // Parse the array manually from raw JSON
     // This is a workaround for serde_json converting large integers to f64
     // We'll use a simpler approach: parse as Value and handle each element
     let array = value
         .as_array()
         .ok_or_else(|| D::Error::custom("Expected array"))?;
-    
+
     array
         .iter()
         .map(|v| {
@@ -136,20 +151,20 @@ fn generate_adaptor_point_from_python(
     let mut tools_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     tools_dir.pop(); // Go up from rust/ to repo root
     tools_dir.push("tools");
-    
+
     let script_path = tools_dir.join("generate_ed25519_test_data.py");
     if !script_path.exists() {
         return Err("Python tool not found".to_string());
     }
 
-    // Call Python tool: uv run python generate_ed25519_test_data.py <secret_hex> --save
+    // Call Python tool: uv run python generate_ed25519_test_data.py <secret_hex> --json
     let output = Command::new("uv")
-        .args(&[
+        .args([
             "run",
             "python",
             script_path.to_str().unwrap(),
             secret_hex,
-            "--save",
+            "--json",
         ])
         .current_dir(&tools_dir)
         .output()
@@ -160,12 +175,7 @@ fn generate_adaptor_point_from_python(
         return Err(format!("Python tool failed: {}", stderr));
     }
 
-    // Read JSON file written by Python tool
-    let json_path = tools_dir.join("ed25519_test_data.json");
-    let json_content = std::fs::read_to_string(&json_path)
-        .map_err(|e| format!("Failed to read JSON file: {}", e))?;
-    
-    let data: PythonToolOutput = serde_json::from_str(&json_content)
+    let data: PythonToolOutput = serde_json::from_slice(&output.stdout)
         .map_err(|e| format!("Failed to parse Python tool output: {}", e))?;
 
     // Extract x_limbs from cairo_x: "(0x..., 0x..., 0x..., 0x...)"
@@ -221,6 +231,23 @@ fn generate_adaptor_point_from_python(
     ))
 }
 
+fn u256_hex_from_le_bytes(bytes: &[u8; 32]) -> U256Hex {
+    let mut low_bytes = [0u8; 16];
+    let mut high_bytes = [0u8; 16];
+    low_bytes.copy_from_slice(&bytes[..16]);
+    high_bytes.copy_from_slice(&bytes[16..]);
+
+    U256Hex {
+        value: format!("0x{}", BigUint::from_bytes_le(bytes).to_str_radix(16)),
+        low: format!("0x{:x}", u128::from_le_bytes(low_bytes)),
+        high: format!("0x{:x}", u128::from_le_bytes(high_bytes)),
+    }
+}
+
+fn felt_hex_from_le_bytes(bytes: &[u8; 32]) -> String {
+    format!("0x{}", BigUint::from_bytes_le(bytes).to_str_radix(16))
+}
+
 /// Generate a Monero-compatible scalar and compute its SHA-256 hash.
 pub fn generate_swap_secret() -> SwapSecret {
     let mut csprng = OsRng;
@@ -232,24 +259,14 @@ pub fn generate_swap_secret() -> SwapSecret {
     let secret_bytes = scalar.to_bytes();
 
     // Compute adaptor point T = t·G on Edwards curve (for Monero compatibility check).
-    let _adaptor_point: EdwardsPoint = &scalar * &ED25519_BASEPOINT_POINT;
+    let adaptor_point_edwards: EdwardsPoint = &scalar * &ED25519_BASEPOINT_POINT;
 
     // Generate real adaptor point and fake-GLV hint using Python tool for consistency with Cairo.
     let secret_hex = hex::encode(secret_bytes);
-    let (adaptor_point_x_limbs, adaptor_point_y_limbs, fake_glv_hint) = 
-        generate_adaptor_point_from_python(&secret_hex).unwrap_or_else(|e| {
-            // Fallback to placeholder if Python tool unavailable (e.g., in tests without Python env)
-            // In production, ensure Python tool is available or use pre-generated values
-            eprintln!(
-                "Warning: Python tool unavailable ({}), using placeholder adaptor point/hint",
-                e
-            );
-            (
-                ["0x0", "0x0", "0x0", "0x0"].map(str::to_string),
-                ["0x0", "0x0", "0x0", "0x0"].map(str::to_string),
-                ["0x0"; 10].map(str::to_string),
-            )
-        });
+    let (adaptor_point_x_limbs, adaptor_point_y_limbs, fake_glv_hint) =
+        generate_adaptor_point_from_python(&secret_hex).expect(
+            "failed to generate Cairo adaptor point/fake-GLV hints; run through tools/uv instead of using placeholder data",
+        );
 
     // SHA-256 hash.
     let hash_bytes: [u8; 32] = Sha256::digest(&secret_bytes).into();
@@ -264,22 +281,27 @@ pub fn generate_swap_secret() -> SwapSecret {
     // Generate DLEQ proof (wrap scalar in Zeroizing for memory safety)
     // Note: secret_bytes is already raw bytes here, which is correct for Cairo compatibility
     let secret_zeroizing = Zeroizing::new(scalar);
-    let adaptor_point_edwards = ED25519_BASEPOINT_POINT * *secret_zeroizing;
-    let dleq_proof = generate_dleq_proof(&secret_zeroizing, &secret_bytes, &adaptor_point_edwards, &hashlock)
-        .expect("DLEQ proof generation should succeed for valid test inputs");
+    let dleq_proof = generate_dleq_proof(
+        &secret_zeroizing,
+        &secret_bytes,
+        &adaptor_point_edwards,
+        &hashlock,
+    )
+    .expect("DLEQ proof generation should succeed for valid test inputs");
+    let dleq_cairo = dleq_proof
+        .to_cairo_format(&adaptor_point_edwards)
+        .expect("DLEQ proof should convert to Cairo deployment format");
 
-    // Convert DLEQ second point to Weierstrass and get limbs
-    // TODO: Use Python tool to convert Edwards to Weierstrass for consistency
-    // For now, use placeholder - in production, call Python tool similar to adaptor point
-    let dleq_second_point_x_limbs = ["0x0", "0x0", "0x0", "0x0"].map(str::to_string);
-    let dleq_second_point_y_limbs = ["0x0", "0x0", "0x0", "0x0"].map(str::to_string);
-    
-    // Format DLEQ challenge and response as hex strings (felt252 in Cairo)
-    // Convert scalar bytes to hex, then format as felt252 (big-endian u256)
-    let challenge_bytes = dleq_proof.challenge.to_bytes();
-    let response_bytes = dleq_proof.response.to_bytes();
-    let dleq_challenge = format!("0x{}", hex::encode(challenge_bytes));
-    let dleq_response = format!("0x{}", hex::encode(response_bytes));
+    let adaptor_point_compressed = u256_hex_from_le_bytes(&dleq_cairo.adaptor_point_compressed);
+    let adaptor_point_sqrt_hint = u256_hex_from_le_bytes(&dleq_cairo.adaptor_point_sqrt_hint);
+    let dleq_second_point_compressed = u256_hex_from_le_bytes(&dleq_cairo.second_point_compressed);
+    let dleq_second_point_sqrt_hint = u256_hex_from_le_bytes(&dleq_cairo.second_point_sqrt_hint);
+    let dleq_challenge = felt_hex_from_le_bytes(&dleq_cairo.challenge);
+    let dleq_response = u256_hex_from_le_bytes(&dleq_cairo.response);
+    let dleq_r1_compressed = u256_hex_from_le_bytes(&dleq_cairo.r1_compressed);
+    let dleq_r1_sqrt_hint = u256_hex_from_le_bytes(&dleq_cairo.r1_sqrt_hint);
+    let dleq_r2_compressed = u256_hex_from_le_bytes(&dleq_cairo.r2_compressed);
+    let dleq_r2_sqrt_hint = u256_hex_from_le_bytes(&dleq_cairo.r2_sqrt_hint);
 
     // Format for Cairo.
     let cairo_hash_literal = format!(
@@ -306,10 +328,16 @@ pub fn generate_swap_secret() -> SwapSecret {
         cairo_secret_literal,
         adaptor_point_x_limbs,
         adaptor_point_y_limbs,
-        dleq_second_point_x_limbs,
-        dleq_second_point_y_limbs,
+        adaptor_point_compressed,
+        adaptor_point_sqrt_hint,
+        dleq_second_point_compressed,
+        dleq_second_point_sqrt_hint,
         dleq_challenge,
         dleq_response,
+        dleq_r1_compressed,
+        dleq_r1_sqrt_hint,
+        dleq_r2_compressed,
+        dleq_r2_sqrt_hint,
         fake_glv_hint,
     }
 }

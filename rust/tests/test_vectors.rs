@@ -1,16 +1,15 @@
-//! Generate cross-platform test vectors for Rust↔Cairo BLAKE2s compatibility.
+//! Generate cross-platform test vectors for Rust/Cairo DLEQ compatibility.
 //!
 //! This module generates test vectors that can be used in both Rust and Cairo
-//! to verify that BLAKE2s challenge computation produces identical results.
+//! to verify that Poseidon challenge computation produces identical results.
 
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::scalar::Scalar;
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use std::fs;
-use zeroize::Zeroizing;
-use std::ops::Deref;
 use xmr_secret_gen::dleq::generate_dleq_proof;
+use zeroize::Zeroizing;
 
 /// Generate test vectors for Cairo integration tests
 #[test]
@@ -40,7 +39,7 @@ fn generate_cairo_test_vectors() {
 
     // Create test vector JSON
     let test_vector = json!({
-        "description": "DLEQ proof test vector for Rust↔Cairo compatibility",
+        "description": "DLEQ proof test vector for Rust/Cairo compatibility",
         "secret": hex::encode(secret_bytes),
         "hashlock": hex::encode(hashlock),
         "adaptor_point_compressed": hex::encode(cairo_format.adaptor_point_compressed),
@@ -52,9 +51,11 @@ fn generate_cairo_test_vectors() {
         "g_compressed": hex::encode(cairo_format.g_compressed),
         "y_compressed": hex::encode(cairo_format.y_compressed),
         "r1_compressed": hex::encode(cairo_format.r1_compressed),
+        "r1_sqrt_hint": hex::encode(cairo_format.r1_sqrt_hint),
         "r2_compressed": hex::encode(cairo_format.r2_compressed),
+        "r2_sqrt_hint": hex::encode(cairo_format.r2_sqrt_hint),
         "expected_verification": true,
-        "notes": "This test vector can be used in Cairo tests to verify BLAKE2s compatibility"
+        "notes": "This test vector can be used in Cairo tests to verify Poseidon compatibility"
     });
 
     // Write to file
@@ -65,8 +66,8 @@ fn generate_cairo_test_vectors() {
     )
     .expect("Failed to write test vectors");
 
-    println!("✅ Test vectors written to {}", output_path);
-    println!("📋 Use this file in Cairo integration tests");
+    println!("Test vectors written to {}", output_path);
+    println!("Use this file in Cairo integration tests");
 }
 
 /// Generate multiple test vectors with different inputs
@@ -85,8 +86,9 @@ fn generate_multiple_test_vectors() {
         // Generate hashlock from raw bytes (Cairo-compatible)
         let hashlock: [u8; 32] = Sha256::digest(secret_bytes).into();
 
-        let proof = generate_dleq_proof(&secret_zeroizing, &secret_bytes, &adaptor_point, &hashlock)
-            .expect("Proof generation should succeed for valid inputs");
+        let proof =
+            generate_dleq_proof(&secret_zeroizing, &secret_bytes, &adaptor_point, &hashlock)
+                .expect("Proof generation should succeed for valid inputs");
         let cairo_format = proof
             .to_cairo_format(&adaptor_point)
             .expect("Failed to derive Cairo sqrt hints");
@@ -112,5 +114,5 @@ fn generate_multiple_test_vectors() {
     )
     .expect("Failed to write test vectors");
 
-    println!("✅ Generated {} test vectors", test_vectors.len());
+    println!("Generated {} test vectors", test_vectors.len());
 }

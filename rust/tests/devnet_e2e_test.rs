@@ -5,19 +5,16 @@
 //! 2. Run: cargo test devnet_e2e -- --ignored --nocapture
 
 use anyhow::Result;
-use xmr_secret_gen::swap::{StarknetManualClient, StarknetClient};
+use xmr_secret_gen::swap::{StarknetClient, StarknetManualClient};
 
 /// Devnet account from `--seed 0` (deterministic pre-funded account)
 const DEVNET_ACCOUNT: &str = "0x64b48806902a367c8598f4f95c305e8c1a1acba5f082d294a43793113115691";
 const DEVNET_PRIVATE_KEY: &str = "0x71d7bb07b9a64f6f78ac4c816aff4da9";
-const ATOMIC_LOCK_CLASS_HASH: &str = "0x15def28bab7530cff17c58973bad4ca0966aa5d5626edf03a8fde3ef41c92af";
+const ATOMIC_LOCK_CLASS_HASH: &str =
+    "0x15def28bab7530cff17c58973bad4ca0966aa5d5626edf03a8fde3ef41c92af";
 
 fn create_devnet_client() -> Result<StarknetManualClient> {
-    StarknetManualClient::devnet(
-        DEVNET_ACCOUNT,
-        DEVNET_PRIVATE_KEY,
-        ATOMIC_LOCK_CLASS_HASH,
-    )
+    StarknetManualClient::devnet(DEVNET_ACCOUNT, DEVNET_PRIVATE_KEY, ATOMIC_LOCK_CLASS_HASH)
 }
 
 #[tokio::test]
@@ -25,7 +22,10 @@ fn create_devnet_client() -> Result<StarknetManualClient> {
 async fn test_devnet_connection() {
     let client = create_devnet_client().expect("Failed to create client");
 
-    let timestamp = client.get_block_timestamp().await.expect("Failed to get timestamp");
+    let timestamp = client
+        .get_block_timestamp()
+        .await
+        .expect("Failed to get timestamp");
 
     println!("✅ Connected to devnet");
     println!("   Block timestamp: {}", timestamp);
@@ -137,11 +137,11 @@ async fn test_invoke_transaction_submission() {
     let secret = [0x42u8; 32];
 
     println!("📤 Testing invoke transaction submission...");
-    
+
     // This will fail because contract doesn't exist, but we should get a proper error
     // from devnet, not a transaction format error
     let result = client.reveal_secret(fake_contract, &secret).await;
-    
+
     match result {
         Ok(tx_hash) => {
             println!("   ✅ Transaction submitted successfully: {}", tx_hash);
@@ -150,15 +150,23 @@ async fn test_invoke_transaction_submission() {
         Err(e) => {
             // Check if it's a contract error (expected) vs transaction format error (bad)
             let error_msg = e.to_string();
-            if error_msg.contains("contract") || error_msg.contains("Contract") || error_msg.contains("not found") {
-                println!("   ✅ Transaction format correct (contract error expected): {}", error_msg);
+            if error_msg.contains("contract")
+                || error_msg.contains("Contract")
+                || error_msg.contains("not found")
+            {
+                println!(
+                    "   ✅ Transaction format correct (contract error expected): {}",
+                    error_msg
+                );
             } else if error_msg.contains("FieldElement") || error_msg.contains("hex") {
                 panic!("Transaction format error (invalid address?): {}", error_msg);
             } else {
                 // Other errors are acceptable - we're just testing transaction submission
-                println!("   ✅ Transaction submitted (got error: {} - may be contract-related)", error_msg);
+                println!(
+                    "   ✅ Transaction submitted (got error: {} - may be contract-related)",
+                    error_msg
+                );
             }
         }
     }
 }
-

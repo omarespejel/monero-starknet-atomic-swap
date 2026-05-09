@@ -61,11 +61,11 @@ mod garaga_msm_debug_tests {
     
     #[test]
     fn test_msm_with_actual_scalar_from_test() {
-        // Use actual scalar from test vectors (truncated)
+        // Use actual scalar from test vectors (full)
         // This matches what Cairo actually passes to Garaga
         let G = get_G(ED25519_CURVE_INDEX);
         
-        // Truncated response scalar (matching reduce_felt_to_scalar)
+        // Legacy debug scalar retained only for MSM hint diagnostics.
         let s_scalar = u256 {
             low: 0x1e741f8fec4161ea41b23ce6d007ba12,
             high: 0x0
@@ -101,4 +101,3 @@ mod garaga_msm_debug_tests {
         result.assert_on_curve_excluding_infinity(ED25519_CURVE_INDEX);
     }
 }
-

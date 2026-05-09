@@ -48,14 +48,14 @@ Production-grade prototype implementation of a trustless atomic swap protocol en
 | **Core Protocol** | ✅ Complete | Two-party keys, DLEQ proofs, scalar compatibility |
 | **Cairo Contract** | ✅ Complete | DLEQ verification, MSM checks, reentrancy protection |
 | **Rust Library** | ✅ Complete | Key generation, proof generation, Monero integration |
-| **Tests** | ✅ 136+ passing | 36+ Rust, 100+ Cairo (security, E2E, integration) |
-| **Starknet Signing** | ✅ Implemented | Invoke transactions (production-ready) |
-| **Deployment** | ⚠️ Partial | Calldata builder ready, transaction signing pending |
+| **Tests** | ✅ Passing | Cairo full suite: 109 passed, 7 ignored; targeted Rust suites passing |
+| **Starknet Signing** | ⚠️ TS path only | Use `scripts/deploy.ts`/starknet.js for signed transactions; Rust macOS placeholder signing is disabled |
+| **Deployment** | ⚠️ Testnet-ready tooling | Calldata builder and TS deploy scripts build cleanly; use funded testnet account |
 | **External Audit** | 🔄 Pending | Required before mainnet |
 
 **Production Blockers:**
-- ⬜ Contract deployment transaction signing (use TypeScript scripts for now)
-- ⬜ Live devnet E2E test execution
+- ⬜ Live Sepolia deployment/transaction rehearsal with funded testnet account
+- ⬜ Live Monero stagenet swap rehearsal with funded stagenet wallet
 - ⬜ External security audit
 
 ---
@@ -70,6 +70,18 @@ Production-grade prototype implementation of a trustless atomic swap protocol en
 - Starknet account (testnet)
 - Monero stagenet access (for testing)
 
+Monero tooling should run inside the Lima VM, not directly on macOS:
+
+```bash
+# Show VM status and wallet-rpc process
+./scripts/monero_vm_tunnel.sh status
+
+# Temporarily expose VM wallet-rpc on 127.0.0.1:38090 for host-side tests
+./scripts/monero_vm_tunnel.sh start
+./scripts/monero_vm_tunnel.sh smoke
+./scripts/monero_vm_tunnel.sh stop
+```
+
 ### Build
 
 ```bash
@@ -83,17 +95,35 @@ cd ../cairo && scarb build
 ### Deploy Contract
 
 ```bash
-# Option 1: TypeScript (Recommended)
-cd scripts/ts && npm install && npm run deploy
+# Live Sepolia rehearsal path (sncast, RPC v0.10 fee fields)
+ATOMIC_SWAP_DEPOSITOR=0x... \
+ATOMIC_SWAP_TOKEN_ADDRESS=0x... \
+ATOMIC_SWAP_AMOUNT=... \
+scripts/deploy_with_sncast.sh
 
-# Option 2: Shell script
-./scripts/deploy.sh sepolia 0xYOUR_DEPLOYER_ADDRESS
-
-# Option 3: Python
-python scripts/deploy_with_starknet_py.py
+# Calldata-only path for review or external signing
+python3 tools/generate_deploy_calldata.py \
+  --network sepolia \
+  --depositor 0x... \
+  --token 0x... \
+  --amount ...
 ```
 
-**⚠️ Critical**: Always use deployment scripts — they enforce sqrt hint validation (golden rule).
+**Critical**: Regenerate Rust vectors and Cairo hints before deploy calldata changes:
+
+```bash
+cd rust
+cargo test -q --test test_vectors generate_cairo_test_vectors -- --ignored --nocapture
+cd ..
+uv run --project tools python tools/regenerate_dleq_hints.py
+python3 tools/generate_deploy_calldata.py \
+  --network sepolia \
+  --depositor 0x... \
+  --token 0x... \
+  --amount ...
+```
+
+See [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md) for the current testnet readiness checklist and the remaining blockers before mainnet.
 
 ### Run Tests
 

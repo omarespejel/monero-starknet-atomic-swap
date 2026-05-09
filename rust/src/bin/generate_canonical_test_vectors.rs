@@ -9,8 +9,8 @@ use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::scalar::Scalar;
 use serde_json::json;
 use sha2::{Digest, Sha256};
-use zeroize::Zeroizing;
 use xmr_secret_gen::dleq::generate_dleq_proof;
+use zeroize::Zeroizing;
 
 fn main() {
     // Generate secret (using test vector secret for reproducibility)
@@ -48,18 +48,18 @@ fn main() {
         "vector_version": "1.0.0",
         "description": "Canonical test vector - SINGLE SOURCE OF TRUTH",
         "protocol_note": "Cairo uses SHA-256(raw_secret_bytes) in verify_and_unlock",
-        
+
         // Secret representations
         "secret_raw_bytes": hex::encode(secret_bytes),
         "secret_as_scalar_bytes": hex::encode(secret_scalar_bytes),
         "scalar_reduction_changed_bytes": scalar_reduction_changed,
-        
+
         // Hashlock computations (both methods for comparison)
         "hashlock_of_raw": hex::encode(hashlock_of_raw),
         "hashlock_of_scalar": hex::encode(hashlock_of_scalar),
         "canonical_hashlock": hex::encode(hashlock_of_raw),
         "why_canonical": "Cairo uses raw bytes in verify_and_unlock - no scalar reduction",
-        
+
         // DLEQ proof data
         "adaptor_point_compressed": hex::encode(cairo_format.adaptor_point_compressed),
         "adaptor_point_sqrt_hint": hex::encode(cairo_format.adaptor_point_sqrt_hint),
@@ -72,14 +72,14 @@ fn main() {
         "y_compressed": hex::encode(cairo_format.y_compressed),
         "r1_compressed": hex::encode(cairo_format.r1_compressed),
         "r2_compressed": hex::encode(cairo_format.r2_compressed),
-        
+
         "expected_verification": true,
         "generated_by": "generate_canonical_test_vectors.rs",
         "audit_note": "This vector is the canonical reference. All implementations must match these values."
     });
 
     println!("{}", serde_json::to_string_pretty(&output).unwrap());
-    
+
     // Print warning if scalar reduction changed bytes
     if scalar_reduction_changed {
         eprintln!("\n⚠️  WARNING: Scalar reduction changed bytes!");
@@ -88,4 +88,3 @@ fn main() {
         eprintln!("    Using raw bytes for hashlock (Cairo-compatible)");
     }
 }
-

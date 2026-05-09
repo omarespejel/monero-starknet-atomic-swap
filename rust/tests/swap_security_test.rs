@@ -7,11 +7,11 @@ use mockall::mock;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tempfile::tempdir;
 
-use xmr_secret_gen::swap::{
-    step, resume_with_xmr_txid, SwapState, SwapDb, StarknetClient, JsonFileDb, GRACE_PERIOD_SECS,
-};
 use xmr_secret_gen::monero::MoneroWalletClient;
 use xmr_secret_gen::monero_wallet::types::TransferInfo;
+use xmr_secret_gen::swap::{
+    resume_with_xmr_txid, step, JsonFileDb, StarknetClient, SwapDb, SwapState, GRACE_PERIOD_SECS,
+};
 
 // === In-Memory DB for Tests ===
 
@@ -100,9 +100,7 @@ async fn test_timeout_triggers_refund_from_starknet_locked() {
 
     let mut mock_monero = MockMonero::new();
     // Should not be called since we timeout before checking XMR
-    mock_monero
-        .expect_get_transfer_by_txid()
-        .times(0);
+    mock_monero.expect_get_transfer_by_txid().times(0);
 
     let secret = [0u8; 32];
 
@@ -170,7 +168,7 @@ async fn test_claim_before_grace_period_fails() {
     mock_starknet
         .expect_get_block_timestamp()
         .returning(move || Ok(reveal_timestamp + 100)); // Only 100 seconds passed
-    // Should NOT call claim_tokens (grace period not expired)
+                                                        // Should NOT call claim_tokens (grace period not expired)
     mock_starknet.expect_claim_tokens().times(0);
 
     let state = SwapState::SecretRevealed {
@@ -252,7 +250,7 @@ async fn test_refund_before_timeout_fails() {
     mock_starknet
         .expect_get_block_timestamp()
         .returning(|| Ok(5000)); // Before lock_until
-    // Should NOT call refund
+                                 // Should NOT call refund
     mock_starknet.expect_refund().times(0);
 
     let state = SwapState::StarknetLocked {
@@ -385,7 +383,7 @@ fn test_resume_rejects_insufficient_amount() {
 
     // Should reject insufficient amount (expected amount is in state)
     let result = resume_with_xmr_txid(&state, "txid".to_string(), actual_amount);
-    
+
     assert!(result.is_err());
     let error_msg = result.unwrap_err().to_string();
     assert!(error_msg.contains("amount") || error_msg.contains("less than expected"));
@@ -462,21 +460,23 @@ fn test_grace_period_constant_matches_cairo() {
     // This prevents mismatches that could cause incorrect grace period calculations
     // Cairo contract: const GRACE_PERIOD: u64 = 7200;  // 2 hours (line 109 in lib.cairo)
     // Rust constant: pub const GRACE_PERIOD_SECS: u64 = 7200;
-    
+
     use xmr_secret_gen::swap::GRACE_PERIOD_SECS;
-    
+
     const CAIRO_GRACE_PERIOD: u64 = 7200; // From cairo/src/lib.cairo:109
-    
+
+    assert_eq!(
+        GRACE_PERIOD_SECS, CAIRO_GRACE_PERIOD,
+        "Rust GRACE_PERIOD_SECS ({}) must match Cairo GRACE_PERIOD ({})",
+        GRACE_PERIOD_SECS, CAIRO_GRACE_PERIOD
+    );
+
+    // Verify it's 2 hours (7200 seconds)
     assert_eq!(
         GRACE_PERIOD_SECS,
-        CAIRO_GRACE_PERIOD,
-        "Rust GRACE_PERIOD_SECS ({}) must match Cairo GRACE_PERIOD ({})",
-        GRACE_PERIOD_SECS,
-        CAIRO_GRACE_PERIOD
+        2 * 60 * 60,
+        "Grace period should be 2 hours (7200 seconds)"
     );
-    
-    // Verify it's 2 hours (7200 seconds)
-    assert_eq!(GRACE_PERIOD_SECS, 2 * 60 * 60, "Grace period should be 2 hours (7200 seconds)");
 }
 
 #[tokio::test]
@@ -484,7 +484,7 @@ async fn test_double_reveal_attack_prevented() {
     // Attack: Attacker calls reveal_secret twice
     // Expected: State machine should handle gracefully (contract will revert)
     // This test verifies state machine doesn't crash on second reveal attempt
-    
+
     let dir = tempdir().unwrap();
     let db = JsonFileDb::new(dir.path()).unwrap();
 
@@ -543,4 +543,3 @@ async fn test_double_reveal_attack_prevented() {
     // Should proceed to claim, not reveal again
     assert!(matches!(result2.unwrap(), SwapState::Completed { .. }));
 }
-

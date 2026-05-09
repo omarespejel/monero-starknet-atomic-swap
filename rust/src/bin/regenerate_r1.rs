@@ -7,6 +7,7 @@ use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::scalar::Scalar;
 use serde_json::json;
 use std::fs;
+use xmr_secret_gen::dleq::get_second_generator;
 
 fn main() {
     // Read existing test vectors
@@ -72,7 +73,7 @@ fn main() {
     test_vectors["r1_compressed"] = json!(r1_hex);
 
     // Also update R2 = k·Y to maintain DLEQ consistency
-    let y = g * Scalar::from(2u64); // Y = 2·G (matches current implementation)
+    let y = get_second_generator();
     let r2_point = y * k_scalar;
     let r2_compressed = r2_point.compress();
     let r2_bytes = r2_compressed.to_bytes();

@@ -18,13 +18,14 @@
 use anyhow::{Context, Result};
 use curve25519_dalek::scalar::Scalar;
 use hex;
+use monero::Network;
 use tiny_keccak::{Hasher, Keccak};
 use zeroize::{Zeroize, Zeroizing};
 
 use crate::monero_wallet::client::MoneroWallet;
 
 /// Derive Monero view key from spend key using keccak256.
-/// 
+///
 /// This is the standard Monero view key derivation: `view_key = keccak256(spend_key)`
 /// The view key is required by wallet-rpc for wallet operations.
 /// Derive Monero view key from spend key (public for testing)
@@ -43,10 +44,10 @@ fn derive_view_key_impl(spend_key: &Scalar) -> Scalar {
 }
 
 /// Claim Monero funds after secret revelation using wallet-rpc.
-/// 
+///
 /// This is the auditor-approved approach: use wallet-rpc's production-grade
 /// operations instead of custom transaction signing.
-/// 
+///
 /// # Security
 /// - Uses wallet-rpc's AUDITED CLSAG implementation
 /// - NO custom ring signatures - all crypto handled by wallet-rpc
@@ -62,6 +63,7 @@ fn derive_view_key_impl(spend_key: &Scalar) -> Scalar {
 /// * `t` - Adaptor scalar (revealed on Starknet)
 /// * `destination` - Monero address to send funds to
 /// * `restore_height` - Block height when swap was initiated (for optimization)
+/// * `network` - Monero network for restored wallet address derivation
 ///
 /// # Returns
 /// Transaction hash of the sweep transaction
@@ -80,46 +82,50 @@ pub async fn claim_monero_after_reveal(
     t: Scalar,
     destination: &str,
     restore_height: u64,
+    network: Network,
 ) -> Result<String> {
     // Step 1: Recover full spend key
     let full_key = Zeroizing::new(*x_partial + t);
-    
+
     // Step 2: Derive view key (REQUIRED by wallet-rpc)
     let mut view_key = derive_view_key_impl(&full_key);
-    
-    // Step 3: Derive address from keys (using monero-rs - AUDITOR APPROVED)
-    let address = crate::monero::address::derive_stagenet_address(&full_key, &view_key)
-        .context("Failed to derive Monero address from keys")?;
-    
+
+    // Step 3: Derive address from keys for the explicit network.
+    let address = crate::monero::address::derive_address_for_network(&full_key, &view_key, network)
+        .with_context(|| format!("Failed to derive {:?} Monero address from keys", network))?;
+
     // Step 4: Convert to hex for wallet-rpc
     let spend_key_hex = hex::encode(full_key.to_bytes());
     let view_key_hex = hex::encode(view_key.to_bytes());
-    
+
     // Step 5: Import key with BOTH keys and optimized height
-    let wallet_name = wallet.generate_from_keys(
-        &spend_key_hex,
-        &view_key_hex,      // ✅ REQUIRED - not empty!
-        &address,
-        restore_height,     // ✅ OPTIMIZED (not 0!)
-    ).await?;
-    
+    let wallet_name = wallet
+        .generate_from_keys(
+            &spend_key_hex,
+            &view_key_hex, // ✅ REQUIRED - not empty!
+            &address,
+            restore_height, // ✅ OPTIMIZED (not 0!)
+        )
+        .await?;
+
     let result = async {
         wallet.refresh().await?;
         wallet.sweep_all(destination).await
-    }.await;
-    
+    }
+    .await;
+
     // Step 7: ALWAYS cleanup (even on error)
     let _ = wallet.close_wallet().await;
     let _ = wallet.secure_delete_wallet(&wallet_name).await;
-    
+
     // Step 8: Zeroize sensitive data
     view_key.zeroize();
-    
+
     result
 }
 
 /// Legacy function name for backward compatibility.
-/// 
+///
 /// This function is deprecated. Use `claim_monero_after_reveal()` instead.
 #[deprecated(note = "Use claim_monero_after_reveal() instead")]
 pub async fn create_transaction_after_reveal(
@@ -184,29 +190,33 @@ mod tests {
         // 1. wallet-rpc running
         // 2. Test wallet with funds
         // 3. Valid destination address
-        
+
         use crate::monero_wallet::client::MoneroWallet;
         use rand::RngCore;
-        
+
         let wallet = MoneroWallet::new(
-            "http://localhost:38088/json_rpc".to_string(),
-            "http://stagenet.xmr-tw.org:38081/json_rpc".to_string(),
+            std::env::var("MONERO_WALLET_RPC_URL")
+                .unwrap_or_else(|_| "http://127.0.0.1:38090/json_rpc".to_string()),
+            std::env::var("MONERO_DAEMON_RPC_URL")
+                .unwrap_or_else(|_| "http://node2.monerodevs.org:38089/json_rpc".to_string()),
             "test_wallet".to_string(),
             "./wallets".to_string(), // wallet_dir
-        ).await.expect("Failed to create wallet client");
-        
+        )
+        .await
+        .expect("Failed to create wallet client");
+
         // Generate test keys
         let mut rng = OsRng;
         let mut x_partial_bytes = [0u8; 32];
         rng.fill_bytes(&mut x_partial_bytes);
         let x_partial = Zeroizing::new(Scalar::from_bytes_mod_order(x_partial_bytes));
-        
+
         let mut t_bytes = [0u8; 32];
         rng.fill_bytes(&mut t_bytes);
         let t = Scalar::from_bytes_mod_order(t_bytes);
-        
+
         let destination = "5A1..."; // Test address
-        
+
         // This will fail without actual funds, but tests the flow
         let result = claim_monero_after_reveal(
             &wallet,
@@ -214,8 +224,10 @@ mod tests {
             t,
             destination,
             0, // restore_height for test
-        ).await;
-        
+            Network::Stagenet,
+        )
+        .await;
+
         // Expect error without actual funds, but function should be callable
         assert!(result.is_err()); // Will fail at refresh() or sweep_all() without funds
     }

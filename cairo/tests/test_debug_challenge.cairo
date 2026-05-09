@@ -11,8 +11,8 @@ mod print_challenge_tests {
     };
 
     const ED25519_SECOND_GENERATOR_COMPRESSED: u256 = u256 {
-        low: 0x97390f51643851560e5f46ae6af8a3c9,
-        high: 0x2260cdf3092329c21da25ee8c9a21f56,
+        low: 0x21ba32594950b67cf0d8bb8c8ac5e8c7,
+        high: 0xf08df421a3209ab6373dd0ec7ef25dfd,
     };
 
     const ED25519_ORDER: u256 = u256 {
@@ -27,8 +27,8 @@ mod print_challenge_tests {
     };
 
     const TEST_VECTOR_U_COMPRESSED: u256 = u256 {
-        low: 0xd893b3476bdf09770b7616f84c5c7bbe,
-        high: 0x5c79d0fa84d6440908e2e2065e60d1cd,
+        low: 0x9244eb3a3699efed3106c6ae0afdf28,
+        high: 0xb6e0bfc0d9fbb8a4c8ef08cb5da2eff3,
     };
 
     const TEST_VECTOR_R1_COMPRESSED: u256 = u256 {
@@ -37,8 +37,8 @@ mod print_challenge_tests {
     };
 
     const TEST_VECTOR_R2_COMPRESSED: u256 = u256 {
-        low: 0xb4fb26c272cbe6b84d65d4f908aff02f,
-        high: 0xf58498fd33c0fbca066f3fdff2f49225,
+        low: 0xe66ca975ef303c032fcc18a952325162,
+        high: 0xc5d2eb608176c8b79dfa55289c35b35f,
     };
 
     const TESTVECTOR_HASHLOCK: [u32; 8] = [
@@ -67,15 +67,11 @@ mod print_challenge_tests {
             ED25519_ORDER,
         );
 
-        // Convert to u256 to extract low/high parts
-        let challenge_u256: u256 = challenge.into();
-        
         // Expected challenge from test_vectors.json (reduced scalar, LE bytes)
-        // Challenge truncated (low 128 bits): 0x8d664bb70810bdab323a44354d98f94a
-        let expected_low: u128 = 0x8d664bb70810bdab323a44354d98f94a;
+        // Challenge full (full scalar): 0x47c760eb9b6a8797680bef6218e06aacc6570f8be11819d2268bb024f816108
+        let expected_challenge: felt252 = 0x47c760eb9b6a8797680bef6218e06aacc6570f8be11819d2268bb024f816108;
 
-        // Verify truncated challenge matches expected
-        assert(challenge_u256.low == expected_low, 'Challenge mismatch');
+        // Verify full challenge matches expected
+        assert(challenge == expected_challenge, 'Challenge mismatch');
     }
 }
-

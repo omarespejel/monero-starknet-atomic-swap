@@ -7,7 +7,7 @@ mod garaga_msm_all_calls_tests {
     use core::integer::u256;
     use garaga::definitions::get_G;
     use garaga::signatures::eddsa_25519::decompress_edwards_pt_from_y_compressed_le_into_weirstrass_point;
-    use garaga::ec_ops::{msm_g1, G1PointTrait, ec_safe_add};
+    use garaga::ec_ops::{msm_g1, G1PointTrait};
     use atomic_lock::AtomicLock::reduce_felt_to_scalar;
 
     const ED25519_CURVE_INDEX: u32 = 4;
@@ -26,62 +26,46 @@ mod garaga_msm_all_calls_tests {
         high: 0x17611da35f39a2a5e3a9fddb8d978e4f,
     };
     const TEST_SECOND_POINT_COMPRESSED: u256 = u256 {
-        low: 0xd893b3476bdf09770b7616f84c5c7bbe,
-        high: 0x5c79d0fa84d6440908e2e2065e60d1cd,
+        low: 0x9244eb3a3699efed3106c6ae0afdf28,
+        high: 0xb6e0bfc0d9fbb8a4c8ef08cb5da2eff3,
     };
     const TEST_SECOND_POINT_SQRT_HINT: u256 = u256 {
-        low: 0xdcad2173817c163b5405cec7698eb4b8,
-        high: 0x742bb3c44b13553c8ddff66565b44cac,
+        low: 0xcffea6b3bffe746de20fdd0734b30845,
+        high: 0x5e4a3b18b41199f9389ded8696067271,
+    };
+    const TESTVECTOR_Y_COMPRESSED: u256 = u256 {
+        low: 0x21ba32594950b67cf0d8bb8c8ac5e8c7,
+        high: 0xf08df421a3209ab6373dd0ec7ef25dfd,
+    };
+    const TESTVECTOR_Y_SQRT_HINT: u256 = u256 {
+        low: 0x928f238c602cdbb49c96ac47cbbf79d7,
+        high: 0x65c31da8af8318232d04a1abf99f036e,
     };
 
-    const BASE_128: felt252 = 0x100000000000000000000000000000000;
-    const RESPONSE_LOW: felt252 = 0x1e741f8fec4161ea41b23ce6d007ba12;
-    const RESPONSE_HIGH: felt252 = 0x026ed77551e578013227c9b98bd25c66;
-    const CHALLENGE_FELT: felt252 = 0x8d664bb70810bdab323a44354d98f94a;
+    const RESPONSE: u256 = u256 {
+        low: 0xbe3ffdd10e06b50b800feb45877b787b,
+        high: 0x2f0ceba8a8c56d6f6b4ed3ae98db234,
+    };
+    const CHALLENGE_FELT: felt252 = 0x47c760eb9b6a8797680bef6218e06aacc6570f8be11819d2268bb024f816108;
 
     #[test]
     fn test_msm_sg_isolation() {
         // Test s·G MSM call (same as working isolation test)
         let G = get_G(ED25519_CURVE_INDEX);
-        // Use direct truncated scalar (matching working test)
-        let s_scalar = u256 {
-            low: RESPONSE_LOW.try_into().unwrap(),
-            high: 0
-        };
+        // Use direct full scalar (matching working test)
+        let s_scalar = RESPONSE;
         
         let s_hint_for_g = array![
-
-        
-            0x52f522935135e7c5474d3b99,
-
-        
-            0x7ff7e65231c434008a0c02f8,
-
-        
-            0x41a3962ca5bba9db,
-
-        
+            0xceeec4a90f34e45c033e2ff5,
+            0xb419479f38f86b2b114d2ff1,
+            0x256941d7d54e7beb,
             0x0,
-
-        
-            0xa144206dc24b7180d05200e0,
-
-        
-            0xe8a798301a354777473cd98e,
-
-        
-            0x7ca5add375ea088,
-
-        
+            0xaa6ddc025eb012317a89612a,
+            0x6e9d804e52cb98594f552df2,
+            0x47244d9888c072a3,
             0x0,
-
-        
-            0x1e741f8fec4161ea41b23ce6d007ba12,
-
-        
-            0x100000000000000000000000000000001
-
-        
+            0xcd234e4105b9809a3f4f0dde019dac1,
+            0x1268c27967bf37239a1bdcad1722144e1
         ].span();
         
         let sG = msm_g1(
@@ -96,51 +80,27 @@ mod garaga_msm_all_calls_tests {
     #[test]
     fn test_msm_sy_isolation() {
         // Test s·Y MSM call
-        // CRITICAL: Y is the second generator (2·G), NOT the second_point (U) from test vectors
-        // The hint is generated for s·(2·G), so we must compute 2·G directly
-        let G = get_G(ED25519_CURVE_INDEX);
-        let Y = ec_safe_add(G, G, ED25519_CURVE_INDEX);  // Y = 2·G
+        // CRITICAL: Y is the domain-separated second generator, NOT U from test vectors.
+        let Y = decompress_edwards_pt_from_y_compressed_le_into_weirstrass_point(
+            TESTVECTOR_Y_COMPRESSED,
+            TESTVECTOR_Y_SQRT_HINT
+        ).unwrap();
         Y.assert_on_curve_excluding_infinity(ED25519_CURVE_INDEX);
         
-        // Use direct truncated scalar (matching working test)
-        let s_scalar = u256 {
-            low: RESPONSE_LOW.try_into().unwrap(),
-            high: 0
-        };
+        // Use direct full scalar (matching working test)
+        let s_scalar = RESPONSE;
         
         let s_hint_for_y = array![
-
-        
-            0x3b81c211fd322bb7dbcb711c,
-
-        
-            0x2082c0dd34f9225f2eb5e0b0,
-
-        
-            0x311b02be49202932,
-
-        
+            0x872011d1a9f20fc5fbed65ec,
+            0xd36e4710d58461cfe9c9ee1d,
+            0x686f29bbaf2b952f,
             0x0,
-
-        
-            0x18c0245425f95187b10e1913,
-
-        
-            0x922be9d1d5313d1c7a4cb499,
-
-        
-            0x51d9b0eb8a969e37,
-
-        
+            0xf350a6f8bc8acbb1d5c40cd5,
+            0x4b256a3dba76a0bc779c811,
+            0x43f41814a3eefa59,
             0x0,
-
-        
-            0x1e741f8fec4161ea41b23ce6d007ba12,
-
-        
-            0x100000000000000000000000000000001
-
-        
+            0xcd234e4105b9809a3f4f0dde019dac1,
+            0x1268c27967bf37239a1bdcad1722144e1
         ].span();
         
         let sY = msm_g1(
@@ -166,38 +126,16 @@ mod garaga_msm_all_calls_tests {
         let c_neg_scalar = (ED25519_ORDER - (c_scalar % ED25519_ORDER)) % ED25519_ORDER;
         
         let c_neg_hint_for_t = array![
-
-        
-            0xcb63575f3729fe6cbe7f8496,
-
-        
-            0x9dc314d92447fddbfc1be6cd,
-
-        
-            0x7d6caff1e7cdaa02,
-
-        
+            0xfbeb7a88a7204a3109847933,
+            0xd7bd766f54592bfb04b8a0bf,
+            0x36adfbd5b292a10e,
             0x0,
-
-        
-            0x78dc46b41742aa135083e2da,
-
-        
-            0xecafad9bd49fe98686457cc6,
-
-        
-            0x592bb6f3eaf7ca3,
-
-        
+            0xb1cb68d66c0170146df52bb2,
+            0x7ad50b1ffcd1293f12940e01,
+            0x665e063c6d4ac0f6,
             0x0,
-
-        
-            0x34a3efff5488d0dfc135bf37e3357b53,
-
-        
-            0x1cf7b1760ae5d3463a08a196fd625720
-
-        
+            0x4d5cf08f2a0aee991f621d5e4e15728,
+            0x1148705832ba97f2b70dec32979f4f785
         ].span();
         
         let neg_cT = msm_g1(
@@ -223,38 +161,16 @@ mod garaga_msm_all_calls_tests {
         let c_neg_scalar = (ED25519_ORDER - (c_scalar % ED25519_ORDER)) % ED25519_ORDER;
         
         let c_neg_hint_for_u = array![
-
-        
-            0x61ebcae684d8530622e29b45,
-
-        
-            0x694dbc34734f56c0e29f5240,
-
-        
-            0x1913755501e61b9a,
-
-        
+            0x16ecdc108960cb810ed61451,
+            0x28bf80201d67e2f4728ba74b,
+            0x63f872f4f71e1950,
             0x0,
-
-        
-            0x2a37ba10878046ff378a7d73,
-
-        
-            0x25857fe5ce7f65cea1bbc1e0,
-
-        
-            0xca82b2053c5e43e,
-
-        
+            0xe94caf1beb68a19f34eb98a4,
+            0x48bcbcb46602eeea1b043d0d,
+            0x52e390f474357096,
             0x0,
-
-        
-            0x34a3efff5488d0dfc135bf37e3357b53,
-
-        
-            0x1cf7b1760ae5d3463a08a196fd625720
-
-        
+            0x4d5cf08f2a0aee991f621d5e4e15728,
+            0x1148705832ba97f2b70dec32979f4f785
         ].span();
         
         let neg_cU = msm_g1(
@@ -266,4 +182,3 @@ mod garaga_msm_all_calls_tests {
         neg_cU.assert_on_curve_excluding_infinity(ED25519_CURVE_INDEX);
     }
 }
-

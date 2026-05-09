@@ -2,11 +2,21 @@
 
 **Date**: December 23, 2025  
 **Commit**: `49ad8de`  
-**Status**: ✅ Invoke transactions implemented, deployment pending
+**Status**: Rust signing is not the production deployment path
 
 ---
 
-## ✅ IMPLEMENTED: Invoke Transaction Signing
+## Current Position
+
+Use `scripts/deploy.ts` or another starknet.js signer for Sepolia/mainnet
+deployment and reveal/claim transactions.
+
+The Rust `starknet_manual` module keeps non-macOS signing code for development,
+but macOS placeholder signatures are disabled and deployment still returns an
+explicit error. This prevents a devnet-only shortcut from being mistaken for a
+real transaction path.
+
+## Non-macOS Invoke Transaction Signing
 
 ### Transaction Hash Computation
 
@@ -36,14 +46,16 @@ let signature = sign(&private_key_fe, &tx_hash_fe)?;
 
 ### Platform Support
 
-- **Non-macOS**: Full STARK curve signing (production-ready)
-- **macOS**: Placeholder signatures (works with devnet `--seed 0`)
+- **Non-macOS**: Invoke signing code exists, but needs live Sepolia rehearsal
+  before being treated as production.
+- **macOS**: Rust invoke submission fails closed. Use starknet.js.
 
-**Reason**: `starknet-crypto` depends on `size-of` crate which has macOS compatibility issues (fastcall ABI). macOS uses placeholders for devnet testing.
+The old macOS devnet placeholder signature path was removed because it could be
+confused with real signing.
 
 ---
 
-## ⚠️ PENDING: Contract Deployment
+## Pending: Rust Contract Deployment
 
 Contract deployment requires a different transaction format:
 
@@ -66,16 +78,22 @@ The hash format for deployment transactions differs from invoke:
 H(version, contract_address_salt, constructor_calldata_hash, class_hash, ...)
 ```
 
-**Status**: Not yet implemented. Requires:
+**Status**: Not implemented in Rust. Requires:
 1. Deployment transaction hash computation
 2. Contract class declaration (if not already declared)
 3. Constructor calldata building from DLEQ proof data
 
 ---
 
-## 📋 USAGE
+## Usage
 
-### Invoke Transactions (✅ Ready)
+### Recommended Deployment
+
+```bash
+bun run scripts/deploy.ts
+```
+
+### Rust Invoke Experiments
 
 ```rust
 let client = StarknetManualClient::devnet(
@@ -91,11 +109,11 @@ let calls = vec![Call {
     data: secret_calldata,
 }];
 
-// Submit with real signature (non-macOS) or placeholder (macOS)
+// Non-macOS only; macOS refuses to submit placeholder signatures.
 let tx_hash = client.submit_invoke_tx(calls).await?;
 ```
 
-### Contract Deployment (⚠️ Pending)
+### Rust Contract Deployment
 
 ```rust
 // TODO: Implement deploy_and_deposit()
@@ -108,7 +126,7 @@ let (contract_address, lock_until) = client.deploy_and_deposit(
 
 ---
 
-## 🧪 TESTING
+## Testing
 
 ### Unit Tests
 
@@ -180,4 +198,3 @@ let is_revealed = client.is_secret_revealed(&contract_address).await?;
 - [Starknet Transaction Format](https://docs.starknet.io/documentation/architecture_and_concepts/Transactions/)
 - [starknet-crypto crate](https://crates.io/crates/starknet-crypto)
 - [Pedersen Hash Specification](https://docs.starknet.io/documentation/architecture_and_concepts/Hashing/hash-functions/)
-

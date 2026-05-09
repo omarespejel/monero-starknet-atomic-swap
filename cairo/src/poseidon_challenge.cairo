@@ -12,7 +12,6 @@
 use core::hash::HashStateTrait;
 use core::integer::u256;
 use core::poseidon::{HashState, PoseidonTrait};
-use core::traits::TryInto;
 
 /// Compute DLEQ challenge using Poseidon with compressed Edwards points.
 ///
@@ -23,8 +22,9 @@ use core::traits::TryInto;
 /// @param R1_compressed First commitment point (compressed Edwards, u256)
 /// @param R2_compressed Second commitment point (compressed Edwards, u256)
 /// @param hashlock SHA-256 hash of secret (Span<u32> - 8 words, big-endian)
-/// @param ed25519_order Ed25519 curve order for reduction
-/// @return Challenge scalar c reduced mod Ed25519 order (felt252)
+/// @param ed25519_order Ed25519 curve order for reduction. Unused for Poseidon because a Stark
+/// field element is already below the Ed25519 group order.
+/// @return Challenge scalar c as a full felt252, not truncated to 128 bits.
 pub fn compute_dleq_challenge_poseidon(
     G_compressed: u256,
     Y_compressed: u256,
@@ -33,7 +33,7 @@ pub fn compute_dleq_challenge_poseidon(
     R1_compressed: u256,
     R2_compressed: u256,
     hashlock: Span<u32>,
-    ed25519_order: u256,
+    _ed25519_order: u256,
 ) -> felt252 {
     let mut state = PoseidonTrait::new();
     let dleq_tag: felt252 = 0x444c4551; // "DLEQ"
@@ -54,10 +54,7 @@ pub fn compute_dleq_challenge_poseidon(
         i += 1;
     }
 
-    let hash_felt = state.finalize();
-    let hash_u256: u256 = hash_felt.try_into().unwrap();
-    let scalar = hash_u256 % ed25519_order;
-    scalar.low.try_into().unwrap()
+    state.finalize()
 }
 
 fn update_compressed_point(mut state: HashState, point: u256) -> HashState {

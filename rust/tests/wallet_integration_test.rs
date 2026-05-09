@@ -6,6 +6,20 @@ mod helpers;
 use anyhow::Result;
 use helpers::monero_wallet::MoneroWallet;
 
+fn wallet_rpc_url() -> String {
+    std::env::var("MONERO_WALLET_RPC_URL")
+        .unwrap_or_else(|_| "http://127.0.0.1:38090/json_rpc".to_string())
+}
+
+fn daemon_rpc_url() -> String {
+    std::env::var("MONERO_DAEMON_RPC_URL")
+        .unwrap_or_else(|_| "http://node2.monerodevs.org:38089/json_rpc".to_string())
+}
+
+fn wallet_dir() -> String {
+    std::env::var("MONERO_WALLET_DIR").unwrap_or_else(|_| "./wallets".to_string())
+}
+
 // Helper: Convert XMR to piconero (atomic units)
 // 1 XMR = 10^12 piconero
 fn xmr_to_piconero(xmr: f64) -> u64 {
@@ -24,16 +38,17 @@ async fn test_wallet_connection_and_balance() -> Result<()> {
 
     println!("🔄 Testing Monero wallet-rpc connection...");
     println!("⚠️  Requirements:");
-    println!("   1. Run: docker-compose up -d");
-    println!("   2. Wait for daemon sync (~30-60 min)");
-    println!("   3. Or use: monero-wallet-rpc --stagenet --rpc-bind-port 38088");
+    println!("   1. Run wallet-rpc inside the isolated Monero VM");
+    println!("   2. Open a temporary SSH tunnel to 127.0.0.1:38090");
+    println!("   3. Override MONERO_WALLET_RPC_URL / MONERO_DAEMON_RPC_URL if needed");
 
     let wallet = MoneroWallet::new(
-        "http://localhost:38088/json_rpc".to_string(),
-        "http://stagenet.xmr-tw.org:38081".to_string(),
+        wallet_rpc_url(),
+        daemon_rpc_url(),
         "atomic-swap-test".to_string(),
-        "./wallets".to_string(),
-    ).await?;
+        wallet_dir(),
+    )
+    .await?;
 
     // Create or open wallet
     match wallet.create_wallet("test123").await {
@@ -69,11 +84,12 @@ async fn test_locked_transaction_creation() -> Result<()> {
     println!("🔐 Testing locked transaction creation...");
 
     let wallet = MoneroWallet::new(
-        "http://localhost:38088/json_rpc".to_string(),
-        "http://stagenet.xmr-tw.org:38081".to_string(),
+        wallet_rpc_url(),
+        daemon_rpc_url(),
         "atomic-swap-test".to_string(),
-        "./wallets".to_string(),
-    ).await?;
+        wallet_dir(),
+    )
+    .await?;
 
     wallet.open_wallet("test123").await?;
 
@@ -103,11 +119,9 @@ async fn test_locked_transaction_creation() -> Result<()> {
     println!("   Unlock time: {} blocks", unlock_height);
 
     // Create locked transaction (ATOMIC SWAP CORE FUNCTION)
-    let result = wallet.transfer_locked(
-        &destination,
-        amount_piconero,
-        unlock_height,
-    ).await?;
+    let result = wallet
+        .transfer_locked(&destination, amount_piconero, unlock_height)
+        .await?;
 
     println!("✅ Transaction created!");
     println!("   TX Hash: {}", result.tx_hash);
@@ -142,19 +156,23 @@ async fn test_ten_confirmation_safety() -> Result<()> {
     println!("   This will take ~20 minutes (10 blocks × 2 min)");
 
     let wallet = MoneroWallet::new(
-        "http://localhost:38088/json_rpc".to_string(),
-        "http://stagenet.xmr-tw.org:38081".to_string(),
+        wallet_rpc_url(),
+        daemon_rpc_url(),
         "atomic-swap-test".to_string(),
-        "./wallets".to_string(),
-    ).await?;
+        wallet_dir(),
+    )
+    .await?;
 
     wallet.open_wallet("test123").await?;
 
     // Check balance first
     let (balance, unlocked_balance) = wallet.get_balance().await?;
-    println!("💰 Wallet balance: {} XMR (unlocked: {} XMR)", 
-             piconero_to_xmr(balance), piconero_to_xmr(unlocked_balance));
-    
+    println!(
+        "💰 Wallet balance: {} XMR (unlocked: {} XMR)",
+        piconero_to_xmr(balance),
+        piconero_to_xmr(unlocked_balance)
+    );
+
     if balance == 0 {
         println!("⚠️  Wallet has 0 balance. Skipping test.");
         println!("💡 Fund wallet via: https://stagenet-faucet.xmr-tw.org/");
@@ -165,21 +183,22 @@ async fn test_ten_confirmation_safety() -> Result<()> {
     // Create test transaction
     let destination = wallet.get_address().await?;
     let amount_piconero = xmr_to_piconero(0.01);
-    
+
     // Ensure we have enough balance
     if balance < amount_piconero {
-        println!("⚠️  Insufficient balance. Need {} XMR, have {} XMR", 
-                 piconero_to_xmr(amount_piconero), piconero_to_xmr(balance));
+        println!(
+            "⚠️  Insufficient balance. Need {} XMR, have {} XMR",
+            piconero_to_xmr(amount_piconero),
+            piconero_to_xmr(balance)
+        );
         return Ok(()); // Skip test if insufficient balance
     }
-    
+
     let current_height = wallet.get_height().await?;
 
-    let result = wallet.transfer_locked(
-        &destination,
-        amount_piconero,
-        current_height + 10,
-    ).await?;
+    let result = wallet
+        .transfer_locked(&destination, amount_piconero, current_height + 10)
+        .await?;
 
     println!("✅ Transaction created: {}", result.tx_hash);
     println!("⏳ Waiting for 10 confirmations (COMIT production standard)...");
@@ -190,13 +209,14 @@ async fn test_ten_confirmation_safety() -> Result<()> {
 
     println!("✅ 10 confirmations received!");
     println!("⏱️  Duration: {:.2} minutes", duration.as_secs_f64() / 60.0);
-    println!("📊 Average block time: {:.2} minutes", 
-             duration.as_secs_f64() / 60.0 / 10.0);
+    println!(
+        "📊 Average block time: {:.2} minutes",
+        duration.as_secs_f64() / 60.0 / 10.0
+    );
 
     // Should be ~20 minutes (2 min per block)
-    assert!(duration.as_secs() > 600);  // At least 10 minutes
+    assert!(duration.as_secs() > 600); // At least 10 minutes
     assert!(duration.as_secs() < 1800); // Less than 30 minutes
 
     Ok(())
 }
-

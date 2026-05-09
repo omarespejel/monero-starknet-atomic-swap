@@ -115,16 +115,16 @@ if __name__ == "__main__":
                 "high": 0x427dde0adb325f957d29ad71e4643882,
             },
             "second_point_compressed": {
-                "low": 0xd893b3476bdf09770b7616f84c5c7bbe,
-                "high": 0x5c79d0fa84d6440908e2e2065e60d1cd,
+                "low": 0x9244eb3a3699efed3106c6ae0afdf28,
+                "high": 0xb6e0bfc0d9fbb8a4c8ef08cb5da2eff3,
             },
             "r1_compressed": {
-                "low": 0x9c289904f3df85b691d32a931f4d239,
-                "high": 0xf7926242a14aef11d6c54224331717ae,
+                "low": 0x3cb02521d7a17fedca11c02ea41fe334,
+                "high": 0x11ef09256f90d942ca7a0e4ae05926a5,
             },
             "r2_compressed": {
-                "low": 0x2a8dcb3f7f2fdfac40805970f83a3577,
-                "high": 0xde953c10ba21a6970b15ecdc1a8d404,
+                "low": 0xe66ca975ef303c032fcc18a952325162,
+                "high": 0xc5d2eb608176c8b79dfa55289c35b35f,
             },
         }
         
@@ -152,4 +152,3 @@ if __name__ == "__main__":
         else:
             print("❌ Some conversions do not match")
             sys.exit(1)
-

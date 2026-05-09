@@ -1,26 +1,26 @@
 //! Generate test vectors for all three test suites
-//! 
+//!
 //! Run: cargo test --test generate_test_vectors -- --ignored --nocapture
 
 use serde_json::json;
+use sha2::{Digest, Sha256};
 use std::fs;
-use sha2::{Sha256, Digest};
 
-use xmr_secret_gen::monero::two_party_keys::{AliceKeys, BobKeys, SharedOutput};
-use xmr_secret_gen::dleq::generate_dleq_proof_for_bob;
 use xmr_secret_gen::crypto::scalar_compat::ed25519_scalar_to_bn254_bytes;
+use xmr_secret_gen::dleq::generate_dleq_proof_for_bob;
+use xmr_secret_gen::monero::two_party_keys::{AliceKeys, BobKeys, SharedOutput};
 
 /// Generate two-party test vectors
 #[test]
-#[ignore]  // Run manually: cargo test generate_two_party -- --ignored
+#[ignore] // Run manually: cargo test generate_two_party -- --ignored
 fn generate_two_party_vectors() {
     let mut vectors = Vec::new();
-    
+
     for i in 0..5 {
         let alice = AliceKeys::generate();
         let bob = BobKeys::generate();
         let shared = SharedOutput::new(&alice, &bob);
-        
+
         let vector = json!({
             "test_id": format!("two_party_{}", i),
             "alice": {
@@ -47,22 +47,23 @@ fn generate_two_party_vectors() {
                 "s_full": hex::encode((alice.spend_share() + bob.spend_share()).to_bytes()),
             }
         });
-        
+
         vectors.push(vector);
     }
-    
+
     let output = json!({
         "description": "Two-party key generation test vectors",
         "version": "1.0.0",
         "generated_at": chrono::Utc::now().to_rfc3339(),
         "vectors": vectors,
     });
-    
+
     fs::write(
         "tests/fixtures/protocol/two_party_key_exchange_vectors.json",
-        serde_json::to_string_pretty(&output).unwrap()
-    ).expect("Failed to write vectors");
-    
+        serde_json::to_string_pretty(&output).unwrap(),
+    )
+    .expect("Failed to write vectors");
+
     println!("✅ Generated {} two-party test vectors", vectors.len());
 }
 
@@ -73,10 +74,9 @@ fn generate_integration_vectors() {
     let alice = AliceKeys::generate();
     let bob = BobKeys::generate();
     let shared = SharedOutput::new(&alice, &bob);
-    
-    let dleq_proof = generate_dleq_proof_for_bob(&bob)
-        .expect("DLEQ proof must succeed");
-    
+
+    let dleq_proof = generate_dleq_proof_for_bob(&bob).expect("DLEQ proof must succeed");
+
     let scenario = json!({
         "scenario": "happy_path_swap",
         "phases": {
@@ -113,19 +113,19 @@ fn generate_integration_vectors() {
             }
         }
     });
-    
+
     let output = json!({
         "description": "Full swap protocol end-to-end test vectors",
         "version": "1.0.0",
         "generated_at": chrono::Utc::now().to_rfc3339(),
         "scenarios": [scenario],
     });
-    
+
     fs::write(
         "tests/fixtures/integration/full_swap_protocol_vectors.json",
-        serde_json::to_string_pretty(&output).unwrap()
-    ).expect("Failed to write vectors");
-    
+        serde_json::to_string_pretty(&output).unwrap(),
+    )
+    .expect("Failed to write vectors");
+
     println!("✅ Generated integration test vectors");
 }
-

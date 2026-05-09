@@ -10,7 +10,7 @@
 //! - Y is the second generator point (derived deterministically)
 //!
 //! **Hash Function Compatibility (CRITICAL):**
-//! 
+//!
 //! **Hashlock**: SHA-256 (matches Cairo's `compute_sha256_byte_array`)
 //! - Hashlock H = SHA-256(raw_secret_bytes) → 32 bytes
 //! - Cairo verification: `compute_sha256_byte_array(@secret)` (line 777)
@@ -31,8 +31,9 @@
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::edwards::{CompressedEdwardsY, EdwardsPoint};
 use curve25519_dalek::scalar::Scalar;
+use curve25519_dalek::traits::IsIdentity;
 use hex;
-use sha2::{Digest, Sha256};
+use sha2::{Digest, Sha256, Sha512};
 use std::ops::Deref;
 use thiserror::Error;
 use zeroize::{Zeroize, Zeroizing};
@@ -116,8 +117,12 @@ pub struct DleqProofForCairo {
     pub y_compressed: [u8; 32],
     /// First commitment R1 = k·G (compressed Edwards, 32 bytes)
     pub r1_compressed: [u8; 32],
+    /// Sqrt hint for R1 decompression (x-coordinate as u256)
+    pub r1_sqrt_hint: [u8; 32],
     /// Second commitment R2 = k·Y (compressed Edwards, 32 bytes)
     pub r2_compressed: [u8; 32],
+    /// Sqrt hint for R2 decompression (x-coordinate as u256)
+    pub r2_sqrt_hint: [u8; 32],
 }
 
 /// Generate a DLEQ proof for the given secret and adaptor point.
@@ -165,19 +170,19 @@ pub fn generate_dleq_proof(
     hashlock: &[u8; 32],
 ) -> Result<DleqProof, DleqError> {
     // SECURITY: Validate inputs before generating proof
-    
+
     // 1. Check secret is non-zero (use double deref for Zeroizing)
     if **secret == Scalar::ZERO {
         return Err(DleqError::ZeroScalar);
     }
-    
+
     // 2. Verify adaptor_point = secret * G (use deref() for Zeroizing)
     let G = ED25519_BASEPOINT_POINT;
     let computed_point = G * secret.deref();
     if computed_point != *adaptor_point {
         return Err(DleqError::PointMismatch);
     }
-    
+
     // 3. Verify hashlock = SHA256(raw_secret_bytes) for Cairo compatibility
     // AUDIT: Warn if scalar reduction changed the bytes (could cause hashlock mismatch)
     let scalar_bytes = secret.to_bytes();
@@ -187,12 +192,12 @@ pub fn generate_dleq_proof(
         eprintln!("    Scalar: {}", hex::encode(scalar_bytes));
         eprintln!("    Using raw bytes for hashlock (Cairo-compatible)");
     }
-    
+
     let computed_hash: [u8; 32] = Sha256::digest(secret_bytes).into();
     if computed_hash != *hashlock {
         return Err(DleqError::HashlockMismatch);
     }
-    
+
     // 4. Get generators
     let Y = get_second_generator(); // Derived second base
 
@@ -228,23 +233,25 @@ pub fn generate_dleq_proof(
 }
 
 /// Generate DLEQ proof for Bob's secret (s_b)
-/// 
+///
 /// SECURITY: Verifies Ed25519→BN254 compatibility before proof generation.
 /// This is a convenience function for the two-party protocol.
-pub fn generate_dleq_proof_for_bob(bob_keys: &crate::monero::two_party_keys::BobKeys) -> Result<DleqProof, DleqError> {
+pub fn generate_dleq_proof_for_bob(
+    bob_keys: &crate::monero::two_party_keys::BobKeys,
+) -> Result<DleqProof, DleqError> {
     use crate::dleq::ed25519_bn254::ed25519_scalar_to_bn254_safe;
     use zeroize::Zeroizing;
-    
+
     let secret = bob_keys.spend_share();
-    
+
     // CRITICAL: Validate scalar is safe for cross-curve use
     let _bn254_bytes = ed25519_scalar_to_bn254_safe(&secret)
         .map_err(|e| DleqError::ScalarConversionError(e.to_string()))?;
-    
+
     let secret_bytes = bob_keys.secret_bytes();
     let adaptor_point = bob_keys.adaptor_point();
     let hashlock = bob_keys.hashlock();
-    
+
     generate_dleq_proof(
         &Zeroizing::new(secret),
         &secret_bytes,
@@ -253,14 +260,11 @@ pub fn generate_dleq_proof_for_bob(bob_keys: &crate::monero::two_party_keys::Bob
     )
 }
 
-
 /// Convert an Edwards point to compressed format and sqrt hint.
 ///
 /// The sqrt hint is the Edwards x-coordinate (u256, 32 bytes little-endian).
 /// This is needed by Cairo's `decompress_edwards_pt_from_y_compressed_le_into_weirstrass_point`.
-fn edwards_point_to_cairo_format(
-    point: &EdwardsPoint,
-) -> Result<([u8; 32], [u8; 32]), DleqError> {
+fn edwards_point_to_cairo_format(point: &EdwardsPoint) -> Result<([u8; 32], [u8; 32]), DleqError> {
     let compressed = point.compress().to_bytes();
     let sqrt_hint = edwards_x_from_compressed(&compressed)?;
     Ok((compressed, sqrt_hint))
@@ -313,9 +317,7 @@ fn edwards_x_from_compressed(compressed: &[u8; 32]) -> Result<[u8; 32], DleqErro
 }
 
 /// Derive a Cairo sqrt hint from a compressed Edwards point.
-pub fn sqrt_hint_from_compressed(
-    compressed: &[u8; 32],
-) -> Result<[u8; 32], DleqError> {
+pub fn sqrt_hint_from_compressed(compressed: &[u8; 32]) -> Result<[u8; 32], DleqError> {
     edwards_x_from_compressed(compressed)
 }
 
@@ -390,21 +392,21 @@ impl DleqProof {
         let second_point = CompressedEdwardsY(ser.second_point)
             .decompress()
             .ok_or(DleqError::PointMismatch)?;
-        
+
         let r1 = CompressedEdwardsY(ser.r1)
             .decompress()
             .ok_or(DleqError::PointMismatch)?;
-        
+
         let r2 = CompressedEdwardsY(ser.r2)
             .decompress()
             .ok_or(DleqError::PointMismatch)?;
-        
+
         let challenge: Option<Scalar> = Scalar::from_canonical_bytes(ser.challenge).into();
         let challenge = challenge.ok_or(DleqError::InvalidProof)?;
-        
+
         let response: Option<Scalar> = Scalar::from_canonical_bytes(ser.response).into();
         let response = response.ok_or(DleqError::InvalidProof)?;
-        
+
         Ok(DleqProof {
             second_point,
             challenge,
@@ -461,14 +463,13 @@ impl DleqProof {
         let Y = get_second_generator();
 
         // Convert all points to compressed format with sqrt hints
-        let (adaptor_compressed, adaptor_sqrt_hint) =
-            edwards_point_to_cairo_format(adaptor_point)?;
+        let (adaptor_compressed, adaptor_sqrt_hint) = edwards_point_to_cairo_format(adaptor_point)?;
         let (second_compressed, second_sqrt_hint) =
             edwards_point_to_cairo_format(&self.second_point)?;
         let (g_compressed, _) = edwards_point_to_cairo_format(&G)?;
         let (y_compressed, _) = edwards_point_to_cairo_format(&Y)?;
-        let (r1_compressed, _) = edwards_point_to_cairo_format(&self.r1)?;
-        let (r2_compressed, _) = edwards_point_to_cairo_format(&self.r2)?;
+        let (r1_compressed, r1_sqrt_hint) = edwards_point_to_cairo_format(&self.r1)?;
+        let (r2_compressed, r2_sqrt_hint) = edwards_point_to_cairo_format(&self.r2)?;
 
         Ok(DleqProofForCairo {
             adaptor_point_compressed: adaptor_compressed,
@@ -480,26 +481,43 @@ impl DleqProof {
             g_compressed,
             y_compressed,
             r1_compressed,
+            r1_sqrt_hint,
             r2_compressed,
+            r2_sqrt_hint,
         })
     }
 }
 
 /// Get the second generator point Y for DLEQ proofs.
 ///
-/// CRITICAL: Must match Cairo's `get_dleq_second_generator()` exactly!
+/// CRITICAL: Must match Cairo's `get_dleq_second_generator()` and
+/// `ED25519_SECOND_GENERATOR_COMPRESSED` constants exactly.
 ///
-/// Currently uses `2·G` as placeholder to match Cairo's implementation.
-/// This ensures Rust-generated proofs verify correctly in Cairo.
-///
-/// TODO: Once Python tool generates hash-to-curve constant for Cairo,
-/// update both Rust and Cairo to use the same hash-to-curve point.
-///
-/// Production path: Use hash-to-curve("DLEQ_SECOND_BASE_V1") → Edwards → Weierstrass → u384 limbs
-pub(crate) fn get_second_generator() -> EdwardsPoint {
-    // Current implementation: Y = 2·G (matches Cairo placeholder)
-    // This ensures compatibility between Rust proof generation and Cairo verification
-    ED25519_BASEPOINT_POINT * Scalar::from(2u64)
+/// The point is derived deterministically from a domain-separated transcript by
+/// trying SHA-512 outputs as compressed Edwards-Y encodings, then multiplying by
+/// the cofactor to land in the prime-order subgroup. This avoids the old `2*G`
+/// placeholder while keeping the constant reproducible.
+pub fn get_second_generator() -> EdwardsPoint {
+    const DST: &[u8] = b"MONERO_STARKNET_ATOMIC_SWAP_DLEQ_SECOND_GENERATOR_V1";
+
+    for counter in 0u32..1024 {
+        let mut hasher = Sha512::new();
+        hasher.update(DST);
+        hasher.update(counter.to_le_bytes());
+        let digest = hasher.finalize();
+
+        let mut compressed = [0u8; 32];
+        compressed.copy_from_slice(&digest[..32]);
+
+        if let Some(point) = CompressedEdwardsY(compressed).decompress() {
+            let subgroup_point = point.mul_by_cofactor();
+            if !subgroup_point.is_identity() && subgroup_point.is_torsion_free() {
+                return subgroup_point;
+            }
+        }
+    }
+
+    unreachable!("domain-separated Ed25519 second generator derivation failed")
 }
 
 /// Generate a deterministic nonce k for DLEQ proof generation.
@@ -543,18 +561,18 @@ fn generate_deterministic_nonce(
     hashlock: &[u8; 32],
 ) -> Result<Zeroizing<Scalar>, DleqError> {
     let mut counter = 0u32;
-    
+
     loop {
-    let mut hasher = Sha256::new();
+        let mut hasher = Sha256::new();
         // Domain separation: prevents hash collisions with other protocol hashes
         hasher.update(b"DLEQ_NONCE_V1");
         hasher.update(secret.deref().to_bytes()); // Use deref() for Zeroizing
-    hasher.update(hashlock);
+        hasher.update(hashlock);
         hasher.update(&counter.to_le_bytes()); // Counter for retry if k is invalid
 
-    let hash = hasher.finalize();
-    let mut scalar_bytes = [0u8; 32];
-    scalar_bytes.copy_from_slice(&hash);
+        let hash = hasher.finalize();
+        let mut scalar_bytes = [0u8; 32];
+        scalar_bytes.copy_from_slice(&hash);
         let k = Scalar::from_bytes_mod_order(scalar_bytes);
 
         // Validate nonce is non-zero
@@ -618,14 +636,10 @@ fn compute_challenge(
         inputs.push(poseidon_fe_from_u128(word as u128));
     }
 
+    let mut scalar_bytes = [0u8; 32];
     let hash_felt = PoseidonCairoStark252::hash_many(&inputs);
     let hash_bytes = hash_felt.to_bytes_le();
-    let mut low_bytes = [0u8; 16];
-    low_bytes.copy_from_slice(&hash_bytes[..16]);
-    let hash_u128 = u128::from_le_bytes(low_bytes);
-
-    let mut scalar_bytes = [0u8; 32];
-    scalar_bytes[..16].copy_from_slice(&hash_u128.to_le_bytes());
+    scalar_bytes.copy_from_slice(&hash_bytes[..32]);
     Scalar::from_bytes_mod_order(scalar_bytes)
 }
 
@@ -650,8 +664,6 @@ fn poseidon_fe_from_u128(value: u128) -> PoseidonFE {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use zeroize::Zeroizing;
-    use std::ops::Deref;
 
     #[test]
     fn test_dleq_proof_generation() {
@@ -667,8 +679,9 @@ mod tests {
         let adaptor_point = ED25519_BASEPOINT_POINT * *secret_zeroizing;
 
         // Generate DLEQ proof
-        let proof = generate_dleq_proof(&secret_zeroizing, &secret_bytes, &adaptor_point, &hashlock)
-            .expect("Proof generation should succeed for valid inputs");
+        let proof =
+            generate_dleq_proof(&secret_zeroizing, &secret_bytes, &adaptor_point, &hashlock)
+                .expect("Proof generation should succeed for valid inputs");
 
         // Verify proof structure: U should equal t·Y
         let Y = get_second_generator();
@@ -693,13 +706,17 @@ mod tests {
         let hashlock = [0u8; 32]; // arbitrary
 
         let result = generate_dleq_proof(&secret, &secret_bytes, &adaptor_point, &hashlock);
-        assert_eq!(result, Err(DleqError::ZeroScalar), "Zero scalar must be rejected");
+        assert_eq!(
+            result,
+            Err(DleqError::ZeroScalar),
+            "Zero scalar must be rejected"
+        );
     }
 
     #[test]
     fn test_dleq_validation_point_mismatch() {
-        use zeroize::Zeroizing;
         use std::ops::Deref;
+        use zeroize::Zeroizing;
         let secret = Zeroizing::new(Scalar::from(42u64));
         let secret_bytes = secret.deref().to_bytes(); // Use scalar bytes for test
         let wrong_point = ED25519_BASEPOINT_POINT * Scalar::from(99u64); // wrong!
@@ -715,8 +732,8 @@ mod tests {
 
     #[test]
     fn test_dleq_validation_hashlock_mismatch() {
-        use zeroize::Zeroizing;
         use std::ops::Deref;
+        use zeroize::Zeroizing;
         let secret = Zeroizing::new(Scalar::from(42u64));
         let secret_bytes = secret.deref().to_bytes(); // Use scalar bytes for test
         let adaptor_point = ED25519_BASEPOINT_POINT * *secret;
@@ -732,8 +749,8 @@ mod tests {
 
     #[test]
     fn test_nonce_generation_deterministic() {
-        use zeroize::Zeroizing;
         use std::ops::Deref;
+        use zeroize::Zeroizing;
         let secret = Zeroizing::new(Scalar::from(42u64));
         let hashlock: [u8; 32] = Sha256::digest(secret.deref().to_bytes()).into();
 
@@ -748,8 +765,8 @@ mod tests {
 
     #[test]
     fn test_nonce_generation_different_inputs_produce_different_nonces() {
-        use zeroize::Zeroizing;
         use std::ops::Deref;
+        use zeroize::Zeroizing;
         let secret1 = Zeroizing::new(Scalar::from(42u64));
         let secret2 = Zeroizing::new(Scalar::from(99u64));
         let hashlock1: [u8; 32] = Sha256::digest(secret1.deref().to_bytes()).into();
@@ -761,13 +778,16 @@ mod tests {
             .expect("Nonce generation should succeed");
 
         // Different inputs should produce different nonces (with high probability)
-        assert_ne!(*nonce1, *nonce2, "Different inputs should produce different nonces");
+        assert_ne!(
+            *nonce1, *nonce2,
+            "Different inputs should produce different nonces"
+        );
     }
 
     #[test]
     fn test_dleq_validation_scalar_one() {
-        use zeroize::Zeroizing;
         use std::ops::Deref;
+        use zeroize::Zeroizing;
         // Test edge case: Scalar::ONE (smallest non-zero scalar)
         let secret = Zeroizing::new(Scalar::ONE);
         let secret_bytes = secret.deref().to_bytes(); // Use scalar bytes for test
@@ -782,7 +802,6 @@ mod tests {
     #[test]
     fn test_dleq_validation_max_scalar() {
         use zeroize::Zeroizing;
-        use std::ops::Deref;
         // Test edge case: Maximum scalar value (order - 1)
         // Ed25519 order is 2^252 + 27742317777372353535851937790883648493
         // Maximum scalar is order - 1
@@ -803,8 +822,8 @@ mod tests {
 
     #[test]
     fn test_nonce_generation_counter_boundary() {
-        use zeroize::Zeroizing;
         use std::ops::Deref;
+        use zeroize::Zeroizing;
         // Test that nonce generation handles counter retries correctly
         // This tests the boundary condition where k might be zero multiple times
         // (though statistically unlikely, we should handle it)
@@ -821,8 +840,8 @@ mod tests {
 
     #[test]
     fn test_nonce_generation_max_attempts() {
-        use zeroize::Zeroizing;
         use std::ops::Deref;
+        use zeroize::Zeroizing;
         // Test that nonce generation doesn't loop infinitely
         // Even if we hit zero nonces, we should fail gracefully after max attempts
         // Note: This is a theoretical test - hitting zero 100 times is cryptographically impossible
@@ -832,6 +851,9 @@ mod tests {
 
         // This should succeed (hitting zero 100 times is impossible)
         let result = generate_deterministic_nonce(&secret, &hashlock);
-        assert!(result.is_ok(), "Nonce generation should succeed for valid inputs");
+        assert!(
+            result.is_ok(),
+            "Nonce generation should succeed for valid inputs"
+        );
     }
 }

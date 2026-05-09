@@ -30,7 +30,7 @@ impl MoneroStagenet {
             "http://monero-stagenet.exan.tech:38081/json_rpc", // Fallback
             "http://stagenet.melo.tools:38081/json_rpc", // Legacy fallback
             "http://stagenet.community.rino.io:38081/json_rpc", // Legacy fallback
-            "http://localhost:38081/json_rpc", // Local fallback
+            "http://localhost:38081/json_rpc",           // Local fallback
         ];
 
         let http_client = Client::builder()
@@ -42,7 +42,10 @@ impl MoneroStagenet {
         for rpc_url in &rpc_urls {
             match Self::get_height_internal(&http_client, rpc_url).await {
                 Ok(height) => {
-                    println!("✅ Connected to Monero stagenet at {}! Height: {}", rpc_url, height);
+                    println!(
+                        "✅ Connected to Monero stagenet at {}! Height: {}",
+                        rpc_url, height
+                    );
                     return Ok(Self {
                         rpc_url: rpc_url.to_string(),
                         http_client,
@@ -111,4 +114,3 @@ impl MoneroStagenet {
         Self::get_height_internal(&self.http_client, &self.rpc_url).await
     }
 }
-

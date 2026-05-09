@@ -38,5 +38,16 @@ fn print_human_readable(secret: &SwapSecret) {
     println!("[2] CAIRO HASH");
     println!("    let expected_hash = {};\n", secret.cairo_hash_literal);
     println!("[3] CAIRO SECRET");
-    println!("    let secret_input = {};", secret.cairo_secret_literal);
+    println!("    let secret_input = {};\n", secret.cairo_secret_literal);
+    println!("[4] DLEQ DEPLOYMENT ARTIFACTS");
+    println!("    challenge: {}", secret.dleq_challenge);
+    println!(
+        "    response: low={}, high={}",
+        secret.dleq_response.low, secret.dleq_response.high
+    );
+    println!(
+        "    adaptor compressed: low={}, high={}",
+        secret.adaptor_point_compressed.low, secret.adaptor_point_compressed.high
+    );
+    println!("    Use tools/generate_deploy_calldata.py or scripts/deploy.ts for full constructor calldata.");
 }

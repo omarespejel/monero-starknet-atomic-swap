@@ -140,12 +140,15 @@ Alice deploys AtomicLock contract with:
 - Adaptor point: `T` (compressed + sqrt hint)
 - DLEQ proof: `(U, c, s, R1, R2)`
 - Timelock: `lock_until` (block timestamp + duration)
+- Depositor: Alice's account address, passed explicitly in constructor calldata
 
 Constructor verifies DLEQ proof. If invalid, deployment fails.
 
 ### Step 4: Token Deposit
 
-Alice calls `deposit()` to transfer tokens into contract. Only depositor can call this function.
+Alice calls `deposit()` to transfer tokens into contract. Only the explicit
+constructor depositor can call this function. This must not be inferred from the
+constructor caller because UDC deployment makes the caller the UDC contract.
 
 ### Step 5: Secret Revelation (Two-Phase Unlock)
 
@@ -178,8 +181,10 @@ If all checks pass:
 
 The original `verify_and_unlock(secret)` function still works:
 - Calls `reveal_secret()` internally
-- Immediately transfers tokens (bypasses grace period)
-- Maintains backward compatibility with existing integrations
+- Does not transfer tokens
+- Requires the same later `claim_tokens()` call after the grace period
+- Maintains backward compatibility for reveal integrations without keeping the
+  legacy immediate-unlock behavior
 
 ### Step 6: Key Recovery
 
@@ -295,4 +300,3 @@ Future enhancement. Aggregate multiple swaps into single transaction for gas eff
 
 **Version**: 0.7.1 (Two-Party Key Generation)  
 **Last Updated**: 2025-12-23
-

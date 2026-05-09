@@ -7,8 +7,12 @@ mod tests {
     use core::result::ResultTrait;
     use core::serde::Serde;
     use core::traits::TryInto;
-    use starknet::contract_address::ContractAddress;
-    use snforge_std::{declare, ContractClassTrait, DeclareResultTrait, start_cheat_block_timestamp, stop_cheat_block_timestamp};
+    use starknet::{contract_address::ContractAddress, SyscallResult};
+    use snforge_std::{
+        declare, ContractClassTrait, DeclareResultTrait,
+        start_cheat_block_timestamp, stop_cheat_block_timestamp,
+        start_cheat_caller_address, stop_cheat_caller_address,
+    };
     
     // Future timestamp for test deployments (far enough in future to pass validation)
     const FUTURE_TIMESTAMP: u64 = 9999999999_u64;
@@ -23,12 +27,12 @@ mod tests {
         high: 0x17611da35f39a2a5e3a9fddb8d978e4f,
     };
     const TESTVECTOR_U_COMPRESSED: u256 = u256 {
-        low: 0xd893b3476bdf09770b7616f84c5c7bbe,
-        high: 0x5c79d0fa84d6440908e2e2065e60d1cd,
+        low: 0x9244eb3a3699efed3106c6ae0afdf28,
+        high: 0xb6e0bfc0d9fbb8a4c8ef08cb5da2eff3,
     };
     const TESTVECTOR_U_SQRT_HINT: u256 = u256 {
-        low: 0xdcad2173817c163b5405cec7698eb4b8,
-        high: 0x742bb3c44b13553c8ddff66565b44cac,
+        low: 0xcffea6b3bffe746de20fdd0734b30845,
+        high: 0x5e4a3b18b41199f9389ded8696067271,
     };
     const TESTVECTOR_R1_COMPRESSED: u256 = u256 {
         low: 0x3cb02521d7a17fedca11c02ea41fe334,
@@ -39,15 +43,16 @@ mod tests {
         high: 0x0a2d15cdfbfcf6181e92f0b7c74b477e,
     };
     const TESTVECTOR_R2_COMPRESSED: u256 = u256 {
-        low: 0xb4fb26c272cbe6b84d65d4f908aff02f,
-        high: 0xf58498fd33c0fbca066f3fdff2f49225,
+        low: 0xe66ca975ef303c032fcc18a952325162,
+        high: 0xc5d2eb608176c8b79dfa55289c35b35f,
     };
     const TESTVECTOR_R2_SQRT_HINT: u256 = u256 {
-        low: 0x598521e3f6d818ed84721901f0d87f89,
-        high: 0x09d2fd2811966933dff4c8ab0d9059fc,
+        low: 0xd8b08d5ec3d265b83e5e333d750d6b37,
+        high: 0x0e41fbdbbf62b47c511e0a5aa04059de,
     };
-    const TESTVECTOR_CHALLENGE_LOW: felt252 = 0x8d664bb70810bdab323a44354d98f94a;
-    const TESTVECTOR_RESPONSE_LOW: felt252 = 0x1e741f8fec4161ea41b23ce6d007ba12;
+    const TESTVECTOR_CHALLENGE: felt252 = 0x47c760eb9b6a8797680bef6218e06aacc6570f8be11819d2268bb024f816108;
+    const TESTVECTOR_RESPONSE: u256 = u256 { low: 0xbe3ffdd10e06b50b800feb45877b787b, high: 0x2f0ceba8a8c56d6f6b4ed3ae98db234 };
+    const ERR_HINT_Q_MISMATCH: felt252 = 'Hint Q mismatch adaptor';
     const TESTVECTOR_HASHLOCK: [u32; 8] = [
         0xb6acca81_u32, 0xa0939a85_u32, 0x6c35e4c4_u32, 0x188e95b9_u32,
         0x1731aab1_u32, 0xd4629a4c_u32, 0xee79dd09_u32, 0xded4fc94_u32,
@@ -74,12 +79,6 @@ mod tests {
         token: ContractAddress,
         amount: u256,
     ) -> IAtomicLockDispatcher {
-        // Use hashlock from test vectors
-        let hashlock = TESTVECTOR_HASHLOCK.span();
-        
-        // Get real MSM hints (from test_e2e_dleq.cairo - truncated scalar version)
-        let (s_hint_for_g, s_hint_for_y, c_neg_hint_for_t, c_neg_hint_for_u) = get_real_msm_hints();
-        
         // Fake-GLV hint for adaptor point MSM (from test_e2e_dleq.cairo)
         let fake_glv_hint = array![
             0x4af5bf430174455ca59934c5,           // Q.x limb0
@@ -93,7 +92,28 @@ mod tests {
             0x1569bc348ca5e9beecb728fdbfea1cd6,   // s1
             0x28e2d5faa7b8c3b25a1678149337cad3   // s2_encoded
         ].span();
-        
+
+        let (addr, _) = deploy_with_test_vectors_and_fake_glv_hint_result(
+            lock_until,
+            token,
+            amount,
+            fake_glv_hint,
+        ).unwrap();
+        IAtomicLockDispatcher { contract_address: addr }
+    }
+
+    fn deploy_with_test_vectors_and_fake_glv_hint_result(
+        lock_until: u64,
+        token: ContractAddress,
+        amount: u256,
+        fake_glv_hint: Span<felt252>,
+    ) -> SyscallResult<(ContractAddress, Span<felt252>)> {
+        // Use hashlock from test vectors
+        let hashlock = TESTVECTOR_HASHLOCK.span();
+
+        // Get real MSM hints (from test_e2e_dleq.cairo - full scalar version)
+        let (s_hint_for_g, s_hint_for_y, c_neg_hint_for_t, c_neg_hint_for_u) = get_real_msm_hints();
+
         // Deploy using dleq_test_helpers pattern
         let declare_res = declare("AtomicLock");
         let contract = declare_res.unwrap().contract_class();
@@ -101,6 +121,8 @@ mod tests {
         let mut calldata = ArrayTrait::new();
         hashlock.serialize(ref calldata);
         Serde::serialize(@lock_until, ref calldata);
+        let constructor_depositor = starknet::get_caller_address();
+        Serde::serialize(@constructor_depositor, ref calldata);
         Serde::serialize(@token, ref calldata);
         Serde::serialize(@amount, ref calldata);
         
@@ -108,8 +130,8 @@ mod tests {
         Serde::serialize(@TESTVECTOR_T_SQRT_HINT, ref calldata);
         Serde::serialize(@TESTVECTOR_U_COMPRESSED, ref calldata);
         Serde::serialize(@TESTVECTOR_U_SQRT_HINT, ref calldata);
-        Serde::serialize(@TESTVECTOR_CHALLENGE_LOW, ref calldata);
-        Serde::serialize(@TESTVECTOR_RESPONSE_LOW, ref calldata);
+        Serde::serialize(@TESTVECTOR_CHALLENGE, ref calldata);
+        Serde::serialize(@TESTVECTOR_RESPONSE, ref calldata);
         Serde::serialize(@fake_glv_hint, ref calldata);
         Serde::serialize(@s_hint_for_g, ref calldata);
         Serde::serialize(@s_hint_for_y, ref calldata);
@@ -120,11 +142,25 @@ mod tests {
         Serde::serialize(@TESTVECTOR_R2_COMPRESSED, ref calldata);
         Serde::serialize(@TESTVECTOR_R2_SQRT_HINT, ref calldata);
         
-        let (addr, _) = contract.deploy(@calldata).unwrap();
-        IAtomicLockDispatcher { contract_address: addr }
+        contract.deploy(@calldata)
+    }
+
+    fn assert_deploy_failed_with(
+        result: SyscallResult<(ContractAddress, Span<felt252>)>,
+        expected: felt252,
+    ) {
+        match result {
+            Result::Ok(_) => {
+                assert(false, 'deploy should fail');
+            },
+            Result::Err(error_data) => {
+                assert(error_data.len() > 0, 'empty deploy error');
+                assert(*error_data.at(0) == expected, 'wrong deploy error');
+            },
+        };
     }
     
-    /// Get real MSM hints for truncated scalar (matches Cairo behavior)
+    /// Get real MSM hints for full scalar (matches Cairo behavior)
     fn get_real_msm_hints() -> (
         Span<felt252>,
         Span<felt252>,
@@ -132,132 +168,55 @@ mod tests {
         Span<felt252>,
     ) {
         let s_hint_for_g = array![
-
-            0x52f522935135e7c5474d3b99,
-
-            0x7ff7e65231c434008a0c02f8,
-
-            0x41a3962ca5bba9db,
-
+            0xceeec4a90f34e45c033e2ff5,
+            0xb419479f38f86b2b114d2ff1,
+            0x256941d7d54e7beb,
             0x0,
-
-            0xa144206dc24b7180d05200e0,
-
-            0xe8a798301a354777473cd98e,
-
-            0x7ca5add375ea088,
-
+            0xaa6ddc025eb012317a89612a,
+            0x6e9d804e52cb98594f552df2,
+            0x47244d9888c072a3,
             0x0,
-
-            0x1e741f8fec4161ea41b23ce6d007ba12,
-
-            0x100000000000000000000000000000001
-
+            0xcd234e4105b9809a3f4f0dde019dac1,
+            0x1268c27967bf37239a1bdcad1722144e1
         ].span();
         
         let s_hint_for_y = array![
-
-        
-            0x3b81c211fd322bb7dbcb711c,
-
-        
-            0x2082c0dd34f9225f2eb5e0b0,
-
-        
-            0x311b02be49202932,
-
-        
+            0x872011d1a9f20fc5fbed65ec,
+            0xd36e4710d58461cfe9c9ee1d,
+            0x686f29bbaf2b952f,
             0x0,
-
-        
-            0x18c0245425f95187b10e1913,
-
-        
-            0x922be9d1d5313d1c7a4cb499,
-
-        
-            0x51d9b0eb8a969e37,
-
-        
+            0xf350a6f8bc8acbb1d5c40cd5,
+            0x4b256a3dba76a0bc779c811,
+            0x43f41814a3eefa59,
             0x0,
-
-        
-            0x1e741f8fec4161ea41b23ce6d007ba12,
-
-        
-            0x100000000000000000000000000000001
-
-        
+            0xcd234e4105b9809a3f4f0dde019dac1,
+            0x1268c27967bf37239a1bdcad1722144e1
         ].span();
         
         let c_neg_hint_for_t = array![
-
-        
-            0xcb63575f3729fe6cbe7f8496,
-
-        
-            0x9dc314d92447fddbfc1be6cd,
-
-        
-            0x7d6caff1e7cdaa02,
-
-        
+            0xfbeb7a88a7204a3109847933,
+            0xd7bd766f54592bfb04b8a0bf,
+            0x36adfbd5b292a10e,
             0x0,
-
-        
-            0x78dc46b41742aa135083e2da,
-
-        
-            0xecafad9bd49fe98686457cc6,
-
-        
-            0x592bb6f3eaf7ca3,
-
-        
+            0xb1cb68d66c0170146df52bb2,
+            0x7ad50b1ffcd1293f12940e01,
+            0x665e063c6d4ac0f6,
             0x0,
-
-        
-            0x34a3efff5488d0dfc135bf37e3357b53,
-
-        
-            0x1cf7b1760ae5d3463a08a196fd625720
-
-        
+            0x4d5cf08f2a0aee991f621d5e4e15728,
+            0x1148705832ba97f2b70dec32979f4f785
         ].span();
         
         let c_neg_hint_for_u = array![
-
-        
-            0x61ebcae684d8530622e29b45,
-
-        
-            0x694dbc34734f56c0e29f5240,
-
-        
-            0x1913755501e61b9a,
-
-        
+            0x16ecdc108960cb810ed61451,
+            0x28bf80201d67e2f4728ba74b,
+            0x63f872f4f71e1950,
             0x0,
-
-        
-            0x2a37ba10878046ff378a7d73,
-
-        
-            0x25857fe5ce7f65cea1bbc1e0,
-
-        
-            0xca82b2053c5e43e,
-
-        
+            0xe94caf1beb68a19f34eb98a4,
+            0x48bcbcb46602eeea1b043d0d,
+            0x52e390f474357096,
             0x0,
-
-        
-            0x34a3efff5488d0dfc135bf37e3357b53,
-
-        
-            0x1cf7b1760ae5d3463a08a196fd625720
-
-        
+            0x4d5cf08f2a0aee991f621d5e4e15728,
+            0x1148705832ba97f2b70dec32979f4f785
         ].span();
 
         (s_hint_for_g, s_hint_for_y, c_neg_hint_for_t, c_neg_hint_for_u)
@@ -276,6 +235,13 @@ mod tests {
 
         let success = dispatcher.verify_and_unlock(secret_input);
         assert(success, 'unlock fail');
+        assert(dispatcher.is_secret_revealed(), 'secret revealed');
+        assert(!dispatcher.is_unlocked(), 'grace enforced');
+        let claimable_after = dispatcher.get_claimable_after();
+        start_cheat_block_timestamp(dispatcher.contract_address, claimable_after + 1);
+        let claimed = dispatcher.claim_tokens();
+        stop_cheat_block_timestamp(dispatcher.contract_address);
+        assert(claimed, 'claim fail');
         assert(dispatcher.is_unlocked(), 'state');
     }
 
@@ -302,8 +268,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
-    fn test_cannot_unlock_twice() {
+    fn test_legacy_verify_alias_is_idempotent_for_unlocker() {
         let secret_input = get_test_vector_secret();
         
         let dispatcher = deploy_with_test_vectors(
@@ -313,7 +278,10 @@ mod tests {
         );
 
         assert(dispatcher.verify_and_unlock(secret_input), 'first ok');
-        dispatcher.verify_and_unlock("unlock_me");
+        let secret_again = get_test_vector_secret();
+        assert(dispatcher.verify_and_unlock(secret_again), 'second ok');
+        assert(dispatcher.is_secret_revealed(), 'still revealed');
+        assert(!dispatcher.is_unlocked(), 'not unlocked');
     }
 
     #[test]
@@ -348,7 +316,10 @@ mod tests {
         start_cheat_block_timestamp(dispatcher.contract_address, lock_until + 1);
         
         // Now refund should succeed (lock expired, still locked, caller is depositor)
+        let depositor: ContractAddress = 0.try_into().unwrap();
+        start_cheat_caller_address(dispatcher.contract_address, depositor);
         let success = dispatcher.refund();
+        stop_cheat_caller_address(dispatcher.contract_address);
         assert(success, 'refund');
         
         // Stop cheating
@@ -417,6 +388,10 @@ mod tests {
         // Check snforge output for gas metrics: l1_gas, l1_data_gas, l2_gas
         let success = dispatcher.verify_and_unlock(secret_input);
         assert(success, 'gas profile test failed');
+        let claimable_after = dispatcher.get_claimable_after();
+        start_cheat_block_timestamp(dispatcher.contract_address, claimable_after + 1);
+        dispatcher.claim_tokens();
+        stop_cheat_block_timestamp(dispatcher.contract_address);
         assert(dispatcher.is_unlocked(), 'unlock state failed');
     }
 
@@ -433,49 +408,47 @@ mod tests {
 
         let success = dispatcher.verify_and_unlock(secret_input);
         assert(success, 'MSM check failed');
+        let claimable_after = dispatcher.get_claimable_after();
+        start_cheat_block_timestamp(dispatcher.contract_address, claimable_after + 1);
+        dispatcher.claim_tokens();
+        stop_cheat_block_timestamp(dispatcher.contract_address);
         assert(dispatcher.is_unlocked(), 'unlock failed');
     }
 
     #[test]
-    #[ignore] // TODO: This test needs custom invalid hint support - requires helper that uses real DLEQ but tampered hint
-    #[should_panic(expected: ('Wrong FakeGLV decomposition',))]
     fn test_wrong_hint_fails() {
-        // This test verifies MSM hint validation with invalid hint.
-        // Needs: Real DLEQ base setup but tampered fake-GLV hint.
-        // TODO: Create helper for tests that need invalid hints but valid DLEQ base.
-        // For now, marked as ignore since deploy_with_full is being removed.
+        let bad_fake_glv_hint = array![
+            0x1,                                  // Tampered Q.x limb0
+            0x748d85ad870959a54bca47ba,
+            0x6decdae5e1b9b254,
+            0x0,
+            0xaa008e6009b43d5c309fa848,
+            0x5b26ec9e21237560e1866183,
+            0x7191bfaa5a23d0cb,
+            0x0,
+            0x1569bc348ca5e9beecb728fdbfea1cd6,
+            0x28e2d5faa7b8c3b25a1678149337cad3
+        ].span();
+
+        assert_deploy_failed_with(
+            deploy_with_test_vectors_and_fake_glv_hint_result(
+                FUTURE_TIMESTAMP,
+                0.try_into().unwrap(),
+                u256 { low: 0, high: 0 },
+                bad_fake_glv_hint,
+            ),
+            ERR_HINT_Q_MISMATCH,
+        );
     }
 
-    // ============================================================================
-    // Constructor Validation Tests (snforge #[should_panic] Workaround)
-    // ============================================================================
+    // Constructor validation tests.
     //
-    // These tests verify that the constructor correctly rejects invalid inputs with proper
-    // error messages. They are functionally PASSING - the constructor correctly panics
-    // with the expected error messages.
-    //
-    // However, snforge 0.53.0 has a known limitation (issues #4006, #3974) where
-    // #[should_panic] doesn't work for constructor panics during deploy_syscall.
-    // This is aligned with real Starknet network behavior where constructor failures
-    // cannot be caught - the transaction fails immediately.
-    //
-    // Workaround: Mark these tests with #[ignore] and verify manually using grep.
-    // When snforge issue #3974 is resolved, these can be un-ignored.
-    //
-    // Manual validation commands (use --include-ignored to run ignored tests):
-    //   snforge test test_constructor_rejects_zero_point --include-ignored 2>&1 | grep "Zero adaptor point rejected"
-    //   snforge test test_constructor_rejects_wrong_hint_length --include-ignored 2>&1 | grep "Hint must be 10 felts"
-    //   snforge test test_constructor_rejects_mismatched_hint --include-ignored 2>&1 | grep "Hint Q mismatch adaptor"
-    //   snforge test test_constructor_rejects_small_order_point --include-ignored 2>&1 | grep "point not on curve"
-    //
-    // References:
-    //   https://github.com/foundry-rs/starknet-foundry/issues/4006
-    //   https://github.com/foundry-rs/starknet-foundry/issues/3974
+    // These use the legacy `deploy_with_full` negative harness below. They are kept
+    // as broad constructor-failure smoke tests; the exact DLEQ failure reasons are
+    // covered in `test_security_dleq_negative.cairo`.
 
-    /// Manual validation: `snforge test test_constructor_rejects_zero_point --include-ignored 2>&1 | grep "Zero adaptor point rejected"`
     #[test]
-    #[ignore] // snforge 0.53.0 limitation: constructor panics reported as failures
-    #[should_panic] // Test is actually passing (constructor rejects correctly)
+    #[should_panic]
     fn test_constructor_rejects_zero_point() {
         let expected_hash = array![1_u32, 2_u32, 3_u32, 4_u32, 5_u32, 6_u32, 7_u32, 8_u32].span();
         let zero_point = (0, 0, 0, 0);
@@ -493,10 +466,8 @@ mod tests {
         );
     }
 
-    /// Manual validation: `snforge test test_constructor_rejects_wrong_hint_length 2>&1 | grep "Hint must be 10 felts"`
     #[test]
-    #[ignore] // snforge 0.53.0 limitation: constructor panics reported as failures
-    #[should_panic] // Test is actually passing (constructor rejects correctly)
+    #[should_panic]
     fn test_constructor_rejects_wrong_hint_length() {
         let expected_hash = array![1_u32, 2_u32, 3_u32, 4_u32, 5_u32, 6_u32, 7_u32, 8_u32].span();
         let x_limbs = (0x460f72719199c63ec398673f, 0xf27a4af146a52a7dbdeb4cfb, 0x5f9c70ec759789a0, 0x0);
@@ -514,10 +485,8 @@ mod tests {
         );
     }
 
-    /// Manual validation: `snforge test test_constructor_rejects_mismatched_hint --include-ignored 2>&1 | grep "Hint Q mismatch adaptor"`
     #[test]
-    #[ignore] // snforge 0.53.0 limitation: constructor panics reported as failures
-    #[should_panic] // Test is actually passing (constructor rejects correctly)
+    #[should_panic]
     fn test_constructor_rejects_mismatched_hint() {
         let expected_hash = array![1_u32, 2_u32, 3_u32, 4_u32, 5_u32, 6_u32, 7_u32, 8_u32].span();
         let x_limbs = (0x460f72719199c63ec398673f, 0xf27a4af146a52a7dbdeb4cfb, 0x5f9c70ec759789a0, 0x0);
@@ -556,12 +525,15 @@ mod tests {
         // Verify unlock succeeds (proves Rust -> Python -> Cairo consistency)
         let success = dispatcher.verify_and_unlock(secret_input);
         assert(success, 'Rust Python Cairo failed');
+        let claimable_after = dispatcher.get_claimable_after();
+        start_cheat_block_timestamp(dispatcher.contract_address, claimable_after + 1);
+        dispatcher.claim_tokens();
+        stop_cheat_block_timestamp(dispatcher.contract_address);
         assert(dispatcher.is_unlocked(), 'unlock state failed');
     }
 
     #[test]
-    #[ignore] // snforge 0.53.0 limitation: constructor panics reported as failures
-    #[should_panic] // Test is actually passing (constructor rejects correctly)
+    #[should_panic]
     fn test_constructor_rejects_past_lock_time() {
         let expected_hash = array![1_u32, 2_u32, 3_u32, 4_u32, 5_u32, 6_u32, 7_u32, 8_u32].span();
         let x_limbs = (0x460f72719199c63ec398673f, 0xf27a4af146a52a7dbdeb4cfb, 0x5f9c70ec759789a0, 0x0);
@@ -593,8 +565,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // snforge 0.53.0 limitation: constructor panics reported as failures
-    #[should_panic] // Test is actually passing (constructor rejects correctly)
+    #[should_panic]
     fn test_constructor_rejects_mixed_zero_amount_token() {
         let expected_hash = array![1_u32, 2_u32, 3_u32, 4_u32, 5_u32, 6_u32, 7_u32, 8_u32].span();
         let x_limbs = (0x460f72719199c63ec398673f, 0xf27a4af146a52a7dbdeb4cfb, 0x5f9c70ec759789a0, 0x0);
@@ -625,10 +596,8 @@ mod tests {
         );
     }
 
-    /// Manual validation: `snforge test test_constructor_rejects_small_order_point --include-ignored 2>&1 | grep "point not on curve"`
     #[test]
-    #[ignore] // snforge 0.53.0 limitation: constructor panics reported as failures
-    #[should_panic] // Test is actually passing (constructor rejects correctly)
+    #[should_panic]
     fn test_constructor_rejects_small_order_point() {
         let expected_hash = array![1_u32, 2_u32, 3_u32, 4_u32, 5_u32, 6_u32, 7_u32, 8_u32].span();
         let small_order_x = (0, 0, 0, 0);
@@ -667,7 +636,7 @@ mod tests {
         amount: u256,
         adaptor_point_x: (felt252, felt252, felt252, felt252),
         adaptor_point_y: (felt252, felt252, felt252, felt252),
-        dleq: (felt252, felt252),
+        dleq: (felt252, u256),
         fake_glv_hint: Span<felt252>,
     ) -> IAtomicLockDispatcher {
         let declare_res = declare("AtomicLock");
@@ -714,6 +683,8 @@ mod tests {
         let mut calldata = ArrayTrait::new();
         expected_hash.serialize(ref calldata);
         Serde::serialize(@lock_until, ref calldata);
+        let constructor_depositor = starknet::get_caller_address();
+        Serde::serialize(@constructor_depositor, ref calldata);
         Serde::serialize(@token, ref calldata);
         Serde::serialize(@amount, ref calldata);
         

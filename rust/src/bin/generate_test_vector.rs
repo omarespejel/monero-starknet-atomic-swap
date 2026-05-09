@@ -5,9 +5,8 @@ use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
 use curve25519_dalek::scalar::Scalar;
 use serde_json::json;
 use sha2::{Digest, Sha256};
-use std::ops::Deref;
-use zeroize::Zeroizing;
 use xmr_secret_gen::dleq::generate_dleq_proof;
+use zeroize::Zeroizing;
 
 fn main() {
     // Generate secret (using test vector secret for reproducibility)

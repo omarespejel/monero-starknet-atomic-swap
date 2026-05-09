@@ -28,8 +28,8 @@ mod e2e_dleq_tests {
         high: 0x66666666666666666666666666666666,
     };
     const TESTVECTOR_Y_COMPRESSED: u256 = u256 {
-        low: 0x97390f51643851560e5f46ae6af8a3c9,
-        high: 0x2260cdf3092329c21da25ee8c9a21f56,
+        low: 0x21ba32594950b67cf0d8bb8c8ac5e8c7,
+        high: 0xf08df421a3209ab6373dd0ec7ef25dfd,
     };
     // AUTO-GENERATED from deployment_vector.json (2025-12-09)
     // Using little-endian byte interpretation per RFC 8032
@@ -38,8 +38,8 @@ mod e2e_dleq_tests {
         high: 0x427dde0adb325f957d29ad71e4643882,
     };
     const TESTVECTOR_U_COMPRESSED: u256 = u256 {
-        low: 0xd893b3476bdf09770b7616f84c5c7bbe,
-        high: 0x5c79d0fa84d6440908e2e2065e60d1cd,
+        low: 0x9244eb3a3699efed3106c6ae0afdf28,
+        high: 0xb6e0bfc0d9fbb8a4c8ef08cb5da2eff3,
     };
     // R1/R2 compressed points from working test (test_integration_atomic_lock.cairo)
     // These are the empirically validated values that work with Garaga
@@ -48,16 +48,16 @@ mod e2e_dleq_tests {
         high: 0x11ef09256f90d942ca7a0e4ae05926a5,
     };
     const TESTVECTOR_R2_COMPRESSED: u256 = u256 {
-        low: 0xb4fb26c272cbe6b84d65d4f908aff02f,
-        high: 0xf58498fd33c0fbca066f3fdff2f49225,
+        low: 0xe66ca975ef303c032fcc18a952325162,
+        high: 0xc5d2eb608176c8b79dfa55289c35b35f,
     };
     // Challenge/Response from working test (test_integration_atomic_lock.cairo)
     // These match the compressed points and sqrt hints we're using
-    const TESTVECTOR_CHALLENGE_LOW: felt252 = 0x8d664bb70810bdab323a44354d98f94a;
-    const TESTVECTOR_RESPONSE_LOW: felt252 = 0x1e741f8fec4161ea41b23ce6d007ba12;
-    // CRITICAL: Truncated values (low 128 bits) - this is what hints were generated for
-    const TEST_VECTOR_C_TRUNCATED: felt252 = 0x8d664bb70810bdab323a44354d98f94a;
-    const TEST_VECTOR_S_TRUNCATED: felt252 = 0x1e741f8fec4161ea41b23ce6d007ba12;
+    const TESTVECTOR_CHALLENGE: felt252 = 0x47c760eb9b6a8797680bef6218e06aacc6570f8be11819d2268bb024f816108;
+    const TESTVECTOR_RESPONSE: u256 = u256 { low: 0xbe3ffdd10e06b50b800feb45877b787b, high: 0x2f0ceba8a8c56d6f6b4ed3ae98db234 };
+    // CRITICAL: Full values; hints are generated from these exact scalars.
+    const TEST_VECTOR_C_FULL: felt252 = 0x47c760eb9b6a8797680bef6218e06aacc6570f8be11819d2268bb024f816108;
+    const TEST_VECTOR_S_FULL: u256 = u256 { low: 0xbe3ffdd10e06b50b800feb45877b787b, high: 0x2f0ceba8a8c56d6f6b4ed3ae98db234 };
     const ED25519_ORDER: u256 = u256 {
         low: 0x14def9dea2f79cd65812631a5cf5d3ed,
         high: 0x10000000000000000000000000000000,
@@ -77,8 +77,8 @@ mod e2e_dleq_tests {
     };
 
     const TEST_SECOND_POINT_SQRT_HINT: u256 = u256 {
-        low: 0xdcad2173817c163b5405cec7698eb4b8,
-        high: 0x742bb3c44b13553c8ddff66565b44cac,
+        low: 0xcffea6b3bffe746de20fdd0734b30845,
+        high: 0x5e4a3b18b41199f9389ded8696067271,
     };
 
     const TEST_R1_SQRT_HINT: u256 = u256 { 
@@ -87,20 +87,20 @@ mod e2e_dleq_tests {
     };
     
     const TEST_R2_SQRT_HINT: u256 = u256 { 
-        low: 0x598521e3f6d818ed84721901f0d87f89,
-        high: 0x09d2fd2811966933dff4c8ab0d9059fc,
+        low: 0xd8b08d5ec3d265b83e5e333d750d6b37,
+        high: 0x0e41fbdbbf62b47c511e0a5aa04059de,
     };
     
     const BASE_128: felt252 = 0x100000000000000000000000000000000; // 2^128
     
     fn get_test_dleq_challenge() -> felt252 {
-        // Use truncated challenge (low 128 bits) - matches what MSM hints use
-        TESTVECTOR_CHALLENGE_LOW
+        // Use full challenge (full scalar) - matches what MSM hints use
+        TESTVECTOR_CHALLENGE
     }
     
-    fn get_test_dleq_response() -> felt252 {
-        // Use truncated response (low 128 bits) - matches what MSM hints use
-        TESTVECTOR_RESPONSE_LOW
+    fn get_test_dleq_response() -> u256 {
+        // Use full response (full scalar) - matches what MSM hints use
+        TESTVECTOR_RESPONSE
     }
 
     // Real MSM hints generated from test vectors (from test_hints.json)
@@ -113,109 +113,64 @@ mod e2e_dleq_tests {
     ) {
         // MSM hints regenerated using generate_hints_from_test_vectors.py
         // Updated with regenerated test_vectors.json (correct Y constant)
-        // CRITICAL: Hints generated with TRUNCATED scalars (128-bit) to match Cairo's behavior
-        // Cairo truncates to 128 bits before using scalars, so hints must match
-        // c_truncated = 0x8d664bb70810bdab323a44354d98f94a
-        // s_truncated = 0x1e741f8fec4161ea41b23ce6d007ba12
+        // CRITICAL: Hints generated with full scalars to match Cairo's DLEQ verifier.
+        // c_full = 0x47c760eb9b6a8797680bef6218e06aacc6570f8be11819d2268bb024f816108
+        // s_full = 0x1e741f8fec4161ea41b23ce6d007ba12
         
-        // s_hint_for_g: Fake-GLV hint for s·G (with truncated s)
+        // s_hint_for_g: Fake-GLV hint for s·G (with full s)
         let s_hint_for_g = array![
-
-            0x52f522935135e7c5474d3b99,
-
-            0x7ff7e65231c434008a0c02f8,
-
-            0x41a3962ca5bba9db,
-
+            0xceeec4a90f34e45c033e2ff5,
+            0xb419479f38f86b2b114d2ff1,
+            0x256941d7d54e7beb,
             0x0,
-
-            0xa144206dc24b7180d05200e0,
-
-            0xe8a798301a354777473cd98e,
-
-            0x7ca5add375ea088,
-
+            0xaa6ddc025eb012317a89612a,
+            0x6e9d804e52cb98594f552df2,
+            0x47244d9888c072a3,
             0x0,
-
-            0x1e741f8fec4161ea41b23ce6d007ba12,
-
-            0x100000000000000000000000000000001
-
+            0xcd234e4105b9809a3f4f0dde019dac1,
+            0x1268c27967bf37239a1bdcad1722144e1
         ].span();
 
-        // s_hint_for_y: Fake-GLV hint for s·Y (with truncated s)
+        // s_hint_for_y: Fake-GLV hint for s·Y (with full s)
         let s_hint_for_y = array![
-
-            0x3b81c211fd322bb7dbcb711c,
-
-            0x2082c0dd34f9225f2eb5e0b0,
-
-            0x311b02be49202932,
-
+            0x872011d1a9f20fc5fbed65ec,
+            0xd36e4710d58461cfe9c9ee1d,
+            0x686f29bbaf2b952f,
             0x0,
-
-            0x18c0245425f95187b10e1913,
-
-            0x922be9d1d5313d1c7a4cb499,
-
-            0x51d9b0eb8a969e37,
-
+            0xf350a6f8bc8acbb1d5c40cd5,
+            0x4b256a3dba76a0bc779c811,
+            0x43f41814a3eefa59,
             0x0,
-
-            0x1e741f8fec4161ea41b23ce6d007ba12,
-
-            0x100000000000000000000000000000001
-
+            0xcd234e4105b9809a3f4f0dde019dac1,
+            0x1268c27967bf37239a1bdcad1722144e1
         ].span();
 
-        // c_neg_hint_for_t: Fake-GLV hint for (-c)·T (with truncated c, EXACT Garaga decompression)
+        // c_neg_hint_for_t: Fake-GLV hint for (-c)·T (with full c, EXACT Garaga decompression)
         let c_neg_hint_for_t = array![
-
-            0xcb63575f3729fe6cbe7f8496,
-
-            0x9dc314d92447fddbfc1be6cd,
-
-            0x7d6caff1e7cdaa02,
-
+            0xfbeb7a88a7204a3109847933,
+            0xd7bd766f54592bfb04b8a0bf,
+            0x36adfbd5b292a10e,
             0x0,
-
-            0x78dc46b41742aa135083e2da,
-
-            0xecafad9bd49fe98686457cc6,
-
-            0x592bb6f3eaf7ca3,
-
+            0xb1cb68d66c0170146df52bb2,
+            0x7ad50b1ffcd1293f12940e01,
+            0x665e063c6d4ac0f6,
             0x0,
-
-            0x34a3efff5488d0dfc135bf37e3357b53,
-
-            0x1cf7b1760ae5d3463a08a196fd625720
-
+            0x4d5cf08f2a0aee991f621d5e4e15728,
+            0x1148705832ba97f2b70dec32979f4f785
         ].span();
 
-        // c_neg_hint_for_u: Fake-GLV hint for (-c)·U (with truncated c, EXACT Garaga decompression)
+        // c_neg_hint_for_u: Fake-GLV hint for (-c)·U (with full c, EXACT Garaga decompression)
         let c_neg_hint_for_u = array![
-
-            0x61ebcae684d8530622e29b45,
-
-            0x694dbc34734f56c0e29f5240,
-
-            0x1913755501e61b9a,
-
+            0x16ecdc108960cb810ed61451,
+            0x28bf80201d67e2f4728ba74b,
+            0x63f872f4f71e1950,
             0x0,
-
-            0x2a37ba10878046ff378a7d73,
-
-            0x25857fe5ce7f65cea1bbc1e0,
-
-            0xca82b2053c5e43e,
-
+            0xe94caf1beb68a19f34eb98a4,
+            0x48bcbcb46602eeea1b043d0d,
+            0x52e390f474357096,
             0x0,
-
-            0x34a3efff5488d0dfc135bf37e3357b53,
-
-            0x1cf7b1760ae5d3463a08a196fd625720
-
+            0x4d5cf08f2a0aee991f621d5e4e15728,
+            0x1148705832ba97f2b70dec32979f4f785
         ].span();
 
         (s_hint_for_g, s_hint_for_y, c_neg_hint_for_t, c_neg_hint_for_u)
@@ -246,12 +201,12 @@ mod e2e_dleq_tests {
         // After fixing base point constant, Rust and Cairo compute the SAME challenge
         // test_vectors.json has been regenerated with correct base point
         // The challenge and response are cryptographically bound: s = k + c*t
-        // CRITICAL: Pass truncated challenge and response
-        // Both must be truncated because:
-        // 1. MSM uses truncated scalars (via u256.low)
-        // 2. Hints were generated for truncated scalars
-        // 3. Constructor must compare truncated challenges to match what MSM uses
-        let challenge_from_json = TEST_VECTOR_C_TRUNCATED;
+        // CRITICAL: Pass full challenge and response
+        // Both must be full because:
+        // 1. MSM uses full scalars (via u256.low)
+        // 2. Hints were generated for full scalars
+        // 3. Constructor must compare full challenges to match what MSM uses
+        let challenge_from_json = TEST_VECTOR_C_FULL;
 
         let computed_challenge = compute_dleq_challenge_poseidon(
             TESTVECTOR_G_COMPRESSED,
@@ -263,9 +218,7 @@ mod e2e_dleq_tests {
             hashlock,
             ED25519_ORDER,
         );
-        let computed_u256: u256 = computed_challenge.into();
-        let expected_low: u128 = TEST_VECTOR_C_TRUNCATED.try_into().unwrap();
-        assert(computed_u256.low == expected_low, 'Challenge mismatch');
+        assert(computed_challenge == TEST_VECTOR_C_FULL, 'Challenge mismatch');
         
         // Get real MSM hints (generated from test vectors)
         let (s_hint_for_g, s_hint_for_y, c_neg_hint_for_t, c_neg_hint_for_u) = get_real_msm_hints();
@@ -303,7 +256,7 @@ mod e2e_dleq_tests {
             TEST_ADAPTOR_POINT_SQRT_HINT,
             TESTVECTOR_U_COMPRESSED,
             TEST_SECOND_POINT_SQRT_HINT,
-            (challenge_from_json, TEST_VECTOR_S_TRUNCATED),
+            (challenge_from_json, TEST_VECTOR_S_FULL),
             fake_glv_hint,
             s_hint_for_g,
             s_hint_for_y,
@@ -331,7 +284,7 @@ mod e2e_dleq_tests {
         adaptor_point_sqrt_hint: u256,
         dleq_second_point_edwards_compressed: u256,
         dleq_second_point_sqrt_hint: u256,
-        dleq: (felt252, felt252),
+        dleq: (felt252, u256),
         fake_glv_hint: Span<felt252>,
         dleq_s_hint_for_g: Span<felt252>,
         dleq_s_hint_for_y: Span<felt252>,
@@ -350,6 +303,8 @@ mod e2e_dleq_tests {
         let mut calldata = ArrayTrait::new();
         expected_hash.serialize(ref calldata);
         Serde::serialize(@lock_until, ref calldata);
+        let constructor_depositor = starknet::get_caller_address();
+        Serde::serialize(@constructor_depositor, ref calldata);
         Serde::serialize(@token, ref calldata);
         Serde::serialize(@amount, ref calldata);
 
@@ -384,4 +339,3 @@ mod e2e_dleq_tests {
         IAtomicLockDispatcher { contract_address: addr }
     }
 }
-

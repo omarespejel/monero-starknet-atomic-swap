@@ -2,9 +2,11 @@ use anyhow::Result;
 use async_trait::async_trait;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use xmr_secret_gen::swap::{SwapState, SwapDb, step, resume_with_xmr_txid, StarknetClient, GRACE_PERIOD_SECS};
 use xmr_secret_gen::monero::MoneroWalletClient;
 use xmr_secret_gen::monero_wallet::types::TransferInfo;
+use xmr_secret_gen::swap::{
+    resume_with_xmr_txid, step, StarknetClient, SwapDb, SwapState, GRACE_PERIOD_SECS,
+};
 
 // === In-Memory DB for Tests ===
 
@@ -14,16 +16,21 @@ struct TestDb {
 
 impl TestDb {
     fn new() -> Self {
-        Self { states: std::sync::Mutex::new(std::collections::HashMap::new()) }
+        Self {
+            states: std::sync::Mutex::new(std::collections::HashMap::new()),
+        }
     }
 }
 
 impl SwapDb for TestDb {
     fn save(&self, state: &SwapState) -> Result<()> {
-        self.states.lock().unwrap().insert(state.swap_id().to_string(), state.clone());
+        self.states
+            .lock()
+            .unwrap()
+            .insert(state.swap_id().to_string(), state.clone());
         Ok(())
     }
-    
+
     fn load(&self, swap_id: &str) -> Result<Option<SwapState>> {
         Ok(self.states.lock().unwrap().get(swap_id).cloned())
     }
@@ -43,7 +50,7 @@ impl MockStarknet {
             deploy_result: Ok(("0xcontract".to_string(), timestamp + 10800)),
         }
     }
-    
+
     fn advance_time(&self, secs: u64) {
         self.timestamp.fetch_add(secs, Ordering::SeqCst);
     }
@@ -51,23 +58,28 @@ impl MockStarknet {
 
 #[async_trait]
 impl StarknetClient for MockStarknet {
-    async fn deploy_and_deposit(&self, _: [u32; 8], lock_duration: u64, _: u128) -> Result<(String, u64)> {
+    async fn deploy_and_deposit(
+        &self,
+        _: [u32; 8],
+        lock_duration: u64,
+        _: u128,
+    ) -> Result<(String, u64)> {
         let now = self.timestamp.load(Ordering::SeqCst);
         Ok(("0xcontract".to_string(), now + lock_duration))
     }
-    
+
     async fn reveal_secret(&self, _: &str, _: &[u8; 32]) -> Result<String> {
         Ok("0xreveal_tx".to_string())
     }
-    
+
     async fn claim_tokens(&self, _: &str) -> Result<String> {
         Ok("0xclaim_tx".to_string())
     }
-    
+
     async fn refund(&self, _: &str) -> Result<String> {
         Ok("0xrefund_tx".to_string())
     }
-    
+
     async fn get_block_timestamp(&self) -> Result<u64> {
         Ok(self.timestamp.load(Ordering::SeqCst))
     }
@@ -110,12 +122,14 @@ async fn test_step_created_to_starknet_locked() {
         monero_restore_height: Some(1000),
     };
 
-    let result = step(&initial, &db, &monero, &starknet, &secret).await.unwrap();
-    
+    let result = step(&initial, &db, &monero, &starknet, &secret)
+        .await
+        .unwrap();
+
     assert!(result.is_some());
     let new_state = result.unwrap();
     assert!(matches!(new_state, SwapState::StarknetLocked { .. }));
-    
+
     // Verify persisted
     let loaded = db.load("test-1").unwrap().unwrap();
     assert!(matches!(loaded, SwapState::StarknetLocked { .. }));
@@ -138,7 +152,9 @@ async fn test_step_starknet_locked_returns_none() {
     };
 
     // Should return None (waiting for XMR txid)
-    let result = step(&state, &db, &monero, &starknet, &secret).await.unwrap();
+    let result = step(&state, &db, &monero, &starknet, &secret)
+        .await
+        .unwrap();
     assert!(result.is_none());
 }
 
@@ -153,9 +169,12 @@ async fn test_resume_with_xmr_txid() {
         monero_restore_height: Some(1000),
     };
 
-    let new_state = resume_with_xmr_txid(&state, "monero_txid_123".to_string(), 1_000_000_000).unwrap();
-    
-    assert!(matches!(new_state, SwapState::XmrSent { monero_txid, .. } if monero_txid == "monero_txid_123"));
+    let new_state =
+        resume_with_xmr_txid(&state, "monero_txid_123".to_string(), 1_000_000_000).unwrap();
+
+    assert!(
+        matches!(new_state, SwapState::XmrSent { monero_txid, .. } if monero_txid == "monero_txid_123")
+    );
 }
 
 #[tokio::test]
@@ -173,8 +192,10 @@ async fn test_step_xmr_sent_to_confirmed() {
         monero_amount: 1_000_000_000,
     };
 
-    let result = step(&state, &db, &monero, &starknet, &secret).await.unwrap();
-    
+    let result = step(&state, &db, &monero, &starknet, &secret)
+        .await
+        .unwrap();
+
     assert!(result.is_some());
     assert!(matches!(result.unwrap(), SwapState::XmrConfirmed { .. }));
 }
@@ -193,16 +214,18 @@ async fn test_step_xmr_confirmed_to_secret_revealed() {
         monero_txid: "txid123".to_string(),
     };
 
-    let result = step(&state, &db, &monero, &starknet, &secret).await.unwrap();
-    
+    let result = step(&state, &db, &monero, &starknet, &secret)
+        .await
+        .unwrap();
+
     assert!(result.is_some());
     match result.unwrap() {
-        SwapState::SecretRevealed { 
+        SwapState::SecretRevealed {
             monero_restore_height: _,
             partial_spend_key: _,
             claim_destination: _,
-            .. 
-        } => {},
+            ..
+        } => {}
         _ => panic!("Expected SecretRevealed state"),
     }
 }
@@ -224,7 +247,9 @@ async fn test_step_secret_revealed_waits_for_grace_period() {
     };
 
     // Should return None (still in grace period)
-    let result = step(&state, &db, &monero, &starknet, &secret).await.unwrap();
+    let result = step(&state, &db, &monero, &starknet, &secret)
+        .await
+        .unwrap();
     assert!(result.is_none());
 }
 
@@ -244,8 +269,10 @@ async fn test_step_secret_revealed_to_completed() {
         claim_destination: None,
     };
 
-    let result = step(&state, &db, &monero, &starknet, &secret).await.unwrap();
-    
+    let result = step(&state, &db, &monero, &starknet, &secret)
+        .await
+        .unwrap();
+
     assert!(result.is_some());
     assert!(matches!(result.unwrap(), SwapState::Completed { .. }));
 }
@@ -265,8 +292,10 @@ async fn test_step_timeout_triggers_refund() {
         monero_amount: 1_000_000_000,
     };
 
-    let result = step(&state, &db, &monero, &starknet, &secret).await.unwrap();
-    
+    let result = step(&state, &db, &monero, &starknet, &secret)
+        .await
+        .unwrap();
+
     assert!(result.is_some());
     assert!(matches!(result.unwrap(), SwapState::Refunded { .. }));
 }
@@ -284,7 +313,8 @@ async fn test_step_terminal_state_returns_none() {
         monero_txid: "txid".to_string(),
     };
 
-    let result = step(&state, &db, &monero, &starknet, &secret).await.unwrap();
+    let result = step(&state, &db, &monero, &starknet, &secret)
+        .await
+        .unwrap();
     assert!(result.is_none());
 }
-

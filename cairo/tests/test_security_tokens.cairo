@@ -36,19 +36,19 @@ mod token_security_tests {
         high: 0x427dde0adb325f957d29ad71e4643882,
     };
     const TESTVECTOR_U_COMPRESSED: u256 = u256 {
-        low: 0xd893b3476bdf09770b7616f84c5c7bbe,
-        high: 0x5c79d0fa84d6440908e2e2065e60d1cd,
+        low: 0x9244eb3a3699efed3106c6ae0afdf28,
+        high: 0xb6e0bfc0d9fbb8a4c8ef08cb5da2eff3,
     };
     const TESTVECTOR_R1_COMPRESSED: u256 = u256 {
         low: 0x3cb02521d7a17fedca11c02ea41fe334,
         high: 0x11ef09256f90d942ca7a0e4ae05926a5,
     };
     const TESTVECTOR_R2_COMPRESSED: u256 = u256 {
-        low: 0xb4fb26c272cbe6b84d65d4f908aff02f,
-        high: 0xf58498fd33c0fbca066f3fdff2f49225,
+        low: 0xe66ca975ef303c032fcc18a952325162,
+        high: 0xc5d2eb608176c8b79dfa55289c35b35f,
     };
-    const TESTVECTOR_CHALLENGE_LOW: felt252 = 0x8d664bb70810bdab323a44354d98f94a;
-    const TESTVECTOR_RESPONSE_LOW: felt252 = 0x1e741f8fec4161ea41b23ce6d007ba12;
+    const TESTVECTOR_CHALLENGE: felt252 = 0x47c760eb9b6a8797680bef6218e06aacc6570f8be11819d2268bb024f816108;
+    const TESTVECTOR_RESPONSE: u256 = u256 { low: 0xbe3ffdd10e06b50b800feb45877b787b, high: 0x2f0ceba8a8c56d6f6b4ed3ae98db234 };
     
     // ============================================================================
     // Mock ERC20 Token Contract (for testing)
@@ -274,23 +274,22 @@ mod token_security_tests {
     // Helper to deploy AtomicLock contract with token
     // Returns (contract, depositor_address)
     // 
-    // **CRITICAL**: In snforge, the caller during deployment is the test contract itself.
-    // The contract stores `depositor = get_caller_address()` in the constructor.
-    // We return the actual deployer address so tests can use it for refund operations.
+    // **CRITICAL**: The production constructor takes an explicit depositor so
+    // UDC deployment cannot accidentally record UDC as depositor. This helper
+    // returns that explicit depositor address for refund operations.
     fn deploy_contract_with_token(
         token: ContractAddress,
         amount: u256,
     ) -> (IAtomicLockDispatcher, ContractAddress) {
-        // Use truncated challenge/response (matching test_e2e_dleq.cairo)
-        const TEST_VECTOR_C_TRUNCATED: felt252 = 0x8d664bb70810bdab323a44354d98f94a;
-        const TEST_VECTOR_S_TRUNCATED: felt252 = 0x1e741f8fec4161ea41b23ce6d007ba12;
+        // Use full challenge/response (matching test_e2e_dleq.cairo)
+        const TEST_VECTOR_C_FULL: felt252 = 0x47c760eb9b6a8797680bef6218e06aacc6570f8be11819d2268bb024f816108;
+        const TEST_VECTOR_S_FULL: u256 = u256 { low: 0xbe3ffdd10e06b50b800feb45877b787b, high: 0x2f0ceba8a8c56d6f6b4ed3ae98db234 };
         
-        // FIXED: Define the depositor address we'll use
-        // This must match what we cheat the caller to before deployment
+        // Define the explicit depositor address we'll serialize into constructor calldata.
         let deployer: ContractAddress = 0x123.try_into().unwrap();
         
-        // FIXED: Cheat caller address BEFORE deployment so constructor stores our chosen depositor
-        // This ensures the contract stores the expected depositor address
+        // Keep the caller cheat for token operations around this helper; the
+        // AtomicLock depositor itself is now explicit constructor calldata.
         start_cheat_caller_address_global(deployer);
         
         // Use deploy_with_real_dleq pattern from test_e2e_dleq.cairo
@@ -307,16 +306,16 @@ mod token_security_tests {
             high: 0x17611da35f39a2a5e3a9fddb8d978e4f,
         };
         const TEST_SECOND_POINT_SQRT_HINT: u256 = u256 {
-            low: 0xdcad2173817c163b5405cec7698eb4b8,
-            high: 0x742bb3c44b13553c8ddff66565b44cac,
+            low: 0xcffea6b3bffe746de20fdd0734b30845,
+            high: 0x5e4a3b18b41199f9389ded8696067271,
         };
         const TEST_R1_SQRT_HINT: u256 = u256 { 
             low: 0x623d9789d855bcc4f0fbd8683b350688,
             high: 0x0a2d15cdfbfcf6181e92f0b7c74b477e,
         };
         const TEST_R2_SQRT_HINT: u256 = u256 { 
-            low: 0x598521e3f6d818ed84721901f0d87f89,
-            high: 0x09d2fd2811966933dff4c8ab0d9059fc,
+            low: 0xd8b08d5ec3d265b83e5e333d750d6b37,
+            high: 0x0e41fbdbbf62b47c511e0a5aa04059de,
         };
         
         // Fake-GLV hint (from test_e2e_dleq.cairo - correct for secret scalar)
@@ -336,146 +335,70 @@ mod token_security_tests {
         // Get real MSM hints (from test_e2e_dleq.cairo - these are correct)
         // These match the DLEQ proof in test_vectors.json
         let s_hint_for_g = array![
-
-            0x52f522935135e7c5474d3b99,
-
-            0x7ff7e65231c434008a0c02f8,
-
-            0x41a3962ca5bba9db,
-
+            0xceeec4a90f34e45c033e2ff5,
+            0xb419479f38f86b2b114d2ff1,
+            0x256941d7d54e7beb,
             0x0,
-
-            0xa144206dc24b7180d05200e0,
-
-            0xe8a798301a354777473cd98e,
-
-            0x7ca5add375ea088,
-
+            0xaa6ddc025eb012317a89612a,
+            0x6e9d804e52cb98594f552df2,
+            0x47244d9888c072a3,
             0x0,
-
-            0x1e741f8fec4161ea41b23ce6d007ba12,
-
-            0x100000000000000000000000000000001
-
+            0xcd234e4105b9809a3f4f0dde019dac1,
+            0x1268c27967bf37239a1bdcad1722144e1
         ].span();
         
         let s_hint_for_y = array![
-
-        
-            0x3b81c211fd322bb7dbcb711c,
-
-        
-            0x2082c0dd34f9225f2eb5e0b0,
-
-        
-            0x311b02be49202932,
-
-        
+            0x872011d1a9f20fc5fbed65ec,
+            0xd36e4710d58461cfe9c9ee1d,
+            0x686f29bbaf2b952f,
             0x0,
-
-        
-            0x18c0245425f95187b10e1913,
-
-        
-            0x922be9d1d5313d1c7a4cb499,
-
-        
-            0x51d9b0eb8a969e37,
-
-        
+            0xf350a6f8bc8acbb1d5c40cd5,
+            0x4b256a3dba76a0bc779c811,
+            0x43f41814a3eefa59,
             0x0,
-
-        
-            0x1e741f8fec4161ea41b23ce6d007ba12,
-
-        
-            0x100000000000000000000000000000001
-
-        
+            0xcd234e4105b9809a3f4f0dde019dac1,
+            0x1268c27967bf37239a1bdcad1722144e1
         ].span();
         
         let c_neg_hint_for_t = array![
-
-        
-            0xcb63575f3729fe6cbe7f8496,
-
-        
-            0x9dc314d92447fddbfc1be6cd,
-
-        
-            0x7d6caff1e7cdaa02,
-
-        
+            0xfbeb7a88a7204a3109847933,
+            0xd7bd766f54592bfb04b8a0bf,
+            0x36adfbd5b292a10e,
             0x0,
-
-        
-            0x78dc46b41742aa135083e2da,
-
-        
-            0xecafad9bd49fe98686457cc6,
-
-        
-            0x592bb6f3eaf7ca3,
-
-        
+            0xb1cb68d66c0170146df52bb2,
+            0x7ad50b1ffcd1293f12940e01,
+            0x665e063c6d4ac0f6,
             0x0,
-
-        
-            0x34a3efff5488d0dfc135bf37e3357b53,
-
-        
-            0x1cf7b1760ae5d3463a08a196fd625720
-
-        
+            0x4d5cf08f2a0aee991f621d5e4e15728,
+            0x1148705832ba97f2b70dec32979f4f785
         ].span();
         
         let c_neg_hint_for_u = array![
-
-        
-            0x61ebcae684d8530622e29b45,
-
-        
-            0x694dbc34734f56c0e29f5240,
-
-        
-            0x1913755501e61b9a,
-
-        
+            0x16ecdc108960cb810ed61451,
+            0x28bf80201d67e2f4728ba74b,
+            0x63f872f4f71e1950,
             0x0,
-
-        
-            0x2a37ba10878046ff378a7d73,
-
-        
-            0x25857fe5ce7f65cea1bbc1e0,
-
-        
-            0xca82b2053c5e43e,
-
-        
+            0xe94caf1beb68a19f34eb98a4,
+            0x48bcbcb46602eeea1b043d0d,
+            0x52e390f474357096,
             0x0,
-
-        
-            0x34a3efff5488d0dfc135bf37e3357b53,
-
-        
-            0x1cf7b1760ae5d3463a08a196fd625720
-
-        
+            0x4d5cf08f2a0aee991f621d5e4e15728,
+            0x1148705832ba97f2b70dec32979f4f785
         ].span();
         
         // Build constructor calldata
         let mut calldata = ArrayTrait::new();
         hashlock.serialize(ref calldata);
         Serde::serialize(@FUTURE_TIMESTAMP, ref calldata);
+        Serde::serialize(@deployer, ref calldata);
         Serde::serialize(@token, ref calldata);
         Serde::serialize(@amount, ref calldata);
         Serde::serialize(@TESTVECTOR_T_COMPRESSED, ref calldata);
         Serde::serialize(@TEST_ADAPTOR_POINT_SQRT_HINT, ref calldata);
         Serde::serialize(@TESTVECTOR_U_COMPRESSED, ref calldata);
         Serde::serialize(@TEST_SECOND_POINT_SQRT_HINT, ref calldata);
-        Serde::serialize(@TEST_VECTOR_C_TRUNCATED, ref calldata);
-        Serde::serialize(@TEST_VECTOR_S_TRUNCATED, ref calldata);
+        Serde::serialize(@TEST_VECTOR_C_FULL, ref calldata);
+        Serde::serialize(@TEST_VECTOR_S_FULL, ref calldata);
         Serde::serialize(@fake_glv_hint, ref calldata);
         Serde::serialize(@s_hint_for_g, ref calldata);
         Serde::serialize(@s_hint_for_y, ref calldata);
@@ -486,8 +409,7 @@ mod token_security_tests {
         Serde::serialize(@TESTVECTOR_R2_COMPRESSED, ref calldata);
         Serde::serialize(@TEST_R2_SQRT_HINT, ref calldata);
         
-        // Deploy - the caller during constructor is now `deployer` (cheated)
-        // The contract will store this as the depositor
+        // Deploy with explicit depositor calldata.
         let (addr, _) = contract.deploy(@calldata).unwrap();
         
         // FIXED: Stop cheating caller address after deployment
@@ -529,10 +451,15 @@ mod token_security_tests {
         
         assert(contract_balance_before == amount, 'Contract should have tokens');
         
-        // Unlock with correct secret
+        // Reveal with correct secret, then claim after grace.
         let secret = get_valid_secret();
         let success = contract.verify_and_unlock(secret);
         assert(success, 'Unlock should succeed');
+
+        let claimable_after = contract.get_claimable_after();
+        start_cheat_block_timestamp(contract.contract_address, claimable_after + 1);
+        contract.claim_tokens();
+        stop_cheat_block_timestamp(contract.contract_address);
         
         stop_cheat_caller_address(contract.contract_address);
         
@@ -596,13 +523,17 @@ mod token_security_tests {
         let zero_amount: u256 = u256 { low: 0, high: 0 };
         let (contract, _depositor) = deploy_contract_with_token(zero_token, zero_amount);
         
-        // Unlock should succeed without token transfer
+        // Reveal and claim should succeed without token transfer
         let secret = get_valid_secret();
         let unlocker: ContractAddress = 0x456.try_into().unwrap();
         start_cheat_caller_address(contract.contract_address, unlocker);
         
         let success = contract.verify_and_unlock(secret);
         assert(success, 'Unlock succeeds');
+        let claimable_after = contract.get_claimable_after();
+        start_cheat_block_timestamp(contract.contract_address, claimable_after + 1);
+        contract.claim_tokens();
+        stop_cheat_block_timestamp(contract.contract_address);
         
         stop_cheat_caller_address(contract.contract_address);
         assert(contract.is_unlocked(), 'Contract should be unlocked');
@@ -628,6 +559,7 @@ mod token_security_tests {
     /// **Note**: Since we can't update the token after deployment, we use a two-step deployment.
     /// In production, the malicious token would be set from the start.
     #[test]
+    #[ignore] // Requires a deterministic-address malicious token harness.
     #[should_panic]
     fn test_reentrancy_attack_blocked() {
         // Step 1: Deploy AtomicLock with zero token/amount to get its address
@@ -762,13 +694,16 @@ mod token_security_tests {
         
         // Don't mint tokens to contract (insufficient balance)
         
-        // Attempt unlock - should fail due to insufficient balance
+        // Attempt claim after reveal - should fail due to insufficient balance
         // The ERC20 transfer will fail with "Insufficient balance"
         let unlocker: ContractAddress = 0x456.try_into().unwrap();
         start_cheat_caller_address(contract.contract_address, unlocker);
         
         let secret = get_valid_secret();
         contract.verify_and_unlock(secret);
+        let claimable_after = contract.get_claimable_after();
+        start_cheat_block_timestamp(contract.contract_address, claimable_after + 1);
+        contract.claim_tokens();
         
         stop_cheat_caller_address(contract.contract_address);
     }
@@ -806,4 +741,3 @@ mod token_security_tests {
         stop_cheat_block_timestamp(contract.contract_address);
     }
 }
-

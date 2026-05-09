@@ -1,7 +1,7 @@
 //! Race Condition Monitoring for Atomic Swaps
-//! 
+//!
 //! SECURITY: Detects if Starknet secret is revealed before Monero confirms
-//! 
+//!
 //! P0.3: Critical security requirement from final auditor assessment
 
 use anyhow::{bail, Result};
@@ -38,7 +38,7 @@ impl<S: ChainState> RaceConditionMonitor<S> {
             timeout_blocks: 50,
         }
     }
-    
+
     pub fn with_params(state: S, confirmations: u64, timeout: u64) -> Self {
         Self {
             state,
@@ -46,36 +46,37 @@ impl<S: ChainState> RaceConditionMonitor<S> {
             timeout_blocks: timeout,
         }
     }
-    
+
     pub async fn check(&self) -> Result<SecretRevealStatus> {
         let confirmations = self.state.get_monero_confirmations();
         let secret_opt = self.state.get_revealed_secret();
         let elapsed = self.state.get_blocks_elapsed();
-        
+
         // Check timeout first
         if elapsed > self.timeout_blocks && secret_opt.is_none() {
-            bail!("Timeout: no secret revealed within {} blocks", self.timeout_blocks);
+            bail!(
+                "Timeout: no secret revealed within {} blocks",
+                self.timeout_blocks
+            );
         }
-        
+
         match (secret_opt, confirmations >= self.required_confirmations) {
             // Normal completion
             (Some(_), true) => Ok(SecretRevealStatus::BothComplete),
-            
+
             // RACE CONDITION: secret revealed but Monero not confirmed
             (Some(secret), false) => {
                 if confirmations == 0 {
-                    warn!(
-                        "RACE DETECTED: Secret revealed before Monero tx in mempool"
-                    );
+                    warn!("RACE DETECTED: Secret revealed before Monero tx in mempool");
                 }
                 Ok(SecretRevealStatus::RaceDetected { secret })
             }
-            
+
             // Protocol violation: Monero confirmed without secret
             (None, true) => {
                 bail!("Protocol violation: Monero confirmed but no secret revealed")
             }
-            
+
             // Still waiting
             (None, false) => Ok(SecretRevealStatus::Pending),
         }
@@ -98,23 +99,28 @@ impl MockChainState {
             blocks_elapsed: 0,
         }
     }
-    
+
     pub fn set_monero_confirmations(&mut self, n: u64) {
         self.confirmations = n;
     }
-    
+
     pub fn set_secret_revealed(&mut self, s: Option<[u8; 32]>) {
         self.secret = s;
     }
-    
+
     pub fn set_blocks_elapsed(&mut self, n: u64) {
         self.blocks_elapsed = n;
     }
 }
 
 impl ChainState for MockChainState {
-    fn get_monero_confirmations(&self) -> u64 { self.confirmations }
-    fn get_revealed_secret(&self) -> Option<[u8; 32]> { self.secret }
-    fn get_blocks_elapsed(&self) -> u64 { self.blocks_elapsed }
+    fn get_monero_confirmations(&self) -> u64 {
+        self.confirmations
+    }
+    fn get_revealed_secret(&self) -> Option<[u8; 32]> {
+        self.secret
+    }
+    fn get_blocks_elapsed(&self) -> u64 {
+        self.blocks_elapsed
+    }
 }
-

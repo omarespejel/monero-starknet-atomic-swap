@@ -9,6 +9,8 @@ Outputs:
 """
 import sys
 import hashlib
+import json
+from pathlib import Path
 from typing import Tuple, List
 
 from garaga.curves import CurveID, CURVES
@@ -185,38 +187,44 @@ def print_test_data(data: dict) -> None:
     print("=" * 80)
 
 
+def convert_large_ints(obj):
+    if isinstance(obj, dict):
+        return {k: convert_large_ints(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [convert_large_ints(item) for item in obj]
+    if isinstance(obj, int):
+        # Convert integers > 2^53 (JavaScript safe integer limit) to strings
+        # to avoid JSON parsers converting them to floats.
+        if obj > 9007199254740992:
+            return str(obj)
+        return obj
+    return obj
+
+
 def main() -> None:
     secret_hex = None
     save = False
+    json_output = False
     for arg in sys.argv[1:]:
         if arg == "--save":
             save = True
+        elif arg == "--json":
+            json_output = True
         else:
             secret_hex = arg
     data = generate_ed25519_test_data(secret_hex)
-    print_test_data(data)
+    data_safe = convert_large_ints(data)
+    if json_output:
+        print(json.dumps(data_safe))
+    else:
+        print_test_data(data)
     if save:
-        import json
-        # Convert large integers to strings to preserve precision for Rust/JSON parsers
-        def convert_large_ints(obj):
-            if isinstance(obj, dict):
-                return {k: convert_large_ints(v) for k, v in obj.items()}
-            elif isinstance(obj, list):
-                return [convert_large_ints(item) for item in obj]
-            elif isinstance(obj, int):
-                # Convert integers > 2^53 (JavaScript safe integer limit) to strings
-                # to avoid JSON parsers converting them to floats
-                if obj > 9007199254740992:  # 2^53
-                    return str(obj)
-                return obj
-            return obj
-        
-        data_safe = convert_large_ints(data)
-        with open("ed25519_test_data.json", "w") as f:
+        output_path = Path(__file__).resolve().with_name("ed25519_test_data.json")
+        with output_path.open("w") as f:
             json.dump(data_safe, f, indent=2)
-        print("\n✅ Saved to ed25519_test_data.json")
+        if not json_output:
+            print(f"\n✅ Saved to {output_path}")
 
 
 if __name__ == "__main__":
     main()
-

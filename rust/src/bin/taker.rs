@@ -2,16 +2,13 @@
 //!
 //! This command:
 //! 1. Watches for AtomicLock contracts on Starknet Sepolia
-//! 2. When conditions are met, calls verify_and_unlock(secret)
-//! 3. Reveals the secret `t` via the Unlocked event
+//! 2. When conditions are met, prepares the reveal_secret(secret) action
+//! 3. Reveals the secret `t` via the SecretRevealed event
 //! 4. Maker can then finalize Monero signature
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use serde_json::json;
-use xmr_secret_gen::starknet::StarknetClient;
-#[cfg(feature = "full-integration")]
-use xmr_secret_gen::starknet_full::StarknetAccount;
+use xmr_secret_gen::starknet::{watch_unlocked_events, StarknetClient};
 
 #[derive(Parser)]
 #[command(name = "taker")]
@@ -51,9 +48,13 @@ async fn main() -> Result<()> {
 
     if args.watch {
         println!("\n👀 Watch mode: Monitoring for AtomicLock contracts...");
-        println!("   ⚠️  Contract watching requires event filtering");
-        println!("   ⚠️  Implement: Filter for AtomicLock contract deployments");
-        println!("   ⚠️  When found, extract contract address and terms");
+        if let Some(contract_addr) = args.contract_address.as_deref() {
+            let secret_hash = watch_unlocked_events(&starknet_client, contract_addr, 10).await?;
+            println!("   Secret hash word observed: {}", secret_hash);
+        } else {
+            println!("   Provide --contract-address to watch a known AtomicLock instance");
+            println!("   Discovery of new deployments should be done with indexed ContractDeployed events");
+        }
     } else if let Some(contract_addr) = args.contract_address {
         println!("\n🔓 Unlocking contract: {}", contract_addr);
 
@@ -61,47 +62,32 @@ async fn main() -> Result<()> {
             println!("   Secret provided: {}", secret_hex);
 
             // Convert secret to ByteArray format for Cairo
-            let secret_bytes = hex::decode(&secret_hex).context("Invalid secret hex")?;
+            let _secret_bytes = hex::decode(&secret_hex).context("Invalid secret hex")?;
 
             #[cfg(feature = "full-integration")]
             {
                 if let Some(account_path) = args.starknet_account {
-                    // Use full integration if account provided
-                    let account = StarknetAccount::new(
-                        args.starknet_rpc.clone(),
-                        "0x0".to_string(), // Account address - should be loaded from file
-                        "0x0".to_string(), // Private key - should be loaded from file
+                    let _ = account_path;
+                    anyhow::bail!(
+                        "taker does not sign Starknet reveal transactions safely yet. Use the TypeScript/starknet.js path for reveal_secret/claim_tokens; refusing to return a placeholder transaction hash."
                     );
-
-                    println!("   Calling verify_and_unlock...");
-                    let tx_hash = account
-                        .verify_and_unlock(&contract_addr, &secret_bytes)
-                        .await
-                        .context("Failed to call contract")?;
-
-                    println!("   ✅ Transaction submitted! Hash: {}", tx_hash);
-                    println!("   Waiting for confirmation...");
-
-                    // In production, wait for transaction receipt
-                    println!("   ⚠️  Transaction confirmation requires full implementation");
                 } else {
-                    println!("   ⚠️  Full contract interaction requires --starknet-account");
+                    println!("   Full contract interaction requires signed TypeScript/starknet.js tooling");
                     println!("\n   Manual unlock command:");
                     println!("   starknet invoke \\");
                     println!("     --address {} \\", contract_addr);
-                    println!("     --function verify_and_unlock \\");
+                    println!("     --function reveal_secret \\");
                     println!("     --inputs {}", secret_hex);
                 }
             }
 
             #[cfg(not(feature = "full-integration"))]
             {
-                println!("   ⚠️  Contract interaction requires full-integration feature");
-                println!("   ⚠️  Build with: cargo build --features full-integration");
+                println!("   Contract interaction requires signed TypeScript/starknet.js tooling");
                 println!("\n   Manual unlock command:");
                 println!("   starknet invoke \\");
                 println!("     --address {} \\", contract_addr);
-                println!("     --function verify_and_unlock \\");
+                println!("     --function reveal_secret \\");
                 println!("     --inputs {}", secret_hex);
             }
         } else {
@@ -118,8 +104,8 @@ async fn main() -> Result<()> {
     println!("\n✅ Taker ready!");
     println!("   Next steps:");
     println!("   1. Watch for AtomicLock contracts or use known address");
-    println!("   2. When ready, call verify_and_unlock(secret)");
-    println!("   3. Secret `t` will be revealed via Unlocked event");
+    println!("   2. When ready, call reveal_secret(secret), then claim_tokens after grace");
+    println!("   3. Secret `t` will be revealed via SecretRevealed event");
     println!("   4. Maker can finalize Monero signature");
 
     Ok(())

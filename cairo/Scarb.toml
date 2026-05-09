@@ -26,9 +26,10 @@ openzeppelin = { git = "https://github.com/OpenZeppelin/cairo-contracts.git", ta
 
 [dev-dependencies]
 # Testing framework (Starknet Foundry)
-# CRITICAL: Must match snforge version in CI workflow
-# Updated to v0.53.0 to match installed snforge version (requires >=0.50.0)
-snforge_std = { git = "https://github.com/foundry-rs/starknet-foundry", tag = "v0.53.0" }
+# CRITICAL: Must match the snforge version used locally and in CI.
+# v0.56.0 lets ContractClass.deploy/deploy_at surface constructor errors
+# to tests, which removes the old manual-grep workaround for negative deploys.
+snforge_std = { git = "https://github.com/foundry-rs/starknet-foundry", tag = "v0.56.0" }
 assert_macros = "2.10.0"
 
 [features]

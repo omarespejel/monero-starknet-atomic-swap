@@ -11,37 +11,36 @@ mod dleq_challenge_only_tests {
     use atomic_lock::poseidon_challenge::compute_dleq_challenge_poseidon;
     use core::array::ArrayTrait;
     use core::integer::u256;
-    use core::traits::TryInto;
     // Constants from rust/test_vectors.json (match test_vectors.cairo)
     const TESTVECTOR_G_COMPRESSED: u256 = u256 {
         low: 0x66666666666666666666666666666658,
         high: 0x66666666666666666666666666666666,
     };
     const TESTVECTOR_Y_COMPRESSED: u256 = u256 {
-        low: 0x97390f51643851560e5f46ae6af8a3c9,
-        high: 0x2260cdf3092329c21da25ee8c9a21f56,
+        low: 0x21ba32594950b67cf0d8bb8c8ac5e8c7,
+        high: 0xf08df421a3209ab6373dd0ec7ef25dfd,
     };
     const TESTVECTOR_T_COMPRESSED: u256 = u256 {
         low: 0x54e86953e7cc99b545cfef03f63cce85,
         high: 0x427dde0adb325f957d29ad71e4643882,
     };
     const TESTVECTOR_U_COMPRESSED: u256 = u256 {
-        low: 0xd893b3476bdf09770b7616f84c5c7bbe,
-        high: 0x5c79d0fa84d6440908e2e2065e60d1cd,
+        low: 0x9244eb3a3699efed3106c6ae0afdf28,
+        high: 0xb6e0bfc0d9fbb8a4c8ef08cb5da2eff3,
     };
     const TESTVECTOR_R1_COMPRESSED: u256 = u256 {
         low: 0x3cb02521d7a17fedca11c02ea41fe334,
         high: 0x11ef09256f90d942ca7a0e4ae05926a5,
     };
     const TESTVECTOR_R2_COMPRESSED: u256 = u256 {
-        low: 0xb4fb26c272cbe6b84d65d4f908aff02f,
-        high: 0xf58498fd33c0fbca066f3fdff2f49225,
+        low: 0xe66ca975ef303c032fcc18a952325162,
+        high: 0xc5d2eb608176c8b79dfa55289c35b35f,
     };
     const ED25519_ORDER: u256 = u256 {
         low: 0x14def9dea2f79cd65812631a5cf5d3ed,
         high: 0x10000000000000000000000000000000,
     };
-    const TESTVECTOR_CHALLENGE_LOW: felt252 = 0x8d664bb70810bdab323a44354d98f94a;
+    const TESTVECTOR_CHALLENGE: felt252 = 0x47c760eb9b6a8797680bef6218e06aacc6570f8be11819d2268bb024f816108;
 
     /// Test: Compute challenge with Rust test vectors
     ///
@@ -75,14 +74,9 @@ mod dleq_challenge_only_tests {
             ED25519_ORDER,
         );
 
-        let cairo_challenge_u256: u256 = cairo_challenge.into();
-        let expected_low: u128 = TESTVECTOR_CHALLENGE_LOW.try_into().unwrap();
-        assert(cairo_challenge_u256.low == expected_low, 'Challenge low mismatch');
+        assert(cairo_challenge == TESTVECTOR_CHALLENGE, 'Challenge mismatch');
         
-        // Expected challenge from Rust: 0xdb8e86169afd3293b58260ada05e90bb436a67e38f1aac7799f8581342a7c204
-        // Note: This is 256 bits, which exceeds felt252 range
-        // We verify that the challenge is computed (non-zero) and deterministic
-        // The exact value match is verified in the full end-to-end test once sqrt hints are fixed
+        // Exact Rust/Cairo equality is asserted above; keep the extra checks for determinism.
         
         // Verify challenge is computed (non-zero for real inputs)
         assert(cairo_challenge != 0, 'Challenge computed');
@@ -141,4 +135,3 @@ mod dleq_challenge_only_tests {
         assert(challenge1 != challenge2, 'Challenge sensitive');
     }
 }
-

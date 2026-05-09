@@ -4,6 +4,11 @@
 **Commit**: `3f41f09` (post-blocker fixes)  
 **Status**: ✅ All P0/P1/P2 fixes verified, integration work remaining
 
+> Historical audit-response snapshot. For the current executable readiness
+> state, use [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md). macOS
+> placeholder Starknet signatures and placeholder Monero transaction hex are now
+> disabled/fail-closed.
+
 ---
 
 ## ✅ VERIFIED FIXES (Commit `4c012d4` → `3f41f09`)
@@ -259,4 +264,3 @@ async fn submit_invoke_tx(&self, calls: Vec<Call>) -> Result<String> {
 All auditor-identified **cryptographic and security fixes** are complete and verified. The codebase is ready for external security audit. Integration work (signing, live testing) can proceed in parallel with audit preparation.
 
 **Status**: ✅ **READY FOR EXTERNAL AUDIT**
-

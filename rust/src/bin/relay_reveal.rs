@@ -73,7 +73,9 @@ struct TxInfo {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    tracing_subscriber::fmt().with_max_level(tracing::Level::INFO).init();
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::INFO)
+        .init();
 
     let args = Args::parse();
     let secret = parse_secret(&args.secret_hex)?;
@@ -87,8 +89,15 @@ async fn main() -> Result<()> {
     )
     .context("Failed to initialize Starknet client")?;
 
-    if starknet.is_secret_revealed(&args.contract_address).await.unwrap_or(false) {
-        info!("Secret already revealed on contract {}, skipping.", args.contract_address);
+    if starknet
+        .is_secret_revealed(&args.contract_address)
+        .await
+        .unwrap_or(false)
+    {
+        info!(
+            "Secret already revealed on contract {}, skipping.",
+            args.contract_address
+        );
         return Ok(());
     }
 

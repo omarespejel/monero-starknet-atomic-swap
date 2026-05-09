@@ -4,8 +4,9 @@
 /// This module enables testing with various adaptor points to discover vulnerabilities.
 ///
 /// **Usage:**
-/// 1. Generate DLEQ proof using `tools/generate_dleq_for_adaptor_point.py <secret_hex>`
-/// 2. Use the generated proof data in tests with `deploy_with_dleq_proof`
+/// 1. Generate Rust DLEQ vectors for the desired test secret.
+/// 2. Regenerate Cairo hints using `tools/regenerate_dleq_hints.py`.
+/// 3. Use the generated proof data in tests with `deploy_with_dleq_proof`.
 ///
 /// **Security Note:**
 /// These helpers use pre-generated DLEQ proofs. For production, proofs must be
@@ -21,12 +22,13 @@ use snforge_std::{declare, ContractClassTrait, DeclareResultTrait};
 /// Deploy contract with pre-generated DLEQ proof.
 ///
 /// This helper allows tests to use arbitrary adaptor points by providing
-/// pre-generated DLEQ proofs. The proofs should be generated using
-/// `tools/generate_dleq_for_adaptor_point.py`.
+/// pre-generated DLEQ proofs. The proofs should be generated from Rust vectors
+/// and `tools/regenerate_dleq_hints.py`.
 ///
 /// **Example:**
 /// ```cairo
-/// // Generate proof: python tools/generate_dleq_for_adaptor_point.py <secret_hex> > proof.json
+/// // Generate proof vectors in Rust, then run:
+/// // uv run --project tools python tools/regenerate_dleq_hints.py
 /// // Then use the proof data:
 /// let proof = DleqProofData {
 ///     hashlock: hashlock_array.span(),
@@ -52,7 +54,7 @@ pub fn deploy_with_dleq_proof(
     second_point_compressed: u256,
     second_point_sqrt_hint: u256,
     challenge: felt252,
-    response: felt252,
+    response: u256,
     fake_glv_hint: Span<felt252>,
     s_hint_for_g: Span<felt252>,
     s_hint_for_y: Span<felt252>,
@@ -69,6 +71,8 @@ pub fn deploy_with_dleq_proof(
     let mut calldata = ArrayTrait::new();
     hashlock.serialize(ref calldata);
     Serde::serialize(@lock_until, ref calldata);
+    let constructor_depositor = starknet::get_caller_address();
+    Serde::serialize(@constructor_depositor, ref calldata);
     Serde::serialize(@token, ref calldata);
     Serde::serialize(@amount, ref calldata);
     
@@ -102,4 +106,3 @@ pub fn deploy_with_dleq_proof(
     let (addr, _) = contract.deploy(@calldata).unwrap();
     IAtomicLockDispatcher { contract_address: addr }
 }
-

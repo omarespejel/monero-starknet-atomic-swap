@@ -1,4 +1,4 @@
-use xmr_secret_gen::swap::{SwapState, SwapDb, JsonFileDb};
+use xmr_secret_gen::swap::{JsonFileDb, SwapDb, SwapState};
 
 #[test]
 fn test_swap_state_serialization() {
@@ -139,4 +139,3 @@ fn test_db_load_nonexistent() {
     let result = db.load("nonexistent").unwrap();
     assert!(result.is_none());
 }
-

@@ -60,20 +60,27 @@ Bob deploys AtomicLock contract on Starknet with:
 - Adaptor point `S_b` (compressed Edwards, 32 bytes)
 - DLEQ proof (challenge, response, commitments) proving hashlock binds to adaptor point
 - Timelock (minimum 3 hours)
+- Explicit depositor address for deposit/refund authorization
 
 **Security**: Contract constructor verifies DLEQ proof. If invalid, deployment fails. This cryptographically binds the hashlock to the adaptor point, preventing hashlock substitution attacks.
 
 ### Phase 3: Token Deposit
 
-Alice calls `deposit()` to transfer tokens into the contract. Only Alice (depositor) can deposit.
+Alice calls `deposit()` to transfer tokens into the contract. Only Alice
+(the explicit constructor depositor) can deposit. This is intentionally not
+derived from constructor caller because UDC deployment changes the caller to UDC.
 
 ### Phase 4: Secret Revelation
 
-Bob reveals secret `s_b` by calling `verify_and_unlock(s_b)`. Contract verifies:
+Bob reveals secret `s_b` by calling `reveal_secret(s_b)` or the legacy
+reveal-only `verify_and_unlock(s_b)` alias. Contract verifies:
 - `SHA-256(s_b_raw_bytes) == H` (hashlock check)
 - `s_b·G == S_b` (MSM verification via Garaga)
 
-If verification succeeds, tokens transfer to Bob and contract emits `Unlocked` event.
+If verification succeeds, the secret and unlocker are recorded and
+`SecretRevealed` is emitted. Tokens are not transferred yet. After the grace
+period, the unlocker calls `claim_tokens()` to transfer tokens and emit
+`TokensClaimed`/`Unlocked`.
 
 **Security**: Two-phase unlock with grace period (2 hours) mitigates race conditions between secret revelation and cross-chain confirmation.
 
@@ -231,4 +238,3 @@ The protocol is designed for testnet use only. Mainnet deployment requires exter
 
 **Version**: 0.7.1 (Two-Party Key Generation)  
 **Last Updated**: 2025-12-23
-

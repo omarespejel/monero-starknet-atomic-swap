@@ -3,16 +3,16 @@
 //! This binary outputs Cairo constants for G and Y compressed Edwards points.
 
 use curve25519_dalek::constants::ED25519_BASEPOINT_POINT;
-use curve25519_dalek::scalar::Scalar;
+use xmr_secret_gen::dleq::get_second_generator;
 
 fn main() {
     // G is the standard Ed25519 basepoint
-    let G = ED25519_BASEPOINT_POINT;
-    let g_compressed = G.compress().to_bytes();
+    let g = ED25519_BASEPOINT_POINT;
+    let g_compressed = g.compress().to_bytes();
 
-    // Y = 2·G (matching current Rust implementation in dleq.rs)
-    let Y = ED25519_BASEPOINT_POINT * Scalar::from(2u64);
-    let y_compressed = Y.compress().to_bytes();
+    // Y = domain-separated second generator (matching dleq.rs)
+    let y = get_second_generator();
+    let y_compressed = y.compress().to_bytes();
 
     // Convert to u256 format (little-endian bytes)
     let g_u256_low = u128::from_le_bytes(g_compressed[0..16].try_into().unwrap());
@@ -38,7 +38,7 @@ fn main() {
     println!("    high: 0x{:016x}{:016x},", g_high_lo, g_high_hi);
     println!("}};");
     println!();
-    println!("// Ed25519 Second Generator Y = 2·G (compressed)");
+    println!("// Ed25519 Second Generator Y (compressed)");
     println!("const ED25519_SECOND_GENERATOR_COMPRESSED: u256 = u256 {{");
     println!("    low: 0x{:016x}{:016x},", y_low_lo, y_low_hi);
     println!("    high: 0x{:016x}{:016x},", y_high_lo, y_high_hi);

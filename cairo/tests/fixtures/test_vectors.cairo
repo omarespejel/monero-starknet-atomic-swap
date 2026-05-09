@@ -23,10 +23,10 @@ pub const TESTVECTOR_G_COMPRESSED: u256 = u256 {
     high: 0x66666666666666666666666666666666,
 };
 
-/// Ed25519 Second Generator Y = 2·G (compressed Edwards format)
+/// Ed25519 second generator Y (domain-separated compressed Edwards format)
 pub const TESTVECTOR_Y_COMPRESSED: u256 = u256 {
-    low: 0x97390f51643851560e5f46ae6af8a3c9,
-    high: 0x2260cdf3092329c21da25ee8c9a21f56,
+    low: 0x21ba32594950b67cf0d8bb8c8ac5e8c7,
+    high: 0xf08df421a3209ab6373dd0ec7ef25dfd,
 };
 
 /// Adaptor Point T (compressed Edwards format)
@@ -37,8 +37,8 @@ pub const TESTVECTOR_T_COMPRESSED: u256 = u256 {
 
 /// Second Point U (compressed Edwards format)
 pub const TESTVECTOR_U_COMPRESSED: u256 = u256 {
-    low: 0xd893b3476bdf09770b7616f84c5c7bbe,
-    high: 0x5c79d0fa84d6440908e2e2065e60d1cd,
+    low: 0x9244eb3a3699efed3106c6ae0afdf28,
+    high: 0xb6e0bfc0d9fbb8a4c8ef08cb5da2eff3,
 };
 
 /// First Commitment Point R1 (compressed Edwards format)
@@ -49,8 +49,8 @@ pub const TESTVECTOR_R1_COMPRESSED: u256 = u256 {
 
 /// Second Commitment Point R2 (compressed Edwards format)
 pub const TESTVECTOR_R2_COMPRESSED: u256 = u256 {
-    low: 0xb4fb26c272cbe6b84d65d4f908aff02f,
-    high: 0xf58498fd33c0fbca066f3fdff2f49225,
+    low: 0xe66ca975ef303c032fcc18a952325162,
+    high: 0xc5d2eb608176c8b79dfa55289c35b35f,
 };
 
 /// Hashlock (SHA-256 hash as 8 u32 words, big-endian from SHA-256)
@@ -65,19 +65,11 @@ pub const TESTVECTOR_HASHLOCK: [u32; 8] = [
     0xded4fc94_u32,
 ];
 
-/// Challenge scalar (low 128 bits) - truncated from full challenge
-/// Full challenge (reduced scalar, LE bytes): 0x4af9984d35443a32abbd1008b74b668d00000000000000000000000000000000
-/// Low 128 bits:   0x8d664bb70810bdab323a44354d98f94a
-pub const TESTVECTOR_CHALLENGE_LOW: felt252 = 0x8d664bb70810bdab323a44354d98f94a;
+/// Full Poseidon challenge felt used by Cairo and Rust.
+pub const TESTVECTOR_CHALLENGE: felt252 = 0x47c760eb9b6a8797680bef6218e06aacc6570f8be11819d2268bb024f816108;
 
-/// Challenge scalar (high 124 bits)
-pub const TESTVECTOR_CHALLENGE_HIGH: felt252 = 0x0;
-
-/// Response scalar (low 128 bits)
-pub const TESTVECTOR_RESPONSE_LOW: felt252 = 0x1e741f8fec4161ea41b23ce6d007ba12;
-
-/// Response scalar (high 124 bits)
-pub const TESTVECTOR_RESPONSE_HIGH: felt252 = 0x026ed77551e578013227c9b98bd25c66;
+/// Response scalar (full scalar)
+pub const TESTVECTOR_RESPONSE: u256 = u256 { low: 0xbe3ffdd10e06b50b800feb45877b787b, high: 0x2f0ceba8a8c56d6f6b4ed3ae98db234 };
 
 /// Sqrt hints for point decompression (Garaga format)
 /// CRITICAL: These must match the compressed points exactly
@@ -91,8 +83,8 @@ pub const TESTVECTOR_T_SQRT_HINT: u256 = u256 {
 
 /// Second Point U sqrt hint (CORRECT - matches test_e2e_dleq.cairo)
 pub const TESTVECTOR_U_SQRT_HINT: u256 = u256 {
-    low: 0xdcad2173817c163b5405cec7698eb4b8,
-    high: 0x742bb3c44b13553c8ddff66565b44cac,
+    low: 0xcffea6b3bffe746de20fdd0734b30845,
+    high: 0x5e4a3b18b41199f9389ded8696067271,
 };
 
 /// R1 Commitment Point sqrt hint (CORRECT - matches test_e2e_dleq.cairo)
@@ -103,8 +95,7 @@ pub const TESTVECTOR_R1_SQRT_HINT: u256 = u256 {
 
 /// R2 Commitment Point sqrt hint (CORRECT - matches test_e2e_dleq.cairo)
 pub const TESTVECTOR_R2_SQRT_HINT: u256 = u256 {
-    low: 0x598521e3f6d818ed84721901f0d87f89,
-    high: 0x09d2fd2811966933dff4c8ab0d9059fc,
+    low: 0xd8b08d5ec3d265b83e5e333d750d6b37,
+    high: 0x0e41fbdbbf62b47c511e0a5aa04059de,
 };
 }
-

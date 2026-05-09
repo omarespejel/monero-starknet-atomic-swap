@@ -52,7 +52,13 @@ fn main() {
         let x_high = u128::from_le_bytes(x_bytes[16..].try_into().unwrap());
 
         let hint_key = key.replace("_compressed", "_sqrt_hint");
-        hints.push((hint_key.clone(), compressed_hex.clone(), x_bytes, x_low, x_high));
+        hints.push((
+            hint_key.clone(),
+            compressed_hex.clone(),
+            x_bytes,
+            x_low,
+            x_high,
+        ));
 
         println!("{}:", key);
         println!("  Compressed: {}", compressed_hex);

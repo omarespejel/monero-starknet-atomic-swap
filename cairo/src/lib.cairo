@@ -1,10 +1,10 @@
-/// # AtomicLock Contract - Prototype Implementation / Reference PoC
+/// # AtomicLock Contract - Testnet Audit Candidate
 ///
-/// Prototype Starknet contract for XMR↔️Starknet atomic swaps with Garaga MSM
+/// Starknet contract for XMR↔Starknet atomic swaps with Garaga MSM
 /// verification on Ed25519 (Weierstrass form, curve_index=4).
 ///
-/// **Status**: This is a prototype implementation and reference proof-of-concept.
-/// Production-ready status requires security review and DLEQ proof implementation.
+/// **Status**: Production-safety fixes are implemented for the testnet path. Mainnet use
+/// still requires external audit, live Sepolia rehearsal, and live Monero stagenet rehearsal.
 ///
 /// **Hard Invariants (Enforced at Deployment)**:
 /// - Constructor: adaptor point must be non-zero, on-curve, not small-order; FakeGLV
@@ -13,18 +13,21 @@
 /// - Timelock: lock_until must be > current block timestamp (prevents immediate expiry).
 /// - Token/Amount: For real swaps, both token and amount must be non-zero. Zero values
 ///   allowed only for testing (both must be zero together).
+/// - Depositor: explicit constructor parameter, not constructor caller. This is required
+///   for UDC deployments where constructor caller is the UDC, not the signing account.
 ///
 /// **Hard Invariants (Enforced at Runtime)**:
-/// - verify_and_unlock: mandatory MSM assert on SHA-256(secret) reduced scalar;
-///   cannot be bypassed. This is the core cryptographic guarantee.
+/// - reveal_secret / legacy verify_and_unlock: mandatory MSM assert on SHA-256(secret)
+///   reduced scalar; cannot be bypassed. This is the core cryptographic guarantee.
 /// - Refund: only depositor, only after lock_until, only if still locked.
 ///
 /// **Protocol Flow**:
-/// 1. Deploy with hashlock, adaptor point, timelock, token, and amount.
+/// 1. Deploy with hashlock, adaptor point, timelock, explicit depositor, token, and amount.
 /// 2. Depositor calls `deposit()` to transfer tokens into the lock.
 /// 3. Counterparty reveals secret on Monero side, unlocking XMR.
-/// 4. Secret is revealed on Starknet via `verify_and_unlock()`, unlocking tokens.
-/// 5. If secret not revealed before lock_until, depositor can call `refund()`.
+/// 4. Secret is revealed on Starknet via `reveal_secret()`.
+/// 5. After the grace period, the revealer calls `claim_tokens()`.
+/// 6. If secret not revealed before lock_until, depositor can call `refund()`.
 ///
 /// DLEQ verification is implemented in the constructor (lines 577-638).
 /// The constructor verifies the DLEQ proof before deployment, ensuring the hashlock
@@ -36,8 +39,8 @@ pub trait IAtomicLock<TContractState> {
     fn reveal_secret(ref self: TContractState, secret: ByteArray) -> bool;
     /// Phase 2: Claim tokens after grace period (only callable by unlocker after reveal_secret).
     fn claim_tokens(ref self: TContractState) -> bool;
-    /// Legacy: Verify secret and unlock immediately (backward compatibility).
-    /// Internally calls reveal_secret() then claim_tokens() if grace period allows.
+    /// Legacy compatibility alias for reveal_secret().
+    /// This entrypoint no longer transfers tokens immediately.
     fn verify_and_unlock(ref self: TContractState, secret: ByteArray) -> bool;
     /// Get the stored target hash as 8 u32 words.
     fn get_target_hash(self: @TContractState) -> Span<u32>;
@@ -128,6 +131,7 @@ pub mod AtomicLock {
     use core::byte_array::ByteArray;
     use core::integer::u256;
     use core::num::traits::Zero;
+    use core::traits::TryInto;
     use core::sha256::compute_sha256_byte_array;
     use core::hash::HashStateTrait;
     use core::poseidon::PoseidonTrait;
@@ -171,13 +175,13 @@ pub mod AtomicLock {
         high: 0x66666666666666666666666666666666,
     };
     
-    /// Ed25519 Second Generator Y = 2·G (compressed Edwards format)
-    /// Generated from Rust: (ED25519_BASEPOINT_POINT * Scalar::from(2u64)).compress()
-    /// Hex: c9a3f86aae465f0e56513864510f3997561fa2c9e85ea21dc2292309f3cd6022
+    /// Ed25519 second generator Y (compressed Edwards format).
+    /// Generated from Rust's domain-separated `get_second_generator()`.
+    /// Hex: c7e8c58a8cbbd8f07cb650495932ba21fd5df27eecd03d37b69a20a321f48df0
     /// CRITICAL: Must match test_vectors.json and test_e2e_dleq.cairo for challenge computation
     const ED25519_SECOND_GENERATOR_COMPRESSED: u256 = u256 {
-        low: 0x97390f51643851560e5f46ae6af8a3c9,
-        high: 0x2260cdf3092329c21da25ee8c9a21f56,
+        low: 0x21ba32594950b67cf0d8bb8c8ac5e8c7,
+        high: 0xf08df421a3209ab6373dd0ec7ef25dfd,
     };
 
     // PRODUCTION: OpenZeppelin ReentrancyGuard component for audited reentrancy protection
@@ -252,6 +256,8 @@ pub mod AtomicLock {
     pub struct ContractDeployed {
         #[key]
         pub deployer: ContractAddress,
+        #[key]
+        pub depositor: ContractAddress,
         pub version: felt252,
         pub lock_until: u64,
     }
@@ -275,7 +281,7 @@ pub mod AtomicLock {
     // Force new class hash after Starknet v0.14.1 Blake2s migration (Dec 10, 2025)
     // Increment this value to generate a fresh Sierra hash when redeclaring
     // v2: Blake2s migration fix (Poseidon → Blake2s CASM hash change)
-    const DEPLOYMENT_VERSION: felt252 = 2;
+    const DEPLOYMENT_VERSION: felt252 = 5;
 
     #[storage]
     struct Storage {
@@ -312,7 +318,7 @@ pub mod AtomicLock {
         dleq_second_point_y3: felt252,
         /// DLEQ proof components
         dleq_challenge: felt252,
-        dleq_response: felt252,
+        dleq_response: u256,
         /// Fake-GLV hint for single-scalar MSM on Ed25519 (Qx, Qy limbs, s1, s2_encoded)
         fake_glv_hint0: felt252,
         fake_glv_hint1: felt252,
@@ -363,6 +369,7 @@ pub mod AtomicLock {
         pub const TIMELOCK_TOO_SHORT: felt252 = 'Timelock must be >= 3 hours';
         pub const ZERO_AMOUNT: felt252 = 'Amount must be non-zero';
         pub const ZERO_TOKEN: felt252 = 'Token address must be non-zero';
+        pub const ZERO_DEPOSITOR: felt252 = 'Depositor must be non-zero';
         pub const DLEQ_VERIFICATION_FAILED: felt252 = 'DLEQ verification failed';
         pub const SECRET_NOT_REVEALED: felt252 = 'Secret not yet revealed';
         pub const GRACE_PERIOD_NOT_EXPIRED: felt252 = 'Grace period not expired';
@@ -382,6 +389,8 @@ pub mod AtomicLock {
         pub const R1_DECOMPRESS_FAILED: felt252 = 'R1 decompress failed';
         pub const R2_DECOMPRESS_FAILED: felt252 = 'R2 decompress failed';
         pub const DLEQ_CHALLENGE_MISMATCH: felt252 = 'DLEQ: challenge mismatch';
+        pub const DLEQ_R1_MISMATCH: felt252 = 'DLEQ: R1 mismatch';
+        pub const DLEQ_R2_MISMATCH: felt252 = 'DLEQ: R2 mismatch';
         pub const DLEQ_SCALAR_OUT_OF_RANGE: felt252 = 'DLEQ: scalar out of range';
         pub const DLEQ_ZERO_SCALAR: felt252 = 'DLEQ: zero scalar rejected';
     }
@@ -391,13 +400,15 @@ pub mod AtomicLock {
     /// @dev DLEQ proof is verified in constructor - deployment fails if invalid
     /// @param hash_words SHA-256 hashlock as 8×u32 words (big-endian)
     /// @param lock_until Timelock expiry timestamp (must be > current time)
+    /// @param depositor Address allowed to deposit/refund. Must be explicit because UDC
+    ///        deployments make the constructor caller equal to the UDC.
     /// @param token ERC20 token address (must be non-zero if amount > 0)
     /// @param amount Token amount to lock (must be non-zero if token != 0)
     /// @param adaptor_point_edwards_compressed Adaptor point T = t·G (compressed Edwards, 32 bytes = u256)
     /// @param adaptor_point_sqrt_hint sqrt hint for Edwards decompression
     /// @param dleq_second_point_edwards_compressed DLEQ second point U = t·Y (compressed Edwards, 32 bytes = u256)
     /// @param dleq_second_point_sqrt_hint sqrt hint for Edwards decompression
-    /// @param dleq DLEQ proof (challenge, response) as (felt252, felt252)
+    /// @param dleq DLEQ proof (challenge, response) as (felt252, u256)
     /// @param fake_glv_hint Fake-GLV hint for adaptor point (10 felts)
     /// @param dleq_s_hint_for_g Fake-GLV hint for s·G (10 felts)
     /// @param dleq_s_hint_for_y Fake-GLV hint for s·Y (10 felts)
@@ -417,13 +428,14 @@ pub mod AtomicLock {
         ref self: ContractState,
         hash_words: Span<u32>,
         lock_until: u64,
+        depositor: ContractAddress,
         token: ContractAddress,
         amount: u256,
         adaptor_point_edwards_compressed: u256,
         adaptor_point_sqrt_hint: u256,
         dleq_second_point_edwards_compressed: u256,
         dleq_second_point_sqrt_hint: u256,
-        dleq: (felt252, felt252),
+        dleq: (felt252, u256),
         fake_glv_hint: Span<felt252>,
         dleq_s_hint_for_g: Span<felt252>,
         dleq_s_hint_for_y: Span<felt252>,
@@ -434,9 +446,8 @@ pub mod AtomicLock {
         dleq_r2_compressed: u256,
         dleq_r2_sqrt_hint: u256,
     ) {
-        // Force new class hash via storage write (cannot be optimized away)
-        // v3: Blake2s migration fix (Dec 10, 2025) - bumped to avoid CASM hash conflict
-        self.contract_version.write(4);
+        // Force new class hash via storage write (cannot be optimized away).
+        self.contract_version.write(DEPLOYMENT_VERSION);
         
         // ========== INPUT VALIDATION ==========
         // INVARIANT: Hashlock must be exactly 8 u32 words (SHA-256 = 32 bytes = 8×u32)
@@ -481,12 +492,14 @@ pub mod AtomicLock {
         // Allow both zero (for testing) OR both non-zero (for production), but reject mixed states
         // Prevents invalid contract states (e.g., token set but amount = 0)
         let amount_is_zero = is_zero(amount);
-        let token_is_zero = token == starknet::contract_address_const::<0>();
+        let zero_address: ContractAddress = 0.try_into().unwrap();
+        let token_is_zero = token == zero_address;
         // Reject mixed states: if amount is zero, token must also be zero; if amount is non-zero, token must be non-zero
         if amount_is_zero {
             assert(token_is_zero, Errors::ZERO_AMOUNT);
         } else {
             assert(!token_is_zero, Errors::ZERO_TOKEN);
+            assert(depositor != zero_address, Errors::ZERO_DEPOSITOR);
         }
 
         let (dleq_challenge, dleq_response) = dleq;
@@ -653,18 +666,18 @@ pub mod AtomicLock {
         // 2. Challenge comparison issue (felt252 comparison)
         // 3. Challenge passed via calldata differs from computed
         // 
-        // CRITICAL: Compare truncated REDUCED challenges
+        // CRITICAL: Compare full REDUCED challenges
         // Rust stores the REDUCED scalar in test_vectors.json as big-endian bytes
-        // TEST_VECTOR_C_TRUNCATED is the low 128 bits of the REDUCED challenge (big-endian)
+        // TEST_VECTOR_C_FULL is the full scalar of the REDUCED challenge (big-endian)
         // Cairo computes: Poseidon digest -> reduce mod order -> felt252
-        // The felt252 represents the reduced scalar, but we need to compare the truncated value
-        // Convert felt252 to u256 first (always succeeds), then extract low 128 bits
+        // The felt252 represents the reduced scalar, but we need to compare the full value
+        // Convert felt252 to u256 first (always succeeds), then extract full scalar
         let c_prime_u256: u256 = c_prime.into();
         let dleq_challenge_u256: u256 = dleq_challenge.into();
         
-        // Compare low 128 bits of REDUCED challenge (matching Rust's format)
-        // Both c_prime and dleq_challenge are already reduced scalars
-        if c_prime_u256.low != dleq_challenge_u256.low {
+        // Compare the full Fiat-Shamir challenge. Older prototype code compared only the low
+        // 128 bits; production verification must bind the complete transcript value.
+        if c_prime_u256 != dleq_challenge_u256 {
             // The challenge mismatch indicates either:
             // 1. Challenge computation difference (Poseidon implementation?)
             // 2. Challenge passed via calldata differs from what test computed
@@ -678,11 +691,8 @@ pub mod AtomicLock {
         _verify_dleq_proof(
             point,
             dleq_second_point,
-            adaptor_point_edwards_compressed,
-            dleq_second_point_edwards_compressed,
-            dleq_r1_compressed,
-            dleq_r2_compressed,
-            hash_words,
+            dleq_r1,
+            dleq_r2,
             dleq_challenge,
             dleq_response,
             dleq_s_hint_for_g,
@@ -711,7 +721,7 @@ pub mod AtomicLock {
         self.fake_glv_hint9.write(*fake_glv_hint.at(9));
         self.unlocked.write(false);
         self.lock_until.write(lock_until);
-        self.depositor.write(get_caller_address());
+        self.depositor.write(depositor);
         // Initialize two-phase unlock state
         self.secret_revealed.write(false);
         self.reveal_timestamp.write(0);
@@ -723,6 +733,7 @@ pub mod AtomicLock {
         // Emit ContractDeployed event for observability
         self.emit(ContractDeployed {
             deployer: get_caller_address(),
+            depositor,
             version: self.contract_version.read(),
             lock_until: lock_until,
         });
@@ -763,7 +774,7 @@ pub mod AtomicLock {
         assert(!self.unlocked.read(), Errors::ALREADY_UNLOCKED);
         
         // Cannot reveal if already revealed (one-time only)
-        assert(!self.secret_revealed.read(), Errors::ALREADY_UNLOCKED);
+        assert(!self.secret_revealed.read(), Errors::SECRET_ALREADY_REVEALED);
 
         // Reconstruct adaptor point and MSM hint from storage
         let adaptor_point = storage_adaptor_point(@self);
@@ -912,10 +923,10 @@ pub mod AtomicLock {
         }
 
         fn get_claimable_after(self: @ContractState) -> u64 {
-            let reveal_ts = self.reveal_timestamp.read();
-            if reveal_ts == 0 {
+            if !self.secret_revealed.read() {
                 return 0;
             }
+            let reveal_ts = self.reveal_timestamp.read();
             reveal_ts + GRACE_PERIOD
         }
 
@@ -981,12 +992,11 @@ pub mod AtomicLock {
             true
         }
 
-        /// @notice Legacy: Verify secret and unlock immediately (BYPASSES GRACE PERIOD)
-        /// @dev DEPRECATED for production use. Use reveal_secret() + claim_tokens() instead.
-        /// @dev Kept for backward compatibility with existing integrations.
-        /// @dev WARNING: This bypasses the 2-hour grace period designed to mitigate cross-chain race conditions.
+        /// @notice Legacy compatibility alias for reveal_secret().
+        /// @dev DEPRECATED for new integrations. Use reveal_secret() + claim_tokens() instead.
+        /// @dev Production safety: this no longer transfers tokens or bypasses the grace period.
         /// @param secret The revealed Monero secret (must match stored hashlock)
-        /// @return true if verification succeeds and tokens are unlocked
+        /// @return true if verification succeeds and the secret is revealed
         /// @security Protected by ReentrancyGuard. P1 FIX: Uses internal function to avoid guard gaps.
         fn verify_and_unlock(ref self: ContractState, secret: ByteArray) -> bool {
             // PRODUCTION: OpenZeppelin ReentrancyGuard - audited reentrancy protection
@@ -996,19 +1006,11 @@ pub mod AtomicLock {
             // Additional defense-in-depth: unlocked flag check
             assert(!self.unlocked.read(), Errors::ALREADY_UNLOCKED);
             
-            // If secret already revealed, just transfer tokens (backward compat path)
+            // Preserve idempotent legacy behavior for already revealed swaps, without
+            // releasing funds before claim_tokens() enforces the grace period.
             if self.secret_revealed.read() {
                 let caller = get_caller_address();
                 assert(caller == self.unlocker_address.read(), Errors::NOT_UNLOCKER);
-                
-                // Transfer tokens immediately (bypass grace period for backward compat)
-                let amount = self.amount.read();
-                let token = self.token.read();
-                let ok = maybe_transfer(token, caller, amount);
-                assert(ok, Errors::TOKEN_TRANSFER_FAILED);
-                
-                self.unlocked.write(true);
-                self.emit(Unlocked { unlocker: caller, secret_hash: self.h0.read() });
                 self.reentrancy_guard.end();
                 return true;
             }
@@ -1019,18 +1021,7 @@ pub mod AtomicLock {
                 self.reentrancy_guard.end();
                 return false;
             }
-            
-            // Immediately transfer tokens (bypass grace period for backward compatibility)
-            let caller = get_caller_address();
-            assert(caller == self.unlocker_address.read(), Errors::NOT_UNLOCKER);
-            
-            let amount = self.amount.read();
-            let token = self.token.read();
-            let ok = maybe_transfer(token, caller, amount);
-            assert(ok, Errors::TOKEN_TRANSFER_FAILED);
-            
-            self.unlocked.write(true);
-            self.emit(Unlocked { unlocker: caller, secret_hash: self.h0.read() });
+
             self.reentrancy_guard.end();
             true
         }
@@ -1218,18 +1209,24 @@ pub mod AtomicLock {
 
     /// Get the second generator point Y for DLEQ proofs.
     /// 
-    /// This uses a deterministic hash-to-curve approach to derive Y from a constant tag.
-    /// The point Y must be fixed and known to both prover and verifier.
-    /// 
-    /// Currently uses 2·G as placeholder until Python tool converts Edwards→Weierstrass.
-    /// In production, this will be replaced with hardcoded constant from:
-    /// hash_to_curve("DLEQ_SECOND_BASE_V1") → Edwards → Weierstrass → u384 limbs
+    /// This uses the hardcoded Weierstrass coordinates for Rust's domain-separated
+    /// `get_second_generator()` output. The compressed Edwards constant above is used
+    /// in the Fiat-Shamir transcript, so both constants must be regenerated together.
     fn get_dleq_second_generator() -> G1Point {
-        // Placeholder: using 2·G as second generator
-        // TODO: Replace with hardcoded constant from Rust hash-to-curve computation
-        // The constant must match Rust's get_second_generator() exactly
-        let G = get_G(ED25519_CURVE_INDEX);
-        ec_safe_add(G, G, ED25519_CURVE_INDEX)
+        G1Point {
+            x: u384 {
+                limb0: 0x33a87acad79a74b24920d2c1,
+                limb1: 0x90eb31a1df26557c4577e24e,
+                limb2: 0x61a9c1a9c3cf7c7f,
+                limb3: 0x0,
+            },
+            y: u384 {
+                limb0: 0x77277dadbbb81426c761f8a1,
+                limb1: 0xf06b4e37882ce73268a481b,
+                limb2: 0x17665300dfceafd5,
+                limb3: 0x0,
+            },
+        }
     }
 
     /// @notice Verify DLEQ proof: proves that log_G(T) = log_Y(U) without revealing the secret
@@ -1252,13 +1249,10 @@ pub mod AtomicLock {
     fn _verify_dleq_proof(
         T: G1Point,
         U: G1Point,
-        T_edwards_compressed: u256,
-        U_edwards_compressed: u256,
-        R1_edwards_compressed: u256,
-        R2_edwards_compressed: u256,
-        hashlock: Span<u32>,
+        R1: G1Point,
+        R2: G1Point,
         c: felt252,
-        s: felt252,
+        s: u256,
         s_hint_for_g: Span<felt252>,
         s_hint_for_y: Span<felt252>,
         c_neg_hint_for_t: Span<felt252>,
@@ -1278,23 +1272,15 @@ pub mod AtomicLock {
         T.assert_on_curve_excluding_infinity(curve_idx);
         U.assert_on_curve_excluding_infinity(curve_idx);
 
-        // Convert challenge and response to u256 scalars (reduced mod curve order)
-        // All scalar operations have Cairo's built-in overflow protection
-        // No SafeMath needed - Cairo automatically reverts on overflow/underflow
-        // 
-        // FIX: Convert felt252 to u256 first, then extract low 128 bits
-        // This avoids try_into::<u128>() failure when value > 2^128
-        // Hints were generated for truncated scalars, so we truncate to 128 bits
         let c_u256: u256 = c.into();
-        let s_u256: u256 = s.into();
-        let c_scalar = (u256 { low: c_u256.low, high: 0 }) % ED25519_ORDER;
-        let s_scalar = (u256 { low: s_u256.low, high: 0 }) % ED25519_ORDER;
+        let c_scalar = c_u256 % ED25519_ORDER;
+        let s_scalar = s % ED25519_ORDER;
 
         // Compute R1' = s·G - c·T = s·G + (-c)·T
         // PRODUCTION: Split into separate single-scalar MSMs to avoid multi-scalar hint complexity
         // We compute -c mod n as a scalar, then multiply T by that negated scalar
         // This avoids needing point negation and is more efficient
-        // Hints are generated using tools/generate_dleq_hints.py for production-grade verification
+        // Hints are generated using tools/regenerate_dleq_hints.py for production-grade verification
         // PRODUCTION: Compute -c mod n using modular arithmetic
         // Note: We use manual arithmetic here because Garaga's neg_mod_p works with u384/CircuitModulus,
         // but our scalars are u256. The manual approach is correct and matches Garaga's logic.
@@ -1373,7 +1359,8 @@ pub mod AtomicLock {
         neg_cT.assert_on_curve_excluding_infinity(curve_idx);
         
         // Add: R1' = sG + (-c)·T = sG - cT
-        let _R1_prime = ec_safe_add(sG, neg_cT, curve_idx);
+        let R1_prime = ec_safe_add(sG, neg_cT, curve_idx);
+        assert(R1_prime == R1, Errors::DLEQ_R1_MISMATCH);
 
         // Compute R2' = s·Y - c·U = s·Y + (-c)·U
         // s_hint_for_y: hint for s·Y (Q = s·Y)
@@ -1425,18 +1412,18 @@ pub mod AtomicLock {
         neg_cU.assert_on_curve_excluding_infinity(curve_idx);
         
         // Add: R2' = sY + (-c)·U = sY - cU
-        let _R2_prime = ec_safe_add(sY, neg_cU, curve_idx);
+        let R2_prime = ec_safe_add(sY, neg_cU, curve_idx);
+        assert(R2_prime == R2, Errors::DLEQ_R2_MISMATCH);
 
-        // CRITICAL FIX: Removed challenge recomputation to avoid "double consumption" bug
-        // The challenge 'c' passed to this function is already validated by the caller (constructor).
-        // Recomputing it here would cause hint stream exhaustion or other resource issues.
+        // The challenge 'c' passed to this function is already validated by the caller
+        // (constructor). The reconstructed commitments must match the transcript points.
         // 
         // Architecture: Single Source of Truth
         // - Constructor computes and validates challenge: c' = compute_dleq_challenge_poseidon(...)
         // - Constructor asserts: c == c' (validates the proof)
         // - This function trusts the validated challenge and only performs MSM verification
         //
-        // The MSM verification (R1' = sG - cT, R2' = sY - cU) is sufficient to prove:
+        // The MSM verification (R1' = sG - cT, R2' = sY - cU) proves:
         // - The prover knows the discrete log t such that T = t·G and U = t·Y
         // - The challenge c matches the Fiat-Shamir hash of the commitments
         //
@@ -1462,7 +1449,7 @@ pub mod AtomicLock {
         T: G1Point,
         U: G1Point,
         c: felt252,
-        s: felt252,
+        s: u256,
         curve_idx: u32,
     ) {
         // Validate points are on-curve (Garaga's assert_on_curve_excluding_infinity)
@@ -1475,28 +1462,23 @@ pub mod AtomicLock {
         
         // Validate scalars are non-zero
         assert(c != 0, Errors::DLEQ_ZERO_SCALAR);
-        assert(s != 0, Errors::DLEQ_ZERO_SCALAR);
+        assert(!s.is_zero(), Errors::DLEQ_ZERO_SCALAR);
         
         // PRODUCTION: Use Garaga's sign() utility for additional scalar validation
         // sign() returns -1, 0, or 1. We ensure scalars are positive (non-negative, non-zero)
         // This provides an extra layer of validation beyond the != 0 check
         let c_sign = sign(c);
-        let s_sign = sign(s);
+        let s_low_sign = sign(s.low.into());
         // sign() returns felt252: -1 (negative), 0 (zero), 1 (positive)
         // We check that sign is not zero or negative
         assert(c_sign != 0, Errors::DLEQ_ZERO_SCALAR);
-        assert(s_sign != 0, Errors::DLEQ_ZERO_SCALAR);
+        assert(s_low_sign != 0 || s.high != 0, Errors::DLEQ_ZERO_SCALAR);
         // Note: In Cairo's field, negative values are valid, but for DLEQ scalars
         // we want them to be in the positive range [1, n-1]
         
-        // Validate scalars are in range [0, n) by reducing
-        // FIX: Use direct scalar construction (same fix as _verify_dleq_proof)
-        // Convert felt252 to u256 first, then extract low 128 bits
-        // This avoids try_into::<u128>() failure when value > 2^128
         let c_u256: u256 = c.into();
-        let s_u256: u256 = s.into();
-        let c_scalar = (u256 { low: c_u256.low, high: 0 }) % ED25519_ORDER;
-        let s_scalar = (u256 { low: s_u256.low, high: 0 }) % ED25519_ORDER;
+        let c_scalar = c_u256 % ED25519_ORDER;
+        let s_scalar = s % ED25519_ORDER;
         
         // Ensure reduction didn't produce zero (shouldn't happen if c != 0, but check anyway)
         // PRODUCTION: Use Zero trait for u256 zero checks
@@ -1512,17 +1494,7 @@ pub mod AtomicLock {
     /// @invariant Result is always < ED25519_ORDER (enforced by modulo operation)
     /// @invariant Cairo's built-in overflow protection ensures safe arithmetic
     pub fn reduce_felt_to_scalar(f: felt252) -> u256 {
-        // CRITICAL: Cairo's felt252.into() for u256 TRUNCATES to u128 (only keeps low 128 bits)
-        // Cairo doesn't support division/modulo on felt252, so we cannot extract high bits
-        // 
-        // We must accept truncation and generate hints for the truncated value
-        // This matches what Garaga actually receives: u256 { low: truncated_felt, high: 0 }
-        // 
-        // NOTE: felt252.try_into() for u128 always succeeds (just truncates), so .unwrap() is safe
-        // The issue with sequential calls was likely something else - keeping original implementation
-        // but ensuring we handle the truncation correctly
-        let f_u128: u128 = f.try_into().unwrap(); // Truncates to u128 (always succeeds)
-        let f_u256 = u256 { low: f_u128, high: 0 };
+        let f_u256: u256 = f.into();
         f_u256 % ED25519_ORDER
     }
 

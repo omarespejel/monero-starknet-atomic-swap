@@ -1,6 +1,6 @@
 //! Minimal Monero stagenet integration demo.
 //!
-//! **⚠️ WARNING**: This is a minimal adaptor-signature demo, NOT a production wallet integration.
+//! WARNING: This is a minimal adaptor-signature demo, NOT a production wallet integration.
 //!
 //! This module provides a simplified demonstration of:
 //! - Transaction creation with adaptor signatures (simplified, not full CLSAG)
@@ -15,13 +15,13 @@
 //! - Ring signature construction
 //! - Proper transaction fee calculation
 //!
-//! **For production use**: Integrate with a proper Monero wallet stack (e.g., monero-rs)
-//! that handles all the complexities of Monero transaction creation and signing.
+//! Production swaps must use wallet-rpc/monero transaction tooling that creates,
+//! signs, and broadcasts real CLSAG transactions. This module intentionally fails
+//! closed for transaction finalization instead of returning fake transaction hex.
 
 use anyhow::{Context, Result};
 use curve25519_dalek::scalar::Scalar;
 use serde_json::{json, Value};
-use std::collections::HashMap;
 
 /// Monero RPC client for stagenet.
 pub struct MoneroRpcClient {
@@ -153,30 +153,13 @@ impl MoneroTransactionBuilder {
 
     /// Finalize the transaction signature using the revealed secret scalar.
     ///
-    /// ⚠️ This is a simplified demo. A production implementation would:
-    /// 1. Extract full CLSAG ring signature components
-    /// 2. Replace adaptor signature with finalized signature
-    /// 3. Handle key images properly
-    /// 4. Reconstruct full transaction with all outputs
-    /// 5. Serialize to proper Monero transaction format
+    /// This path is intentionally disabled for production safety. The previous
+    /// implementation returned `"finalized_tx_hex_placeholder"`, which could be
+    /// mistaken for a broadcastable transaction by downstream automation.
     pub fn finalize(&mut self, secret_scalar: &Scalar) -> Result<String> {
-        // Finalize the adaptor signature (simplified demo)
-        let finalized_sig = crate::adaptor::finalize_signature(&self.adaptor_sig, secret_scalar)
-            .context("Failed to finalize signature")?;
-
-        // Extract transaction components from partial_tx_data
-        // In production, this would:
-        // 1. Extract ring signature components
-        // 2. Replace adaptor signature with finalized signature
-        // 3. Reconstruct full transaction
-        // 4. Serialize to hex
-
-        // For now, return placeholder
-        println!("✅ Signature finalized successfully (demo implementation)");
-        println!("   Finalized signature: {:?}", finalized_sig);
-        println!("   ⚠️  This is a demo - production requires full CLSAG integration");
-
-        // In production, serialize the full transaction
-        Ok("finalized_tx_hex_placeholder".to_string())
+        let _ = (&self.adaptor_sig, &self.partial_tx_data, secret_scalar);
+        anyhow::bail!(
+            "Monero transaction finalization is not implemented in rust/src/monero_full.rs. Use wallet-rpc/Monero tooling to create and sign a real stagenet transaction; placeholder transaction hex is forbidden."
+        )
     }
 }

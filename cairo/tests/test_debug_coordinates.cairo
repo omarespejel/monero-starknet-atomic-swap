@@ -22,12 +22,12 @@ mod output_coordinates_tests {
     };
 
     const TEST_SECOND_POINT_COMPRESSED: u256 = u256 {
-        low: 0xd893b3476bdf09770b7616f84c5c7bbe,
-        high: 0x5c79d0fa84d6440908e2e2065e60d1cd,
+        low: 0x9244eb3a3699efed3106c6ae0afdf28,
+        high: 0xb6e0bfc0d9fbb8a4c8ef08cb5da2eff3,
     };
     const TEST_SECOND_POINT_SQRT_HINT: u256 = u256 {
-        low: 0xdcad2173817c163b5405cec7698eb4b8,
-        high: 0x742bb3c44b13553c8ddff66565b44cac,
+        low: 0xcffea6b3bffe746de20fdd0734b30845,
+        high: 0x5e4a3b18b41199f9389ded8696067271,
     };
 
     #[test]

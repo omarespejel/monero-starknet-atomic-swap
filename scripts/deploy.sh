@@ -131,7 +131,8 @@ echo "  Ignored: ${SECURITY_IGNORE}"
 
 # Check if there are unexpected failures (not constructor panic tests)
 if [ "$SECURITY_FAIL" -gt 0 ]; then
-  # These are expected constructor panic tests that snforge reports as failures
+  # snforge 0.56 should report promoted constructor negative tests as passes.
+  # Keep this guard as a compatibility fallback, but treat unknown failures as fatal.
   EXPECTED_FAILURES=(
     "test_wrong_response_rejected"
     "test_reject_low_order_point_order_2"
@@ -161,7 +162,7 @@ if [ "$SECURITY_FAIL" -gt 0 ]; then
     echo -e "${RED}Security tests have unexpected failures${NC}"
     exit 1
   else
-    echo -e "${YELLOW}Note: ${SECURITY_FAIL} constructor panic tests failed (expected behavior - marked as #[ignore])${NC}"
+    echo -e "${YELLOW}Note: ${SECURITY_FAIL} legacy constructor negative tests failed under compatibility handling${NC}"
   fi
 fi
 
@@ -286,17 +287,17 @@ echo "  - class_hash: ${CLASS_HASH}"
 echo ""
 echo -e "${YELLOW}Deploying in TEST MODE (no real tokens)${NC}"
 
-# Note: Actual deployment calldata generation would go here
-# For now, we'll use a placeholder that requires manual calldata
-echo -e "${YELLOW}⚠️  Manual calldata required for deployment${NC}"
+# This shell script is kept as a packaging/checklist helper. It does not submit
+# placeholder deployments. Use the TypeScript/starknet.js path for signed deploys.
+echo -e "${YELLOW}Manual signed deployment required${NC}"
 echo "Generate calldata using: tools/generate_deploy_calldata.py"
 echo ""
 echo "Then deploy manually with:"
 echo "  starkli deploy ${CLASS_HASH} --rpc ${RPC_URL} --account ~/.starkli-wallets/deployer/account.json --watch"
 
-# Placeholder for actual deployment
+# Internal sentinel meaning no deployment was submitted by this script.
 CONTRACT_ADDRESS="0x0"
-echo -e "${YELLOW}⚠️  Skipping actual deployment (requires calldata generation)${NC}"
+echo -e "${YELLOW}Skipping actual deployment (no signed transaction submitted)${NC}"
 echo -e "${YELLOW}   Set CONTRACT_ADDRESS manually after deployment${NC}"
 
 # ============================================================================
@@ -387,11 +388,12 @@ if [ "${CONTRACT_ADDRESS}" != "0x0" ]; then
   echo "  3. Monitor on explorer:"
   echo "     https://sepolia.starkscan.co/contract/${CONTRACT_ADDRESS}"
 else
-  echo "  1. Generate deployment calldata:"
-  echo "     cd tools && uv run python generate_deploy_calldata.py ../rust/test_vectors.json <DEPLOYER_ADDRESS>"
+  echo "  1. Regenerate deployment hints/calldata:"
+  echo "     uv run --project tools python tools/regenerate_dleq_hints.py"
+  echo "     python3 tools/generate_deploy_calldata.py --network ${NETWORK} --token 0x... --amount ..."
   echo ""
-  echo "  2. Deploy contract:"
-  echo "     starkli deploy ${CLASS_HASH} --rpc ${RPC_URL} --account ~/.starkli-wallets/deployer/account.json --watch"
+  echo "  2. Deploy with the signed TypeScript path:"
+  echo "     bun run scripts/deploy.ts"
 fi
 echo ""
 

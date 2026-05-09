@@ -44,18 +44,18 @@ impl SwapKeyPair {
     /// Generate a new atomic swap key pair.
     pub fn generate() -> Self {
         let mut rng = OsRng;
-        
+
         // Generate random scalars (v4.x API: use from_bytes_mod_order)
         let mut partial_bytes = [0u8; 32];
         rng.fill_bytes(&mut partial_bytes);
         let partial_key = Scalar::from_bytes_mod_order(partial_bytes);
         partial_bytes.zeroize();
-        
+
         let mut adaptor_bytes = [0u8; 32];
         rng.fill_bytes(&mut adaptor_bytes);
         let adaptor_scalar = Scalar::from_bytes_mod_order(adaptor_bytes);
         adaptor_bytes.zeroize();
-        
+
         let full_spend_key = partial_key + adaptor_scalar;
 
         let adaptor_point = adaptor_scalar * G;
@@ -95,7 +95,7 @@ impl SwapKeyPair {
         // No secret-dependent branches or memory accesses
         Zeroizing::new(*partial_key + revealed_t)
     }
-    
+
     /// Recover full spend key when t is revealed from Starknet (non-zeroizing version).
     ///
     /// **Note**: This is a convenience method for cases where zeroization is not needed.
@@ -143,7 +143,7 @@ mod tests {
         let recovered = SwapKeyPair::recover(partial_key_zeroizing, keys.adaptor_scalar);
         assert_eq!(*recovered, keys.full_spend_key);
     }
-    
+
     #[test]
     fn test_key_recovery_plain() {
         let keys = SwapKeyPair::generate();
@@ -162,7 +162,7 @@ mod tests {
         let keys = SwapKeyPair::generate();
         assert_eq!(keys.public_key, keys.full_spend_key * G);
     }
-    
+
     /// Test that recover() is constant-time (no timing leakage).
     ///
     /// This test verifies that recover() takes approximately the same time
@@ -173,30 +173,31 @@ mod tests {
     #[test]
     fn test_recover_constant_time() {
         use std::time::Instant;
-        
+
         // Generate multiple key pairs with different values
         let mut timings = Vec::new();
-        
+
         for _ in 0..20 {
             let keys = SwapKeyPair::generate();
             let partial_key_zeroizing = Zeroizing::new(keys.partial_key);
-            
+
             let start = Instant::now();
             let _recovered = SwapKeyPair::recover(partial_key_zeroizing, keys.adaptor_scalar);
             let duration = start.elapsed();
-            
+
             timings.push(duration.as_nanos());
         }
-        
+
         // Calculate statistics
         let min = *timings.iter().min().unwrap();
         let max = *timings.iter().max().unwrap();
         let avg = timings.iter().sum::<u128>() / timings.len() as u128;
-        
+
         // Calculate coefficient of variation (CV) = std_dev / mean
         // This is a more robust measure than simple variance percentage
         let mean = avg as f64;
-        let variance_sum: f64 = timings.iter()
+        let variance_sum: f64 = timings
+            .iter()
             .map(|&t| {
                 let diff = t as f64 - mean;
                 diff * diff
@@ -204,14 +205,14 @@ mod tests {
             .sum();
         let std_dev = (variance_sum / timings.len() as f64).sqrt();
         let cv = (std_dev / mean) * 100.0;
-        
+
         println!("Recover() timing statistics:");
         println!("  Min: {} ns", min);
         println!("  Max: {} ns", max);
         println!("  Avg: {:.2} ns", mean);
         println!("  Std Dev: {:.2} ns", std_dev);
         println!("  Coefficient of Variation: {:.2}%", cv);
-        
+
         // Real-world timing has significant jitter from:
         // - CPU scheduling and context switches
         // - Cache effects (L1/L2/L3 cache hits/misses)
@@ -228,12 +229,12 @@ mod tests {
             "Timing coefficient of variation too high ({}%), possible timing leakage. Expected < 100%",
             cv
         );
-        
+
         // Additional check: verify that timing is not correlated with input values
         // (This would indicate secret-dependent timing)
         // For now, we just verify the operation completes successfully
         assert!(min > 0, "Timing measurement failed");
-        
+
         // Verify all timings are non-zero (sanity check)
         assert!(min > 0, "Timing measurement failed");
     }

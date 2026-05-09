@@ -22,7 +22,10 @@ pub enum SwapState {
     Created {
         swap_id: String,
         lock_duration_secs: u64,
-        #[serde(serialize_with = "serialize_u128_as_string", deserialize_with = "deserialize_u128_from_string")]
+        #[serde(
+            serialize_with = "serialize_u128_as_string",
+            deserialize_with = "deserialize_u128_from_string"
+        )]
         amount: u128,
         expected_monero_amount: u64, // Expected XMR amount in piconero (for validation)
         hashlock: [u32; 8],
@@ -55,7 +58,7 @@ pub enum SwapState {
         reveal_timestamp: u64,
         monero_restore_height: Option<u64>, // Monero block height when swap was initiated (for optimized sync)
         partial_spend_key: Option<[u8; 32]>, // Partial spend key (x_partial) for claiming Monero
-        claim_destination: Option<String>, // Monero address to claim funds to
+        claim_destination: Option<String>,  // Monero address to claim funds to
     },
     Completed {
         swap_id: String,
@@ -86,4 +89,3 @@ impl SwapState {
         matches!(self, Self::Completed { .. } | Self::Refunded { .. })
     }
 }
-
