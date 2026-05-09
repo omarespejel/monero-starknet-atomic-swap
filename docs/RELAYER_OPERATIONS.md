@@ -75,6 +75,7 @@ sudo install -d -o atomic-swap -g atomic-swap /var/lib/atomic-swap/claim-relayer
 sudo install -d -o atomic-swap -g atomic-swap /var/log/atomic-swap
 sudo install -d -o atomic-swap -g atomic-swap /home/atomic-swap/.shared-ringdb
 sudo install -d -o root -g root /opt/monero-starknet-atomic-swap/monero-bin
+sudo install -d -o root -g root /opt/monero-starknet-atomic-swap/ops/claim-relayer
 
 sudo cp ops/claim-relayer/claim-relayer.config.example.json \
   /etc/atomic-swap/claim-relayer.config.json
@@ -83,11 +84,17 @@ sudo cp ops/claim-relayer/claim-relayer.env.example \
 sudo cp ops/claim-relayer/claim-relayer.secrets.example \
   /etc/atomic-swap/claim-relayer.secrets
 sudo chmod 600 /etc/atomic-swap/claim-relayer.secrets
+sudo cp ops/claim-relayer/claim-relayer-healthcheck.env.example \
+  /etc/atomic-swap/claim-relayer-healthcheck.env
+sudo cp ops/claim-relayer/claim-relayer-healthcheck.sh \
+  /opt/monero-starknet-atomic-swap/ops/claim-relayer/
 
 sudo cp ops/systemd/monero-claim-wallet-rpc.service /etc/systemd/system/
 sudo cp ops/systemd/monero-claim-wallet-rpc.env.example \
   /etc/atomic-swap/monero-claim-wallet-rpc.env
 sudo cp ops/systemd/monero-claim-relayer.service /etc/systemd/system/
+sudo cp ops/systemd/monero-claim-relayer-healthcheck.service /etc/systemd/system/
+sudo cp ops/systemd/monero-claim-relayer-healthcheck.timer /etc/systemd/system/
 sudo systemctl daemon-reload
 ```
 
@@ -122,6 +129,7 @@ Start the service:
 ```bash
 sudo systemctl enable --now monero-claim-wallet-rpc.service
 sudo systemctl enable --now monero-claim-relayer.service
+sudo systemctl enable --now monero-claim-relayer-healthcheck.timer
 sudo systemctl status monero-claim-relayer.service
 journalctl -u monero-claim-relayer.service -f
 ```
@@ -164,16 +172,26 @@ Minimum checks for an on-call rotation:
 
 - `systemctl is-active monero-claim-relayer.service`
 - `systemctl is-active monero-claim-wallet-rpc.service`
+- `systemctl list-timers monero-claim-relayer-healthcheck.timer`
+- `systemctl status monero-claim-relayer-healthcheck.service`
 - cursor file `mtime` changes when new block ranges are processed
 - log has recent `claim relayer service pass complete`
 - no repeated `failed to load claim relayer config`
 - no repeated `claim relayer lock pass failed`
 - destination wallet sees expected incoming sweep txids
 
+The timer-backed healthcheck in `ops/claim-relayer/claim-relayer-healthcheck.sh`
+turns the minimum checks into a failing systemd unit. It validates JSON config,
+enabled lock/discovery inventory, wallet-rpc liveness, cursor freshness, and
+recent relayer/registry failure patterns in journald. For one-shot rehearsals,
+set `RELAYER_EXPECT_ACTIVE=0` or `WALLET_RPC_EXPECT_ACTIVE=0` in
+`/etc/atomic-swap/claim-relayer-healthcheck.env` as needed.
+
 ## Remaining Production Gap
 
 Automatic discovery now exists as a factory/registry event path and has both a
 Sepolia dry-run proof and a VM live Monero claim proof against factory
 `0x053cb8c9c1590253eabf1fdd88ac6db975c5c91f4705c531b8c664a66b2e4c31`.
-Before using it for meaningful value, add monitoring for registry scan failures
-and rehearse the same path with production-like operator handoff.
+Before using it for meaningful value, route
+`monero-claim-relayer-healthcheck.service` failures into paging/alerting and
+rehearse the same path with production-like operator handoff.

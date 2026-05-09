@@ -427,6 +427,17 @@ Operations artifacts:
 - `docs/RELAYER_OPERATIONS.md` now documents install shape, dry-run-first
   startup, cursor backup/restore rules, stuck wallet-rpc triage, and health
   checks.
+- `ops/claim-relayer/claim-relayer-healthcheck.sh` plus
+  `monero-claim-relayer-healthcheck.{service,timer}` add a VM-side monitoring
+  hook for config parse failures, missing enabled inventory/discovery,
+  wallet-rpc liveness, stale cursors, and recent relayer/registry failure
+  patterns in journald.
+  - validation: `bash -n` passed locally; VM run with one-shot rehearsal
+    services marked inactive passed with `enabled_discoveries=1`,
+    `cursor_count=3`, recent journal clean, and fresh cursor age under the
+    configured threshold.
+  - `systemd-analyze verify` passed in the VM after installing the script at
+    `/opt/monero-starknet-atomic-swap/ops/claim-relayer/claim-relayer-healthcheck.sh`.
 - `docs/SETUP.md` now marks Linux VM Monero as the required funded-swap path and
   demotes Docker/local Monero to legacy development use.
 
@@ -435,8 +446,8 @@ Operations artifacts:
 - Automatic lock discovery: factory/registry contract code, registry event
   decoding, relayer discovery config, focused tests, Sepolia factory deployment,
   factory-created lock deployment, discovery dry-run, and VM live Monero claim
-  proof are done. Remaining production work is monitoring/alerting for registry
-  scan failures and operational runbook hardening.
+  proof are done. Remaining production work is routing healthcheck failures into
+  paging/alerting and production-like operator handoff drills.
 - Starknet test-token finalization: follow-up heartbeat is scheduled to call
   `claim_tokens` for the remaining revealed Sepolia STRK locks after their
   `claimable_after` times.

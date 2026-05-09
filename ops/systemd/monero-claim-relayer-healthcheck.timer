@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Starknet-to-Monero claim relayer healthcheck
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=30s
+Unit=monero-claim-relayer-healthcheck.service
+
+[Install]
+WantedBy=timers.target

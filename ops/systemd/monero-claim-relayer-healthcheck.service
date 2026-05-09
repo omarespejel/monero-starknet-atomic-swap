@@ -1,0 +1,14 @@
+[Unit]
+Description=Healthcheck for Starknet-to-Monero claim relayer
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/atomic-swap/claim-relayer-healthcheck.env
+ExecStart=/opt/monero-starknet-atomic-swap/ops/claim-relayer/claim-relayer-healthcheck.sh
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadOnlyPaths=/etc/atomic-swap /var/lib/atomic-swap /var/log/atomic-swap
