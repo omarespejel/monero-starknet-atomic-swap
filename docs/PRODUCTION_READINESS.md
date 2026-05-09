@@ -435,6 +435,17 @@ Operations artifacts:
 - `docs/OPERATOR_HANDOFF.md` defines the production-like handoff packet,
   receiver verification, dry-run-first takeover, live claim criteria, Starknet
   token claim closeout, and incident notes.
+- `ops/claim-relayer/claim-relayer-handoff-packet.py` generates a redacted JSON
+  handoff packet from the VM config, cursor files, systemd state, and deployed
+  git commit. It reports partial-key environment variable names only, never
+  partial spend key values or webhook secrets. If the installed VM tree is not a
+  git checkout, the packet can include installed binary checksums with
+  `--artifact`.
+  - VM validation against `/etc/atomic-swap/claim-relayer.config.json` succeeded:
+    the Alchemy RPC key was redacted to `<redacted>`, warnings contained only
+    `repo_root did not resolve to a git checkout; verify artifact checksums`,
+    and `claim_relayer_service` was checksummed at
+    `0a3d5949aec3819bb7409d138fdef325849ad11f7e5de4ed93557a55b921315f`.
 - `ops/claim-relayer/claim-relayer-healthcheck.sh` plus
   `monero-claim-relayer-healthcheck.{service,timer}` add a VM-side monitoring
   hook for config parse failures, missing enabled inventory/discovery,
@@ -476,7 +487,8 @@ Operations artifacts:
   decoding, relayer discovery config, focused tests, Sepolia factory deployment,
   factory-created lock deployment, discovery dry-run, and VM live Monero claim
   proof are done. Remaining production work is configuring the real alert
-  webhook/paging destination and running a second-operator handoff drill.
+  webhook/paging destination and running a second-operator handoff drill with
+  the redacted packet.
 - Starknet test-token finalization: the fresh live-mode STRK lock has been
   claimed and verified on Sepolia; a follow-up heartbeat is scheduled for the
   remaining factory-created Sepolia STRK lock after its `claimable_after` time.

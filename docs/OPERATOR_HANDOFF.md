@@ -25,11 +25,33 @@ Do not send private keys, partial spend keys, wallet files, or webhook secrets i
 chat. The receiving operator should read those from the VM-local root-owned env
 files.
 
+Generate the redacted packet from the VM checkout:
+
+```bash
+/opt/monero-starknet-atomic-swap/ops/claim-relayer/claim-relayer-handoff-packet.py \
+  --config /etc/atomic-swap/claim-relayer.config.json \
+  --repo-root /path/to/monero-starknet-atomic-swap \
+  --artifact /opt/monero-starknet-atomic-swap/rust/target/release/claim_relayer_service \
+  --output /tmp/claim-relayer-handoff.json
+```
+
+The packet includes the deployed git commit, sanitized config, cursor file
+metadata, systemd status, and operator checks. It intentionally prints only
+partial-key environment variable names, not their values.
+If `/opt/monero-starknet-atomic-swap` is an installed copy instead of a git
+checkout, pass the actual checkout path as `--repo-root` and record the installed
+binary checksum with `--artifact`.
+
 ## Receiver Verification
 
 On the VM:
 
 ```bash
+python3 -m json.tool /tmp/claim-relayer-handoff.json >/dev/null
+python3 - <<'PY'
+import json
+print(json.load(open("/tmp/claim-relayer-handoff.json"))["warnings"])
+PY
 sudo systemctl status monero-claim-wallet-rpc.service
 sudo systemctl status monero-claim-relayer.service
 sudo systemctl status monero-claim-relayer-healthcheck.service
