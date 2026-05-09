@@ -205,7 +205,10 @@ set `RELAYER_EXPECT_ACTIVE=0` or `WALLET_RPC_EXPECT_ACTIVE=0` in
 `monero-claim-relayer-healthcheck.service` has `OnFailure=` wired to
 `monero-claim-relayer-alert@.service`. Set `RELAYER_ALERT_WEBHOOK_URL` in
 `/etc/atomic-swap/claim-relayer-healthcheck.env` to send failures to the
-operator alerting endpoint; leave it unset for local rehearsals.
+operator alerting endpoint. For local rehearsals without a webhook, set
+`RELAYER_ALERT_FILE=/var/log/atomic-swap/claim-relayer-alerts.jsonl` and invoke
+`claim-relayer-alert.sh <failed-unit>`; the script appends the exact JSON
+payload without sending it over the network.
 
 ## Remaining Production Gap
 

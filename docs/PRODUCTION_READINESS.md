@@ -477,6 +477,12 @@ Operations artifacts:
   wallet-rpc liveness, stale cursors, and recent relayer/registry failure
   patterns in journald. `monero-claim-relayer-alert@.service` is wired through
   `OnFailure=` and posts to `RELAYER_ALERT_WEBHOOK_URL` when configured.
+  `RELAYER_ALERT_FILE` can be used as a local JSONL sink for alert-payload
+  rehearsals before a real webhook is configured.
+  - alert payload validation passed locally and inside the Monero VM using
+    `RELAYER_ALERT_FILE`; the VM payload captured
+    `relayer=success/inactive/dead` and
+    `wallet_rpc=success/inactive/dead` without sending network traffic.
   - validation: `bash -n` passed locally; VM run with one-shot rehearsal
     services marked inactive passed with `enabled_discoveries=1`,
     `cursor_count=3`, recent journal clean, and fresh cursor age under the

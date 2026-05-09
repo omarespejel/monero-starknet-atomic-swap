@@ -3,12 +3,13 @@ set -euo pipefail
 
 FAILED_UNIT="${1:-unknown-unit}"
 RELAYER_ALERT_WEBHOOK_URL="${RELAYER_ALERT_WEBHOOK_URL:-}"
+RELAYER_ALERT_FILE="${RELAYER_ALERT_FILE:-}"
 RELAYER_ALERT_ENVIRONMENT="${RELAYER_ALERT_ENVIRONMENT:-unknown}"
 RELAYER_SERVICE="${RELAYER_SERVICE:-monero-claim-relayer.service}"
 WALLET_RPC_SERVICE="${WALLET_RPC_SERVICE:-monero-claim-wallet-rpc.service}"
 
-if [ -z "$RELAYER_ALERT_WEBHOOK_URL" ]; then
-  printf 'RELAYER_ALERT_WEBHOOK_URL is unset; alert for %s not sent\n' "$FAILED_UNIT" >&2
+if [ -z "$RELAYER_ALERT_WEBHOOK_URL" ] && [ -z "$RELAYER_ALERT_FILE" ]; then
+  printf 'RELAYER_ALERT_WEBHOOK_URL and RELAYER_ALERT_FILE are unset; alert for %s not sent\n' "$FAILED_UNIT" >&2
   exit 0
 fi
 
@@ -32,9 +33,17 @@ print(json.dumps({"text": text}))
 PY
 )"
 
-curl -fsS --max-time 10 \
-  -H 'Content-Type: application/json' \
-  --data-binary "$payload" \
-  "$RELAYER_ALERT_WEBHOOK_URL" >/dev/null
+if [ -n "$RELAYER_ALERT_FILE" ]; then
+  umask 077
+  printf '%s\n' "$payload" >> "$RELAYER_ALERT_FILE"
+  printf 'Wrote relayer alert for %s to %s\n' "$FAILED_UNIT" "$RELAYER_ALERT_FILE"
+fi
 
-printf 'Sent relayer alert for %s\n' "$FAILED_UNIT"
+if [ -n "$RELAYER_ALERT_WEBHOOK_URL" ]; then
+  curl -fsS --max-time 10 \
+    -H 'Content-Type: application/json' \
+    --data-binary "$payload" \
+    "$RELAYER_ALERT_WEBHOOK_URL" >/dev/null
+
+  printf 'Sent relayer alert for %s\n' "$FAILED_UNIT"
+fi
