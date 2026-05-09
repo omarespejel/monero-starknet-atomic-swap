@@ -1,7 +1,8 @@
 /// # Deployment Helpers with Test Vectors
 ///
 /// This module provides deployment helpers that use real DLEQ proof data from test vectors.
-/// All tests should use these helpers instead of placeholder data.
+/// All successful-deployment tests should use these helpers instead of invalid
+/// rejection-test data.
 
 use atomic_lock::IAtomicLockDispatcher;
 use core::array::ArrayTrait;

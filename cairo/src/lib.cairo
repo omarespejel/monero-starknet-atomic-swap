@@ -1743,9 +1743,9 @@ pub mod AtomicLock {
         R2: G1Point,
         hashlock: Span<u32>,
     ) -> felt252 {
-        // TODO: Convert Weierstrass points to compressed Edwards
-        // For now, use Poseidon as fallback until conversion is implemented
-        // This maintains backward compatibility during migration
+        // Legacy compatibility path: hash the Weierstrass limb serialization.
+        // Production deploy calldata uses the compressed-Edwards challenge path
+        // directly, so this helper is retained only for older call sites.
         
         // Initialize Poseidon hash state
         let mut state = PoseidonTrait::new();

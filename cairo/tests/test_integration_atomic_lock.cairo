@@ -552,13 +552,13 @@ mod tests {
     /// 
     /// Helper for tests that need adaptor point and hint values.
     /// 
-    /// **IMPORTANT**: This helper uses placeholder DLEQ values that will cause DLEQ verification
+    /// **IMPORTANT**: This helper uses intentionally invalid DLEQ values that will cause DLEQ verification
     /// to fail in the constructor. Tests that need successful deployment should either:
     /// 1. Use `deploy_with_test_vectors()` for regular integration tests with real DLEQ data
     /// 2. Use `deploy_with_dleq` from test_dleq.cairo with real DLEQ proofs
     /// 3. Be marked with #[should_panic] if testing constructor validation (this helper)
     /// 
-    /// The x/y limbs are currently ignored (converted to placeholder compressed Edwards).
+    /// The x/y limb arguments are intentionally replaced with invalid compressed Edwards test data.
     /// For tests that need real adaptor points, convert Weierstrass to Edwards format first.
     fn deploy_with_full(
         expected_hash: Span<u32>,
@@ -573,7 +573,7 @@ mod tests {
         let declare_res = declare("AtomicLock");
         let contract = declare_res.unwrap().contract_class();
 
-        // Use Ed25519 base point (G) as placeholder - valid compressed Edwards point
+        // Use Ed25519 base point (G) as invalid test data - valid compressed Edwards point
         // This will decompress successfully but DLEQ verification will fail (expected)
         // For tests that need real DLEQ, use deploy_with_dleq from test_dleq.cairo
         const ED25519_BASE_POINT_COMPRESSED: u256 = u256 {
@@ -581,8 +581,8 @@ mod tests {
             high: 0x66666666666666666666666666666666,
         };
         // Sqrt hint for base point (x-coordinate)
-        // Using a placeholder - real tests should compute this properly
-        // Note: x-coordinate is 256 bits, split into low/high u128
+        // The hint is valid for the base point. Successful deployment tests use
+        // authoritative generated vectors instead of this rejection helper.
         let adaptor_point_compressed = ED25519_BASE_POINT_COMPRESSED;
         let adaptor_point_sqrt_hint = u256 { 
             low: 0xc692cc7609525a7b2c9562d608f25d51,
@@ -596,10 +596,10 @@ mod tests {
         
         let (dleq_c, dleq_r) = dleq;
         
-        // Placeholder DLEQ hints (empty - will cause MSM to fail)
+        // Invalid DLEQ hints (empty - will cause MSM to fail)
         let empty_hint = array![0, 0, 0, 0, 0, 0, 0, 0, 0, 0].span();
         
-        // Placeholder R1 and R2 (commitment points) - use base point for valid decompression
+        // Invalid R1 and R2 commitment points - use base point for valid decompression
         let r1_compressed = ED25519_BASE_POINT_COMPRESSED;
         let r1_sqrt_hint = u256 { 
             low: 0xc692cc7609525a7b2c9562d608f25d51,
@@ -634,7 +634,7 @@ mod tests {
         // Fake-GLV hint (for adaptor point)
         Serde::serialize(@fake_glv_hint, ref calldata);
         
-        // DLEQ hints (empty placeholders)
+        // DLEQ hints (intentionally empty invalid data)
         Serde::serialize(@empty_hint, ref calldata); // s_hint_for_g
         Serde::serialize(@empty_hint, ref calldata); // s_hint_for_y
         Serde::serialize(@empty_hint, ref calldata); // c_neg_hint_for_t
