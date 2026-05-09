@@ -52,6 +52,30 @@ cd /opt/monero-starknet-atomic-swap/rust
 cargo build --release --bin relay_reveal
 ```
 
+Install `sncast` in the VM for the service user. For the mainnet dust demo we
+matched the host version with Starknet Foundry `0.56.0`:
+
+```bash
+sudo install -d -m 0755 -o atomic-swap -g atomic-swap /home/atomic-swap/.local/bin
+curl -fL \
+  https://github.com/foundry-rs/starknet-foundry/releases/download/v0.56.0/starknet-foundry-v0.56.0-aarch64-unknown-linux-gnu.tar.gz \
+  -o /tmp/starknet-foundry.tar.gz
+sudo tar -xzf /tmp/starknet-foundry.tar.gz -C /home/atomic-swap/.local/bin
+sudo ln -sfn \
+  /home/atomic-swap/.local/bin/starknet-foundry-v0.56.0-aarch64-unknown-linux-gnu/bin/sncast \
+  /home/atomic-swap/.local/bin/sncast
+sudo chown -h atomic-swap:atomic-swap /home/atomic-swap/.local/bin/sncast
+sudo -u atomic-swap env HOME=/home/atomic-swap /home/atomic-swap/.local/bin/sncast --version
+```
+
+Validate the installed systemd units before enabling a swap:
+
+```bash
+sudo systemd-analyze verify \
+  /etc/systemd/system/monero-reveal-relayer@.service \
+  /etc/systemd/system/monero-reveal-relayer-alert@.service
+```
+
 ## Per-Swap Setup
 
 Create the secret file without putting the value in shell history:
@@ -137,3 +161,10 @@ The release JSON must bind `starknet_network=mainnet` and
 `starknet_atomic_lock` to the exact contract passed to the helper. Keep this
 file public and secret-free. Do not bypass the guard with ad hoc edits on the
 VM.
+
+For the mainnet dust demo, keep the staged file as
+`/etc/atomic-swap/reveal-relayer/mainnet-dust-demo.env.pending` until the real
+Monero txid is known. After replacing `MONERO_TXID`, copy it to
+`mainnet-dust-demo.env`, run once with `REVEAL_DRY_RUN=1`, then switch to
+`REVEAL_DRY_RUN=0` only after wallet-rpc confirms the exact payment and enough
+confirmations.

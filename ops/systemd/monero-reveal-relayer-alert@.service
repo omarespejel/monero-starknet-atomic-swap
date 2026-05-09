@@ -8,7 +8,7 @@ Type=oneshot
 EnvironmentFile=-/etc/atomic-swap/claim-relayer-healthcheck.env
 Environment=RELAYER_SERVICE=%i
 Environment=WALLET_RPC_SERVICE=monero-claim-wallet-rpc.service
-Environment=RELAYER_ALERT_SUMMARY_PREFIX=Atomic swap reveal relayer failed
+Environment="RELAYER_ALERT_SUMMARY_PREFIX=Atomic swap reveal relayer failed"
 Environment=RELAYER_ALERT_SOURCE_TAG=monero-reveal-relayer
 Environment=RELAYER_ALERT_COMPONENT=reveal-relayer
 ExecStart=/opt/monero-starknet-atomic-swap/ops/claim-relayer/claim-relayer-alert.sh %i

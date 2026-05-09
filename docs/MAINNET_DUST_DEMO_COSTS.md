@@ -55,6 +55,33 @@ URLs here.
   `get_claimable_after=0`, `get_lock_until=1778435777`, and contract STRK
   balance `40 STRK`.
 
+## VM Reveal Relayer Prep
+
+- Prepared in `monero-stagenet` Lima VM at `2026-05-09T21:21Z`.
+- Synced `/opt/monero-starknet-atomic-swap` from the host checkout.
+- Built Linux release binaries:
+  `rust/target/release/relay_reveal` and
+  `rust/target/release/swap_public_view`.
+- Installed Starknet Foundry `sncast 0.56.0` for the `atomic-swap` user.
+- Installed and verified:
+  `monero-reveal-relayer@.service` and
+  `monero-reveal-relayer-alert@.service`.
+- Copied the Starknet mainnet account file into
+  `/home/atomic-swap/.starknet_accounts/starknet_open_zeppelin_accounts.json`
+  with `0600` permissions.
+- Staged the reveal secret at
+  `/etc/atomic-swap/reveal-relayer/secrets/mainnet-dust-demo.secret` with
+  `0600` permissions.
+- Staged disabled pending env:
+  `/etc/atomic-swap/reveal-relayer/mainnet-dust-demo.env.pending`.
+  This is not an active systemd env file; it must be copied to
+  `mainnet-dust-demo.env` only after replacing `MONERO_TXID` with the real
+  mainnet transaction id.
+- Read-only VM state check confirmed:
+  `is_secret_revealed=false`, `is_unlocked=false`,
+  `get_claimable_after=0`, `get_lock_until=1778435777`, and contract STRK
+  balance `40 STRK`.
+
 ## Current Totals
 
 - Starknet fees spent: `61.31052558313417 STRK`
