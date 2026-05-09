@@ -51,6 +51,7 @@ python3 tools/generate_deploy_calldata.py \
 The latest local validation included:
 
 ```bash
+python3 tools/readiness_preflight.py --output /tmp/atomic-swap-readiness-preflight.json
 cd cairo && snforge test --detailed-resources
 cd rust && cargo test -q --lib
 cd rust && cargo test -q --test dleq_properties
@@ -460,6 +461,9 @@ Operations artifacts:
 - `docs/EXTERNAL_REVIEW_PACKET.md` defines the review scope, explicit
   non-goals, required commands, VM checks, known follow-ups, and review
   questions for an external reviewer.
+- `tools/readiness_preflight.py` runs the fast reviewer gates, captures redacted
+  command outputs into an optional JSON report, and can include the heavier
+  Cairo/Rust suites with `--include-cairo` and `--include-rust`.
 - `ops/claim-relayer/claim-relayer-handoff-packet.py` generates a redacted JSON
   handoff packet from the VM config, cursor files, systemd state, and deployed
   git commit. It reports partial-key environment variable names only, never

@@ -54,6 +54,7 @@ Run these from the repository root unless noted.
 
 ```bash
 git status --short --branch
+python3 tools/readiness_preflight.py --output /tmp/atomic-swap-readiness-preflight.json
 python3 tools/check_secret_hygiene.py
 python3 tools/check_secret_hygiene.py --history --report-only
 git diff --check

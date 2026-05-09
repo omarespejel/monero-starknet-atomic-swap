@@ -128,6 +128,12 @@ current testnet readiness checklist and the remaining blockers before mainnet.
 See [docs/SECRET_ROTATION_RUNBOOK.md](docs/SECRET_ROTATION_RUNBOOK.md) before
 pushing or handing off a branch with historical RPC-provider exposure.
 
+Fast reviewer preflight:
+
+```bash
+python3 tools/readiness_preflight.py --output /tmp/atomic-swap-readiness-preflight.json
+```
+
 ### Run Tests
 
 ```bash
