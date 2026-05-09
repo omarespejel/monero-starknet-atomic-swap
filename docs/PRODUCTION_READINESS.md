@@ -236,6 +236,31 @@ Operations artifacts:
 - Systemd templates were syntax-checked in the Monero VM with
   `systemd-analyze verify --root=...` against a temporary root containing the
   expected binary and env-file paths.
+- VM systemd dry-run install succeeded:
+  - installed release binary:
+    `/opt/monero-starknet-atomic-swap/rust/target/release/claim_relayer_service`
+  - installed units:
+    `monero-claim-relayer.service` and `monero-claim-wallet-rpc.service`
+  - dry-run override:
+    `/etc/systemd/system/monero-claim-relayer.service.d/dry-run.conf`
+  - installed config:
+    `/etc/atomic-swap/claim-relayer.config.json`
+  - `systemd-analyze verify monero-claim-relayer.service monero-claim-wallet-rpc.service`
+    succeeded in the VM after wiring the expected Monero binary path.
+  - `systemctl start monero-claim-relayer.service` ran a one-shot dry-run and
+    exited with `Result=success`, `ExecMainCode=0`, `ExecMainStatus=0`,
+    `ActiveState=inactive`, `SubState=dead`.
+  - journal result:
+    `latest_block=9570818`, `safe_tip=9570817`,
+    `from_block=9560010`, `to_block=9560029`, `events_seen=1`,
+    `reveals_claimed=1`, `events_skipped=0`,
+    `enabled_locks=1`, `succeeded_locks=1`, `failed_locks=0`.
+  - systemd cursor:
+    `/var/lib/atomic-swap/claim-relayer/cursors/sepolia-strk-smoke-2026-05-09.json`
+    persisted `next_block=9560030` and the processed `SecretRevealed` event id,
+    owned by `atomic-swap:atomic-swap` with `0600` permissions.
+  - both installed units remained `disabled`, and only the primary VM wallet RPC
+    on `127.0.0.1:38090` was listening after the dry-run.
 - `docs/RELAYER_OPERATIONS.md` now documents install shape, dry-run-first
   startup, cursor backup/restore rules, stuck wallet-rpc triage, and health
   checks.
@@ -244,10 +269,12 @@ Operations artifacts:
 
 ## Remaining Blockers
 
-- Continuous relayer deployment rehearsal: service code, inventory templates,
-  systemd units, cursor rules, and runbook are checked in. The remaining proof is
-  installing those units in the VM and running a supervised dry-run pass under
-  systemd before enabling live claim mode.
+- Supervised live-mode relayer rehearsal: service code, inventory templates,
+  systemd units, cursor rules, runbook, VM install, and supervised systemd
+  dry-run are done. The remaining proof is a fresh stagenet-funded swap output
+  plus a fresh Starknet reveal, claimed by `monero-claim-relayer.service`
+  without `--dry-run` while `monero-claim-wallet-rpc.service` is supervised by
+  systemd.
 - Automatic lock discovery: current production path is an explicit lock
   inventory. Fully automatic discovery still needs a factory/registry contract
   that emits AtomicLock addresses and off-chain metadata for the matching
