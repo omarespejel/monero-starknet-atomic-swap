@@ -451,6 +451,9 @@ Operations artifacts:
   `test_integration_atomic_lock.cairo`; the active real-vector unlock/MSM test
   `test_msm_check_with_real_data` passes and reports
   `l2_gas: ~18449527`.
+- Placeholder ignored multi-vector DLEQ tests were removed from
+  `test_integration_dleq_multiple.cairo`; additional vectors should be added as
+  real deployment tests when the generation pipeline emits multiple fixtures.
 - `docs/SETUP.md` now marks Linux VM Monero as the required funded-swap path and
   demotes Docker/local Monero to legacy development use.
 
@@ -464,9 +467,8 @@ Operations artifacts:
 - Starknet test-token finalization: follow-up heartbeat is scheduled to call
   `claim_tokens` for the remaining revealed Sepolia STRK locks after their
   `claimable_after` times.
-- Remaining ignored Cairo tests: multi-vector DLEQ expansion,
-  deterministic-address malicious token harness, and one diagnostic constructor
-  flow.
+- Remaining ignored Cairo tests: deterministic-address malicious token harness
+  and one diagnostic constructor flow.
 - External security review: required before any meaningful-value mainnet use.
 
 ## Explicit Non-Goals For This Stage
