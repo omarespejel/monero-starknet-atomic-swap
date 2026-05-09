@@ -59,6 +59,27 @@ pub enum AtomicLockEvent {
     },
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AtomicLockRegistryEvent {
+    AtomicLockRegistered {
+        meta: StarknetEventMeta,
+        lock_address: String,
+        partial_key_id: String,
+        registrar: String,
+        restore_height: u64,
+        monero_network: String,
+        metadata_hash: String,
+    },
+    AtomicLockDeployed {
+        meta: StarknetEventMeta,
+        lock_address: String,
+        deployer: String,
+        atomic_lock_class_hash: String,
+        salt: String,
+        deploy_from_zero: bool,
+    },
+}
+
 impl StarknetClient {
     pub fn new(rpc_url: String) -> Self {
         Self {
@@ -142,6 +163,19 @@ impl StarknetClient {
             .get_events_filtered(contract_address, from_block, to_block, None)
             .await?;
         decode_atomic_lock_events(&raw)
+    }
+
+    /// Get decoded AtomicLockFactory/registry events from a block range.
+    pub async fn get_atomic_lock_registry_events(
+        &self,
+        registry_address: &str,
+        from_block: Option<u64>,
+        to_block: Option<u64>,
+    ) -> Result<Vec<AtomicLockRegistryEvent>> {
+        let raw = self
+            .get_events_filtered(registry_address, from_block, to_block, None)
+            .await?;
+        decode_atomic_lock_registry_events(&raw)
     }
 
     /// Fetch a transaction by hash.
@@ -347,6 +381,59 @@ pub fn decode_atomic_lock_events(raw_events: &[Value]) -> Result<Vec<AtomicLockE
             Err(err) => Some(Err(err)),
         })
         .collect()
+}
+
+pub fn decode_atomic_lock_registry_events(
+    raw_events: &[Value],
+) -> Result<Vec<AtomicLockRegistryEvent>> {
+    raw_events
+        .iter()
+        .filter_map(|event| match decode_atomic_lock_registry_event(event) {
+            Ok(Some(decoded)) => Some(Ok(decoded)),
+            Ok(None) => None,
+            Err(err) => Some(Err(err)),
+        })
+        .collect()
+}
+
+pub fn decode_atomic_lock_registry_event(event: &Value) -> Result<Option<AtomicLockRegistryEvent>> {
+    let keys = event_field_array(event, "keys")?;
+    if keys.is_empty() {
+        return Ok(None);
+    }
+
+    let selector = normalize_hex(&keys[0]);
+    let data = event_field_array(event, "data")?;
+    let meta = event_meta(event)?;
+
+    if selector == starknet_selector("AtomicLockRegistered") {
+        require_len(&keys, 3, "AtomicLockRegistered keys")?;
+        require_len(&data, 4, "AtomicLockRegistered data")?;
+        return Ok(Some(AtomicLockRegistryEvent::AtomicLockRegistered {
+            meta,
+            lock_address: normalize_hex(&keys[1]),
+            partial_key_id: normalize_hex(&keys[2]),
+            registrar: normalize_hex(&data[0]),
+            restore_height: parse_u64_str(&data[1], "AtomicLockRegistered.restore_height")?,
+            monero_network: normalize_hex(&data[2]),
+            metadata_hash: normalize_hex(&data[3]),
+        }));
+    }
+
+    if selector == starknet_selector("AtomicLockDeployed") {
+        require_len(&keys, 3, "AtomicLockDeployed keys")?;
+        require_len(&data, 3, "AtomicLockDeployed data")?;
+        return Ok(Some(AtomicLockRegistryEvent::AtomicLockDeployed {
+            meta,
+            lock_address: normalize_hex(&keys[1]),
+            deployer: normalize_hex(&keys[2]),
+            atomic_lock_class_hash: normalize_hex(&data[0]),
+            salt: normalize_hex(&data[1]),
+            deploy_from_zero: parse_u64_str(&data[2], "AtomicLockDeployed.deploy_from_zero")? != 0,
+        }));
+    }
+
+    Ok(None)
 }
 
 pub fn decode_atomic_lock_event(event: &Value) -> Result<Option<AtomicLockEvent>> {
@@ -701,6 +788,31 @@ fn normalize_hex(input: &str) -> String {
     }
 }
 
+pub fn decode_short_string_felt(input: &str) -> Option<String> {
+    let normalized = normalize_hex(input);
+    let mut hex_value = normalized.trim_start_matches("0x").to_string();
+    if hex_value == "0" {
+        return Some(String::new());
+    }
+    if hex_value.len() % 2 == 1 {
+        hex_value.insert(0, '0');
+    }
+    let bytes = hex::decode(hex_value).ok()?;
+    let first_non_zero = bytes
+        .iter()
+        .position(|byte| *byte != 0)
+        .unwrap_or(bytes.len());
+    let trimmed = &bytes[first_non_zero..];
+    if trimmed
+        .iter()
+        .all(|byte| byte.is_ascii_graphic() || *byte == b' ')
+    {
+        String::from_utf8(trimmed.to_vec()).ok()
+    } else {
+        None
+    }
+}
+
 fn parse_u64_value(value: &Value, label: &str) -> Result<u64> {
     if let Some(number) = value.as_u64() {
         return Ok(number);
@@ -794,6 +906,50 @@ mod tests {
                 reveal_timestamp: 16,
                 claim_timestamp: 32,
             }
+        );
+    }
+
+    #[test]
+    fn decodes_atomic_lock_registered_event() {
+        let raw = json!({
+            "transaction_hash": "0x123",
+            "block_number": "0xe99a7a",
+            "keys": [
+                starknet_selector("AtomicLockRegistered"),
+                "0x000abc",
+                "0x736d6f6b6531"
+            ],
+            "data": [
+                "0x000456",
+                "0x20482b",
+                "0x73746167656e6574",
+                "0xdead"
+            ]
+        });
+
+        let decoded = decode_atomic_lock_registry_event(&raw).unwrap().unwrap();
+        assert_eq!(
+            decoded,
+            AtomicLockRegistryEvent::AtomicLockRegistered {
+                meta: StarknetEventMeta {
+                    transaction_hash: "0x123".to_string(),
+                    block_number: Some(15_309_434),
+                },
+                lock_address: "0xabc".to_string(),
+                partial_key_id: "0x736d6f6b6531".to_string(),
+                registrar: "0x456".to_string(),
+                restore_height: 2_115_627,
+                monero_network: "0x73746167656e6574".to_string(),
+                metadata_hash: "0xdead".to_string(),
+            }
+        );
+        assert_eq!(
+            decode_short_string_felt("0x736d6f6b6531").unwrap(),
+            "smoke1"
+        );
+        assert_eq!(
+            decode_short_string_felt("0x73746167656e6574").unwrap(),
+            "stagenet"
         );
     }
 

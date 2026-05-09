@@ -19,7 +19,7 @@ use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
 use zeroize::{Zeroize, Zeroizing};
 
-use xmr_secret_gen::starknet::StarknetClient;
+use xmr_secret_gen::starknet::{decode_short_string_felt, AtomicLockRegistryEvent, StarknetClient};
 use xmr_secret_gen::swap::relayer::{
     MoneroClaimConfig, MoneroSecretClaimant, MoneroWalletSecretClaimant, RelayerConfig,
     RetryPolicy, SecretReveal, SecretRevealRelayer,
@@ -57,6 +57,9 @@ struct Args {
 struct ServiceConfig {
     #[serde(default)]
     defaults: ServiceDefaults,
+    #[serde(default)]
+    discoveries: Vec<RegistryDiscoveryConfig>,
+    #[serde(default)]
     locks: Vec<LockConfig>,
 }
 
@@ -112,6 +115,21 @@ struct LockConfig {
     retry_attempts: Option<u32>,
     #[serde(default)]
     retry_backoff_secs: Option<u64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct RegistryDiscoveryConfig {
+    id: String,
+    registry_address: String,
+    start_block: u64,
+    #[serde(default)]
+    enabled: Option<bool>,
+    #[serde(default)]
+    starknet_rpc: Option<String>,
+    #[serde(default)]
+    confirmation_depth: Option<u64>,
+    #[serde(default)]
+    partial_key_env_prefix: Option<String>,
 }
 
 #[derive(Debug, Default)]
@@ -190,8 +208,37 @@ fn validate_config(config: &ServiceConfig) -> Result<()> {
         }
     }
 
-    if config.locks.iter().all(|lock| !lock.enabled()) {
-        anyhow::bail!("Relayer config has no enabled locks");
+    for discovery in &config.discoveries {
+        if discovery.id.trim().is_empty() {
+            anyhow::bail!("Registry discovery id cannot be empty");
+        }
+        if discovery.enabled() && discovery.registry_address.trim().is_empty() {
+            anyhow::bail!(
+                "Registry discovery {} missing registry_address",
+                discovery.id
+            );
+        }
+        if !ids.insert(format!("discovery:{}", discovery.id)) {
+            anyhow::bail!(
+                "Duplicate registry discovery id in relayer config: {}",
+                discovery.id
+            );
+        }
+        if discovery.enabled() && discovery.start_block == 0 {
+            warn!(
+                discovery_id = discovery.id,
+                "registry discovery starts at block 0; use the factory deployment block in production"
+            );
+        }
+    }
+
+    let has_enabled_locks = config.locks.iter().any(|lock| lock.enabled());
+    let has_enabled_discovery = config
+        .discoveries
+        .iter()
+        .any(|discovery| discovery.enabled());
+    if !has_enabled_locks && !has_enabled_discovery {
+        anyhow::bail!("Relayer config has no enabled locks or registry discoveries");
     }
 
     Ok(())
@@ -199,7 +246,8 @@ fn validate_config(config: &ServiceConfig) -> Result<()> {
 
 async fn run_service_pass(args: &Args, config: &ServiceConfig) -> Result<ServicePassStats> {
     let mut stats = ServicePassStats::default();
-    for lock in config.locks.iter().filter(|lock| lock.enabled()) {
+    let locks = locks_for_pass(config).await?;
+    for lock in locks.iter().filter(|lock| lock.enabled()) {
         stats.enabled_locks += 1;
         match run_lock_once(args, config, lock).await {
             Ok(()) => stats.succeeded_locks += 1,
@@ -225,6 +273,127 @@ async fn run_service_pass(args: &Args, config: &ServiceConfig) -> Result<Service
         "claim relayer service pass complete"
     );
     Ok(stats)
+}
+
+async fn locks_for_pass(config: &ServiceConfig) -> Result<Vec<LockConfig>> {
+    let mut locks = config.locks.clone();
+    let mut seen_contracts = locks
+        .iter()
+        .map(|lock| canonical_hex(&lock.contract_address))
+        .collect::<BTreeSet<_>>();
+
+    for discovered in discover_registry_locks(config).await? {
+        if seen_contracts.insert(canonical_hex(&discovered.contract_address)) {
+            locks.push(discovered);
+        } else {
+            warn!(
+                contract_address = discovered.contract_address,
+                "registry discovery skipped duplicate AtomicLock already present in inventory"
+            );
+        }
+    }
+
+    Ok(locks)
+}
+
+async fn discover_registry_locks(config: &ServiceConfig) -> Result<Vec<LockConfig>> {
+    let mut locks = Vec::new();
+    for discovery in config
+        .discoveries
+        .iter()
+        .filter(|discovery| discovery.enabled())
+    {
+        let source = StarknetClient::new(lock_string(
+            &discovery.starknet_rpc,
+            &config.defaults.starknet_rpc,
+            DEFAULT_STARKNET_RPC,
+        ));
+        let latest_block = source.get_block_number().await.with_context(|| {
+            format!("Failed to read latest block for discovery {}", discovery.id)
+        })?;
+        let confirmation_depth = discovery
+            .confirmation_depth
+            .or(config.defaults.confirmation_depth)
+            .unwrap_or(6);
+        let Some(safe_tip) = latest_block.checked_sub(confirmation_depth) else {
+            continue;
+        };
+        if safe_tip < discovery.start_block {
+            continue;
+        }
+
+        let events = source
+            .get_atomic_lock_registry_events(
+                &discovery.registry_address,
+                Some(discovery.start_block),
+                Some(safe_tip),
+            )
+            .await
+            .with_context(|| format!("Failed to read registry events for {}", discovery.id))?;
+
+        for event in events {
+            if let Some(lock) = discovered_lock_from_event(discovery, event)? {
+                locks.push(lock);
+            }
+        }
+    }
+    Ok(locks)
+}
+
+fn discovered_lock_from_event(
+    discovery: &RegistryDiscoveryConfig,
+    event: AtomicLockRegistryEvent,
+) -> Result<Option<LockConfig>> {
+    let AtomicLockRegistryEvent::AtomicLockRegistered {
+        meta,
+        lock_address,
+        partial_key_id,
+        restore_height,
+        monero_network,
+        ..
+    } = event
+    else {
+        return Ok(None);
+    };
+
+    let start_block = meta.block_number.ok_or_else(|| {
+        anyhow!(
+            "Registry discovery {} event missing block number for lock {}",
+            discovery.id,
+            lock_address
+        )
+    })?;
+    let partial_key_env_prefix = discovery
+        .partial_key_env_prefix
+        .as_deref()
+        .unwrap_or("RELAYER_PARTIAL_");
+    let partial_spend_key_env = format!(
+        "{}{}",
+        partial_key_env_prefix,
+        partial_key_env_suffix(&partial_key_id)
+    );
+
+    Ok(Some(LockConfig {
+        id: format!("{}:{}", discovery.id, canonical_hex(&lock_address)),
+        contract_address: lock_address,
+        start_block,
+        enabled: Some(true),
+        cursor_path: None,
+        partial_spend_key_env: Some(partial_spend_key_env),
+        restore_height: Some(restore_height),
+        starknet_rpc: discovery.starknet_rpc.clone(),
+        wallet_rpc_url: None,
+        daemon_rpc_url: None,
+        wallet_dir: None,
+        monero_network: decode_short_string_felt(&monero_network)
+            .filter(|value| !value.trim().is_empty()),
+        claim_destination: None,
+        confirmation_depth: discovery.confirmation_depth,
+        reorg_validation_depth: None,
+        max_blocks_per_batch: None,
+        retry_attempts: None,
+        retry_backoff_secs: None,
+    }))
 }
 
 async fn run_lock_once(args: &Args, config: &ServiceConfig, lock: &LockConfig) -> Result<()> {
@@ -427,7 +596,45 @@ fn sanitize_id(input: &str) -> String {
         .collect()
 }
 
+fn partial_key_env_suffix(partial_key_id: &str) -> String {
+    let raw_suffix = decode_short_string_felt(partial_key_id).unwrap_or_else(|| {
+        canonical_hex(partial_key_id)
+            .trim_start_matches("0x")
+            .to_string()
+    });
+    raw_suffix
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() {
+                ch.to_ascii_uppercase()
+            } else {
+                '_'
+            }
+        })
+        .collect()
+}
+
+fn canonical_hex(input: &str) -> String {
+    let trimmed = input.trim();
+    let without_prefix = trimmed
+        .strip_prefix("0x")
+        .or_else(|| trimmed.strip_prefix("0X"))
+        .unwrap_or(trimmed);
+    let normalized = without_prefix.trim_start_matches('0').to_ascii_lowercase();
+    if normalized.is_empty() {
+        "0x0".to_string()
+    } else {
+        format!("0x{}", normalized)
+    }
+}
+
 impl LockConfig {
+    fn enabled(&self) -> bool {
+        self.enabled.unwrap_or(true)
+    }
+}
+
+impl RegistryDiscoveryConfig {
     fn enabled(&self) -> bool {
         self.enabled.unwrap_or(true)
     }
@@ -497,5 +704,63 @@ mod tests {
         assert_eq!(parse_network("stage").unwrap(), Network::Stagenet);
         assert_eq!(parse_network("mainnet").unwrap(), Network::Mainnet);
         assert!(parse_network("sepolia").is_err());
+    }
+
+    #[test]
+    fn validates_discovery_only_config() {
+        let config: ServiceConfig = serde_json::from_str(
+            r#"{
+              "defaults": {
+                "cursor_dir": "/var/lib/atomic-swap/cursors"
+              },
+              "discoveries": [{
+                "id": "sepolia-strk",
+                "registry_address": "0x123",
+                "start_block": 9570000
+              }]
+            }"#,
+        )
+        .unwrap();
+
+        validate_config(&config).unwrap();
+    }
+
+    #[test]
+    fn builds_lock_from_registry_event() {
+        let discovery = RegistryDiscoveryConfig {
+            id: "sepolia-strk".to_string(),
+            registry_address: "0x123".to_string(),
+            start_block: 9570000,
+            enabled: Some(true),
+            starknet_rpc: Some("https://example.invalid/rpc".to_string()),
+            confirmation_depth: Some(3),
+            partial_key_env_prefix: Some("RELAYER_PARTIAL_".to_string()),
+        };
+        let event = AtomicLockRegistryEvent::AtomicLockRegistered {
+            meta: xmr_secret_gen::starknet::StarknetEventMeta {
+                transaction_hash: "0xaaa".to_string(),
+                block_number: Some(9570938),
+            },
+            lock_address: "0x000abc".to_string(),
+            partial_key_id: "0x736d6f6b6531".to_string(),
+            registrar: "0x456".to_string(),
+            restore_height: 2115307,
+            monero_network: "0x73746167656e6574".to_string(),
+            metadata_hash: "0xdead".to_string(),
+        };
+
+        let lock = discovered_lock_from_event(&discovery, event)
+            .unwrap()
+            .unwrap();
+        assert_eq!(lock.id, "sepolia-strk:0xabc");
+        assert_eq!(lock.contract_address, "0x000abc");
+        assert_eq!(lock.start_block, 9570938);
+        assert_eq!(lock.restore_height, Some(2115307));
+        assert_eq!(
+            lock.partial_spend_key_env.as_deref(),
+            Some("RELAYER_PARTIAL_SMOKE1")
+        );
+        assert_eq!(lock.monero_network.as_deref(), Some("stagenet"));
+        assert_eq!(lock.confirmation_depth, Some(3));
     }
 }

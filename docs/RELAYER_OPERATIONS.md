@@ -48,6 +48,22 @@ The config intentionally stores the environment variable name, not the key
 itself. Keep the actual key in `/etc/atomic-swap/claim-relayer.secrets` with
 mode `0600`.
 
+Registry discovery can be enabled with `discoveries[]`. Each discovery watches
+an `AtomicLockFactory` contract for `AtomicLockRegistered` events and builds
+lock entries automatically:
+
+- `registry_address`: deployed factory/registry contract.
+- `start_block`: factory deployment block or the first block to scan.
+- `partial_key_env_prefix`: environment variable prefix. If the event emits
+  `partial_key_id='smoke1'` and the prefix is `RELAYER_PARTIAL_`, the relayer
+  expects `RELAYER_PARTIAL_SMOKE1` in `claim-relayer.secrets`.
+- `restore_height` and `monero_network` come from the registry event.
+- The discovered lock cursor still lives under `defaults.cursor_dir` and is
+  independent per AtomicLock contract.
+
+Manual `locks[]` entries remain supported and override duplicate discovered
+contracts. This is useful for emergency pinning or one-off rehearsals.
+
 ## VM Install Shape
 
 Inside the Monero VM:
@@ -156,6 +172,6 @@ Minimum checks for an on-call rotation:
 
 ## Remaining Production Gap
 
-This service watches an explicit lock inventory. Automatic lock discovery still
-requires a factory or registry contract that emits new AtomicLock addresses plus
-off-chain metadata for the matching Monero partial-key environment.
+Automatic discovery now exists as a factory/registry event path. Before using it
+for meaningful value, deploy the factory on Sepolia, rehearse a factory-deployed
+lock end to end, and add monitoring for registry scan failures.

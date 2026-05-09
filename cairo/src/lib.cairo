@@ -69,6 +69,210 @@ pub trait IERC20<TContractState> {
     ) -> bool;
 }
 
+#[starknet::interface]
+pub trait IAtomicLockFactory<TContractState> {
+    fn get_owner(self: @TContractState) -> starknet::ContractAddress;
+    fn get_atomic_lock_class_hash(self: @TContractState) -> starknet::class_hash::ClassHash;
+    fn set_atomic_lock_class_hash(
+        ref self: TContractState, atomic_lock_class_hash: starknet::class_hash::ClassHash,
+    ) -> bool;
+    fn register_lock(
+        ref self: TContractState,
+        lock_address: starknet::ContractAddress,
+        partial_key_id: felt252,
+        restore_height: u64,
+        monero_network: felt252,
+        metadata_hash: felt252,
+    ) -> bool;
+    fn deploy_lock(
+        ref self: TContractState,
+        salt: felt252,
+        constructor_calldata: Span<felt252>,
+        partial_key_id: felt252,
+        restore_height: u64,
+        monero_network: felt252,
+        metadata_hash: felt252,
+        deploy_from_zero: bool,
+    ) -> starknet::ContractAddress;
+}
+
+#[starknet::contract]
+pub mod AtomicLockFactory {
+    use core::traits::TryInto;
+    use starknet::class_hash::ClassHash;
+    use starknet::contract_address::ContractAddress;
+    use starknet::get_caller_address;
+    use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
+    use starknet::syscalls::deploy_syscall;
+
+    #[storage]
+    struct Storage {
+        owner: ContractAddress,
+        atomic_lock_class_hash: ClassHash,
+    }
+
+    pub mod Errors {
+        pub const NOT_OWNER: felt252 = 'Not factory owner';
+        pub const ZERO_OWNER: felt252 = 'Factory owner is zero';
+        pub const ZERO_LOCK: felt252 = 'Lock address is zero';
+        pub const ZERO_PARTIAL_KEY_ID: felt252 = 'Partial key id is zero';
+        pub const ZERO_MONERO_NETWORK: felt252 = 'Monero network is zero';
+    }
+
+    #[derive(Drop, starknet::Event)]
+    pub struct AtomicLockClassHashUpdated {
+        #[key]
+        pub owner: ContractAddress,
+        pub atomic_lock_class_hash: ClassHash,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    pub struct AtomicLockRegistered {
+        #[key]
+        pub lock_address: ContractAddress,
+        #[key]
+        pub partial_key_id: felt252,
+        pub registrar: ContractAddress,
+        pub restore_height: u64,
+        pub monero_network: felt252,
+        pub metadata_hash: felt252,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    pub struct AtomicLockDeployed {
+        #[key]
+        pub lock_address: ContractAddress,
+        #[key]
+        pub deployer: ContractAddress,
+        pub atomic_lock_class_hash: ClassHash,
+        pub salt: felt252,
+        pub deploy_from_zero: bool,
+    }
+
+    #[event]
+    #[derive(Drop, starknet::Event)]
+    pub enum Event {
+        AtomicLockClassHashUpdated: AtomicLockClassHashUpdated,
+        AtomicLockRegistered: AtomicLockRegistered,
+        AtomicLockDeployed: AtomicLockDeployed,
+    }
+
+    #[constructor]
+    fn constructor(
+        ref self: ContractState,
+        owner: ContractAddress,
+        atomic_lock_class_hash: ClassHash,
+    ) {
+        let zero_address: ContractAddress = 0.try_into().unwrap();
+        assert(owner != zero_address, Errors::ZERO_OWNER);
+        self.owner.write(owner);
+        self.atomic_lock_class_hash.write(atomic_lock_class_hash);
+    }
+
+    #[abi(embed_v0)]
+    impl AtomicLockFactoryImpl of super::IAtomicLockFactory<ContractState> {
+        fn get_owner(self: @ContractState) -> ContractAddress {
+            self.owner.read()
+        }
+
+        fn get_atomic_lock_class_hash(self: @ContractState) -> ClassHash {
+            self.atomic_lock_class_hash.read()
+        }
+
+        fn set_atomic_lock_class_hash(
+            ref self: ContractState, atomic_lock_class_hash: ClassHash,
+        ) -> bool {
+            assert_only_owner(@self);
+            self.atomic_lock_class_hash.write(atomic_lock_class_hash);
+            self.emit(AtomicLockClassHashUpdated {
+                owner: get_caller_address(), atomic_lock_class_hash,
+            });
+            true
+        }
+
+        fn register_lock(
+            ref self: ContractState,
+            lock_address: ContractAddress,
+            partial_key_id: felt252,
+            restore_height: u64,
+            monero_network: felt252,
+            metadata_hash: felt252,
+        ) -> bool {
+            assert_only_owner(@self);
+            emit_registered(
+                ref self,
+                lock_address,
+                partial_key_id,
+                restore_height,
+                monero_network,
+                metadata_hash,
+            );
+            true
+        }
+
+        fn deploy_lock(
+            ref self: ContractState,
+            salt: felt252,
+            constructor_calldata: Span<felt252>,
+            partial_key_id: felt252,
+            restore_height: u64,
+            monero_network: felt252,
+            metadata_hash: felt252,
+            deploy_from_zero: bool,
+        ) -> ContractAddress {
+            assert_only_owner(@self);
+            let class_hash = self.atomic_lock_class_hash.read();
+            let (lock_address, _) = deploy_syscall(
+                class_hash, salt, constructor_calldata, deploy_from_zero,
+            )
+                .expect('AtomicLock deploy failed');
+
+            self.emit(AtomicLockDeployed {
+                lock_address,
+                deployer: get_caller_address(),
+                atomic_lock_class_hash: class_hash,
+                salt,
+                deploy_from_zero,
+            });
+            emit_registered(
+                ref self,
+                lock_address,
+                partial_key_id,
+                restore_height,
+                monero_network,
+                metadata_hash,
+            );
+            lock_address
+        }
+    }
+
+    fn assert_only_owner(self: @ContractState) {
+        assert(get_caller_address() == self.owner.read(), Errors::NOT_OWNER);
+    }
+
+    fn emit_registered(
+        ref self: ContractState,
+        lock_address: ContractAddress,
+        partial_key_id: felt252,
+        restore_height: u64,
+        monero_network: felt252,
+        metadata_hash: felt252,
+    ) {
+        let zero_address: ContractAddress = 0.try_into().unwrap();
+        assert(lock_address != zero_address, Errors::ZERO_LOCK);
+        assert(partial_key_id != 0, Errors::ZERO_PARTIAL_KEY_ID);
+        assert(monero_network != 0, Errors::ZERO_MONERO_NETWORK);
+        self.emit(AtomicLockRegistered {
+            lock_address,
+            partial_key_id,
+            registrar: get_caller_address(),
+            restore_height,
+            monero_network,
+            metadata_hash,
+        });
+    }
+}
+
 // Module declarations for production-grade cryptographic utilities
 // NOTE: BLAKE2s is kept for future enablement once libfunc is available.
 // For now, Poseidon is the active deployable path.

@@ -14,6 +14,15 @@
     "retry_backoff_secs": 5,
     "poll_interval_secs": 30
   },
+  "discoveries": [
+    {
+      "id": "sepolia-strk-registry",
+      "enabled": false,
+      "registry_address": "0xREPLACE_WITH_ATOMIC_LOCK_FACTORY",
+      "start_block": 0,
+      "partial_key_env_prefix": "RELAYER_PARTIAL_"
+    }
+  ],
   "locks": [
     {
       "id": "sepolia-strk-smoke-2026-05-09",

@@ -233,6 +233,15 @@ Operations artifacts:
   `ops/systemd/monero-claim-relayer.service` provide VM-side service templates
   with restart policy, private temp dirs, strict system protection, and
   write-path restrictions for wallets, cursors, and logs.
+- `AtomicLockFactory` adds the on-chain discovery surface that was missing from
+  the explicit inventory model. Owner-only `register_lock` and `deploy_lock`
+  emit `AtomicLockRegistered` with the AtomicLock address, partial-key id,
+  Monero restore height, Monero network, and metadata hash.
+- `claim_relayer_service` can now enable `discoveries[]` in
+  `claim-relayer.config.json`. It scans finalized-enough factory events,
+  derives per-lock entries, maps `partial_key_id` to deterministic secret env
+  vars such as `RELAYER_PARTIAL_SMOKE1`, and still writes independent per-lock
+  cursors.
 - Systemd templates were syntax-checked in the Monero VM with
   `systemd-analyze verify --root=...` against a temporary root containing the
   expected binary and env-file paths.
@@ -339,10 +348,10 @@ Operations artifacts:
 
 ## Remaining Blockers
 
-- Automatic lock discovery: current production path is an explicit lock
-  inventory. Fully automatic discovery still needs a factory/registry contract
-  that emits AtomicLock addresses and off-chain metadata for the matching
-  partial-key environment.
+- Automatic lock discovery: factory/registry contract code, registry event
+  decoding, relayer discovery config, and focused tests are done. Remaining
+  proof is a Sepolia factory deployment plus an end-to-end factory-discovered
+  lock claim inside the Monero VM.
 - Monero transaction finalization: `rust/src/monero_full.rs` no longer returns
   placeholder transaction hex. Real spends must go through wallet-rpc/Monero
   transaction tooling.
