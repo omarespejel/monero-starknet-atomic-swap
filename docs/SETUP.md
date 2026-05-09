@@ -1,28 +1,25 @@
 # Setup Guide
 
-Complete setup guide for Monero wallet-rpc, Starknet devnet, and Docker deployment.
+Complete setup guide for Monero wallet-rpc, Starknet devnet, and Docker
+deployment.
+
+Security note: current swap rehearsals use a Linux VM for all Monero processes.
+Do not run `monerod`, `monero-wallet-rpc`, or generated claim wallets directly
+on macOS. Use the Lima VM runbook in `docs/RELAYER_OPERATIONS.md` for
+claim-side relayer operations.
 
 ## Quick Start
 
-### Monero Wallet RPC (Docker - Recommended)
+### Monero Wallet RPC (Linux VM)
 
 ```bash
-# Start wallet-rpc container
-docker-compose up -d monero-wallet-rpc
+# Show VM status and wallet-rpc process
+./scripts/monero_vm_tunnel.sh status
 
-# Check status
-docker ps | grep monero-wallet-rpc
-
-# View logs
-docker logs -f monero-wallet-rpc
-
-# Test connection
-curl -X POST http://localhost:38088/json_rpc \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":"0","method":"get_version"}'
+# Query the primary wallet from inside the VM
+./scripts/monero_vm_tunnel.sh vm-address
+./scripts/monero_vm_tunnel.sh vm-balance
 ```
-
-**Published Image**: [`espejelomar/monero-wallet-rpc`](https://hub.docker.com/r/espejelomar/monero-wallet-rpc) on Docker Hub
 
 ### Starknet Devnet
 
@@ -50,81 +47,48 @@ curl -X POST http://localhost:38088/json_rpc \
 
 ## Monero Wallet RPC Setup
 
-### Option 1: Docker (Recommended)
+### Option 1: Linux VM (Required For Swap Ops)
 
-**Benefits**: Avoids antivirus false positives, easy setup, consistent environment.
+Use Lima or a dedicated Linux host. The active local VM name is
+`monero-stagenet`; scripts default to that VM.
 
 ```bash
-# Start wallet-rpc container
-docker-compose up -d monero-wallet-rpc
-
-# Check status
-docker ps | grep monero-wallet-rpc
-
-# View logs
-docker logs -f monero-wallet-rpc
-
-# Test connection
-curl -X POST http://localhost:38088/json_rpc \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":"0","method":"get_version"}'
+./scripts/monero_vm_tunnel.sh status
+./scripts/monero_vm_tunnel.sh vm-height
+./scripts/monero_vm_tunnel.sh vm-address
+./scripts/monero_vm_tunnel.sh vm-balance
 ```
 
-**Why Docker?**
-- Antivirus isolation (Monero binaries trigger false positives)
-- Easy setup (one command)
-- Consistency across environments
-- Portability (Mac, Linux, Windows)
+For the claim-side service, use:
 
-### Option 2: Local Binary
-
-**Via Homebrew (Easiest)**:
 ```bash
-brew install monero
-
-# Start wallet-rpc
-monero-wallet-rpc \
-  --stagenet \
-  --daemon-address stagenet.xmr-tw.org:38081 \
-  --rpc-bind-port 38088 \
-  --rpc-bind-ip 127.0.0.1 \
-  --disable-rpc-login \
-  --wallet-dir ./wallets \
-  --log-level 2
+cd rust
+cargo build --release --bin claim_relayer_service
+target/release/claim_relayer_service \
+  --config /etc/atomic-swap/claim-relayer.config.json \
+  --dry-run \
+  --once
 ```
 
-**Manual Download**:
-- **Mac (Apple Silicon)**: Download `monero-mac-arm8-v0.18.3.1.tar.bz2` from [getmonero.org](https://www.getmonero.org/downloads/)
-- **Mac (Intel)**: Download `monero-mac-x64-v0.18.3.1.tar.bz2`
-- Extract and run `monero-wallet-rpc` with flags above
+See `docs/RELAYER_OPERATIONS.md` for systemd service templates, cursor rules,
+and stuck wallet-rpc triage.
+
+### Option 2: Docker (Legacy Dev Only)
+
+Docker remains useful for isolated development experiments, but it is not the
+current path for funded stagenet/mainnet swap operations.
 
 ### Verification
 
 ```bash
-# Test connection
-curl -X POST http://localhost:38088/json_rpc \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":"0","method":"get_version"}'
-
-# Create test wallet
-curl -X POST http://localhost:38088/json_rpc \
-  -H "Content-Type: application/json" \
-  -d '{
-    "jsonrpc":"2.0",
-    "id":"0",
-    "method":"create_wallet",
-    "params":{"filename":"test_wallet","password":"test123","language":"English"}
-  }'
-
-# Get wallet address
-curl -X POST http://localhost:38088/json_rpc \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":"0","method":"get_address"}'
+./scripts/monero_vm_tunnel.sh vm-height
+./scripts/monero_vm_tunnel.sh vm-address
+./scripts/monero_vm_tunnel.sh vm-balance
 ```
 
 ### Funding Your Wallet (Stagenet)
 
-1. Get your stagenet address from `get_address` call
+1. Get your stagenet address from `./scripts/monero_vm_tunnel.sh vm-address`
 2. Visit: https://stagenet-faucet.xmr-tw.org/
 3. Enter address and request test XMR
 4. Wait ~10 minutes for confirmation
@@ -299,15 +263,16 @@ assert!(tx_info.confirmations >= 10);
 
 **Port Already in Use**:
 ```bash
-lsof -i :38088
-# Kill existing process or use different port: --rpc-bind-port 38089
+limactl shell monero-stagenet -- sh -lc "ss -ltnp | grep 3809 || true"
 ```
 
 **Can't Connect to Daemon**:
-- Try alternative: `--daemon-address monero-stagenet.exan.tech:38081`
-- Check daemon status: `curl http://stagenet.xmr-tw.org:38081/json_rpc -d '{"jsonrpc":"2.0","id":"0","method":"get_block_count"}'`
+- Check the VM process list: `./scripts/monero_vm_tunnel.sh status`
+- Check the primary wallet: `./scripts/monero_vm_tunnel.sh vm-height`
+- Restart only the claim wallet-rpc service if the claim relayer is stuck; do
+  not stop the funded primary wallet-rpc unless you are explicitly rotating it.
 
-**Container Not Starting**:
+**Legacy Container Not Starting**:
 ```bash
 docker logs monero-wallet-rpc
 docker-compose restart

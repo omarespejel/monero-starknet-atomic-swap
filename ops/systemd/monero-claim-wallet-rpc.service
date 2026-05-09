@@ -1,0 +1,23 @@
+[Unit]
+Description=Monero claim wallet-rpc for atomic-swap relayer
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=atomic-swap
+Group=atomic-swap
+EnvironmentFile=/etc/atomic-swap/monero-claim-wallet-rpc.env
+ExecStart=/home/atomic-swap/monero-bin/monero-wallet-rpc --stagenet --wallet-dir ${MONERO_WALLET_DIR} --daemon-address ${MONERO_DAEMON_ADDRESS} --trusted-daemon --rpc-bind-ip 127.0.0.1 --rpc-bind-port ${MONERO_CLAIM_WALLET_RPC_PORT} --disable-rpc-login --log-file ${MONERO_CLAIM_WALLET_RPC_LOG} --non-interactive
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/atomic-swap/monero-wallets /var/log/atomic-swap
+
+[Install]
+WantedBy=multi-user.target

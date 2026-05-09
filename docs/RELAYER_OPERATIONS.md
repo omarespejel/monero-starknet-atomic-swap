@@ -1,0 +1,149 @@
+# Claim Relayer Operations
+
+This runbook is for the claim-side relayer that watches Starknet
+`SecretRevealed` events and sweeps matching Monero outputs through
+`monero-wallet-rpc`.
+
+Do not run Monero daemons, wallet-rpc, or generated claim wallets on macOS.
+Run this flow inside the Lima Monero VM or another dedicated Linux host.
+
+## Binaries
+
+- `claim_revealed_secrets`: one AtomicLock contract, useful for rehearsals and
+  emergency one-off retries.
+- `claim_relayer_service`: long-running multi-lock service. It reloads a JSON
+  inventory, runs each enabled lock with an independent cursor, and keeps later
+  locks moving if one lock hits an RPC error.
+- `derive_claim_address`: stagenet rehearsal helper for deriving the Monero
+  address controlled by a partial spend key plus a public Starknet secret.
+
+## Files
+
+- Config inventory:
+  `/etc/atomic-swap/claim-relayer.config.json`
+- Non-secret environment:
+  `/etc/atomic-swap/claim-relayer.env`
+- Secret partial-key environment:
+  `/etc/atomic-swap/claim-relayer.secrets`
+- Cursors:
+  `/var/lib/atomic-swap/claim-relayer/cursors/*.json`
+- Claim wallet-rpc log:
+  `/var/log/atomic-swap/claim-wallet-rpc.log`
+
+Use the templates in `ops/claim-relayer/` and `ops/systemd/`.
+
+## Config Model
+
+Each enabled lock must have:
+
+- `id`: stable human-readable lock id. This becomes the cursor filename when
+  `cursor_path` is omitted.
+- `contract_address`: AtomicLock contract address.
+- `start_block`: deployment block, not block `0`.
+- `restore_height`: Monero height before the swap output was funded.
+- `partial_spend_key_env`: name of the environment variable holding that lock's
+  32-byte partial spend key share.
+
+The config intentionally stores the environment variable name, not the key
+itself. Keep the actual key in `/etc/atomic-swap/claim-relayer.secrets` with
+mode `0600`.
+
+## VM Install Shape
+
+Inside the Monero VM:
+
+```bash
+id atomic-swap || sudo useradd --system --create-home --shell /usr/sbin/nologin atomic-swap
+sudo install -d -o atomic-swap -g atomic-swap /etc/atomic-swap
+sudo install -d -o atomic-swap -g atomic-swap /var/lib/atomic-swap/claim-relayer/cursors
+sudo install -d -o atomic-swap -g atomic-swap /var/log/atomic-swap
+
+sudo cp ops/claim-relayer/claim-relayer.config.example.json \
+  /etc/atomic-swap/claim-relayer.config.json
+sudo cp ops/claim-relayer/claim-relayer.env.example \
+  /etc/atomic-swap/claim-relayer.env
+sudo cp ops/claim-relayer/claim-relayer.secrets.example \
+  /etc/atomic-swap/claim-relayer.secrets
+sudo chmod 600 /etc/atomic-swap/claim-relayer.secrets
+
+sudo cp ops/systemd/monero-claim-wallet-rpc.service /etc/systemd/system/
+sudo cp ops/systemd/monero-claim-wallet-rpc.env.example \
+  /etc/atomic-swap/monero-claim-wallet-rpc.env
+sudo cp ops/systemd/monero-claim-relayer.service /etc/systemd/system/
+sudo systemctl daemon-reload
+```
+
+Build from the checked-out repo inside the VM:
+
+```bash
+cd /opt/monero-starknet-atomic-swap/rust
+cargo build --release --bin claim_relayer_service --bin claim_revealed_secrets
+```
+
+Dry-run before enabling live claims:
+
+```bash
+target/release/claim_relayer_service \
+  --config /etc/atomic-swap/claim-relayer.config.json \
+  --dry-run \
+  --once
+```
+
+Start the service:
+
+```bash
+sudo systemctl enable --now monero-claim-wallet-rpc.service
+sudo systemctl enable --now monero-claim-relayer.service
+sudo systemctl status monero-claim-relayer.service
+journalctl -u monero-claim-relayer.service -f
+```
+
+## Cursor Rules
+
+- Back up cursor files before deleting or editing them.
+- A cursor advances only after a Monero claim succeeds.
+- If wallet-rpc fails before sweep submission, retry with the same cursor.
+- If wallet-rpc returns a sweep txid but the process dies before cursor write,
+  verify the txid in the destination wallet before retrying. A second retry can
+  safely fail with no spendable funds, but operators should not blindly delete
+  cursors after a submitted sweep.
+- Retained block hashes are used for short Starknet reorg detection. If a reorg
+  changes a retained block, the relayer rewinds to the changed block and drops
+  processed event ids at or after that block.
+
+## Stuck Wallet-RPC Triage
+
+If the claim wallet-rpc stops responding:
+
+```bash
+sudo systemctl restart monero-claim-wallet-rpc.service
+sudo journalctl -u monero-claim-wallet-rpc.service -n 200
+```
+
+Then check for generated temporary wallets:
+
+```bash
+find /home/atomic-swap/monero-wallets -maxdepth 1 -name 'swap_*' -ls
+```
+
+Only remove `swap_*` wallets after confirming no sweep is still in progress.
+The rehearsal showed a slow height-0 refresh could leave a large temporary
+wallet cache; the current code refreshes from `restore_height` before sweeping.
+
+## Health Checks
+
+Minimum checks for an on-call rotation:
+
+- `systemctl is-active monero-claim-relayer.service`
+- `systemctl is-active monero-claim-wallet-rpc.service`
+- cursor file `mtime` changes when new block ranges are processed
+- log has recent `claim relayer service pass complete`
+- no repeated `failed to load claim relayer config`
+- no repeated `claim relayer lock pass failed`
+- destination wallet sees expected incoming sweep txids
+
+## Remaining Production Gap
+
+This service watches an explicit lock inventory. Automatic lock discovery still
+requires a factory or registry contract that emits new AtomicLock addresses plus
+off-chain metadata for the matching Monero partial-key environment.

@@ -1,0 +1,27 @@
+{
+  "defaults": {
+    "starknet_rpc": "https://starknet-sepolia.g.alchemy.com/starknet/version/rpc/v0_10/REPLACE_ME",
+    "wallet_rpc_url": "http://127.0.0.1:38091/json_rpc",
+    "daemon_rpc_url": "http://node2.monerodevs.org:38089/json_rpc",
+    "wallet_dir": "/home/atomic-swap/monero-wallets",
+    "monero_network": "stagenet",
+    "claim_destination": "REPLACE_WITH_STAGENET_RECEIVE_ADDRESS",
+    "cursor_dir": "/var/lib/atomic-swap/claim-relayer/cursors",
+    "confirmation_depth": 6,
+    "reorg_validation_depth": 64,
+    "max_blocks_per_batch": 100,
+    "retry_attempts": 5,
+    "retry_backoff_secs": 5,
+    "poll_interval_secs": 30
+  },
+  "locks": [
+    {
+      "id": "sepolia-strk-smoke-2026-05-09",
+      "enabled": false,
+      "contract_address": "0x056874c6da7e5d485e337769d2267fc6a024a57df85b529d08f453e86b6a40aa",
+      "start_block": 9560010,
+      "restore_height": 2115270,
+      "partial_spend_key_env": "RELAYER_PARTIAL_SEPOLIA_STRK_SMOKE"
+    }
+  ]
+}

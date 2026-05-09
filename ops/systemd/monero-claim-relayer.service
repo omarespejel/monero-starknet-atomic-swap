@@ -1,0 +1,25 @@
+[Unit]
+Description=Starknet-to-Monero atomic-swap claim relayer
+After=network-online.target monero-claim-wallet-rpc.service
+Wants=network-online.target monero-claim-wallet-rpc.service
+
+[Service]
+Type=simple
+User=atomic-swap
+Group=atomic-swap
+WorkingDirectory=/opt/monero-starknet-atomic-swap/rust
+EnvironmentFile=/etc/atomic-swap/claim-relayer.env
+EnvironmentFile=/etc/atomic-swap/claim-relayer.secrets
+ExecStart=/opt/monero-starknet-atomic-swap/rust/target/release/claim_relayer_service --config /etc/atomic-swap/claim-relayer.config.json
+Restart=on-failure
+RestartSec=15
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/atomic-swap /var/log/atomic-swap /home/atomic-swap/monero-wallets
+
+[Install]
+WantedBy=multi-user.target

@@ -57,15 +57,19 @@ cd rust && cargo test -q --test dleq_properties
 cd rust && cargo test -q --test integration_test
 cd rust && cargo test -q --test handle_secret_revealed_test
 cd rust && cargo test -q --lib swap::relayer
+cd rust && cargo test -q --bin claim_relayer_service
 cd rust && cargo check -q --bins
 cd rust && cargo check -q --bin claim_revealed_secrets
+cd rust && cargo check -q --bin claim_relayer_service
 cd rust && cargo check -q --bin derive_claim_address
 cd rust && cargo check -q --features full-integration --bins
+limactl shell monero-stagenet -- bash -lc 'cd ~/atomic-swap-rust && . $HOME/.cargo/env && cargo check -q --bin claim_relayer_service'
 bun build scripts/deploy.ts --outdir /tmp/atomic-deploy-check --target bun
 bun build scripts/ts/src/deploy.ts --outdir /tmp/atomic-ts-deploy-check --target node
 bash -n scripts/deploy_with_sncast.sh
 bash -n scripts/atomic_lock_sncast_ops.sh
 bash -n scripts/monero_vm_tunnel.sh
+python3 -m json.tool ops/claim-relayer/claim-relayer.config.example.json >/tmp/claim-relayer-config-check.json
 git diff --check
 ```
 
@@ -206,12 +210,48 @@ Monero VM check:
     the swap restore height, not height `0`; `refresh_from_height` is now used
     before `sweep_all`.
 
+Operations artifacts:
+
+- `claim_relayer_service` adds a long-running multi-lock service wrapper around
+  the durable relayer. Each lock has its own cursor, restore height, and
+  partial-key environment variable; a failing lock is logged without blocking
+  later enabled locks unless `--fail-fast` is set.
+- VM dry-run of `claim_relayer_service` against the Sepolia smoke lock
+  succeeded with one enabled lock:
+  - event id:
+    `9560016:0x32cbac1724052bf1553d7c34dc978b7049749e251e75d9fc8bff0cad642f02:SecretRevealed`
+  - pass result:
+    `latest_block=9570559`, `safe_tip=9570558`,
+    `from_block=9560010`, `to_block=9560029`, `events_seen=1`,
+    `reveals_claimed=1`, `events_skipped=0`.
+  - service result:
+    `enabled_locks=1`, `succeeded_locks=1`, `failed_locks=0`.
+- `ops/claim-relayer/claim-relayer.config.example.json` is the explicit lock
+  inventory template. It stores environment variable names for partial keys, not
+  the keys themselves.
+- `ops/systemd/monero-claim-wallet-rpc.service` and
+  `ops/systemd/monero-claim-relayer.service` provide VM-side service templates
+  with restart policy, private temp dirs, strict system protection, and
+  write-path restrictions for wallets, cursors, and logs.
+- Systemd templates were syntax-checked in the Monero VM with
+  `systemd-analyze verify --root=...` against a temporary root containing the
+  expected binary and env-file paths.
+- `docs/RELAYER_OPERATIONS.md` now documents install shape, dry-run-first
+  startup, cursor backup/restore rules, stuck wallet-rpc triage, and health
+  checks.
+- `docs/SETUP.md` now marks Linux VM Monero as the required funded-swap path and
+  demotes Docker/local Monero to legacy development use.
+
 ## Remaining Blockers
 
-- Continuous relayer operations: the claim-side one-shot VM rehearsal is done,
-  including a real stagenet sweep. The remaining work is making this a supervised
-  long-running service with alerting, cursor backups, multi-lock discovery, and
-  explicit runbooks for retrying stuck Monero wallet-rpc operations.
+- Continuous relayer deployment rehearsal: service code, inventory templates,
+  systemd units, cursor rules, and runbook are checked in. The remaining proof is
+  installing those units in the VM and running a supervised dry-run pass under
+  systemd before enabling live claim mode.
+- Automatic lock discovery: current production path is an explicit lock
+  inventory. Fully automatic discovery still needs a factory/registry contract
+  that emits AtomicLock addresses and off-chain metadata for the matching
+  partial-key environment.
 - Monero transaction finalization: `rust/src/monero_full.rs` no longer returns
   placeholder transaction hex. Real spends must go through wallet-rpc/Monero
   transaction tooling.

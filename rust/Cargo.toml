@@ -136,6 +136,10 @@ name = "claim_revealed_secrets"
 path = "src/bin/claim_revealed_secrets.rs"
 
 [[bin]]
+name = "claim_relayer_service"
+path = "src/bin/claim_relayer_service.rs"
+
+[[bin]]
 name = "derive_claim_address"
 path = "src/bin/derive_claim_address.rs"
 
