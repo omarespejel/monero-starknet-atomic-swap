@@ -8,8 +8,10 @@ funded testnet rehearsal, and external review.
 
 ## Current Safe Path
 
-- Cairo `AtomicLock` uses two-phase reveal/claim. The legacy
-  `verify_and_unlock` entrypoint is reveal-only and no longer transfers tokens.
+- Cairo `AtomicLock` uses two-phase reveal/claim. Reveals are rejected after
+  `lock_until`, so an unlocker cannot block an expired-lock refund by revealing
+  late. The legacy `verify_and_unlock` entrypoint is reveal-only and no longer
+  transfers tokens.
 - DLEQ proof verification is constructor-enforced and checks the full
   Poseidon challenge plus full u256 response.
 - The second DLEQ generator is domain-separated and no longer `2 * G`.
@@ -53,8 +55,10 @@ python3 tools/generate_deploy_calldata.py \
   `ATOMIC_SWAP_SECRET_HEX`, verifies the wallet-rpc transfer is inbound, large
   enough, sufficiently confirmed, and not future-locked, then delegates the
   signed Starknet reveal to `scripts/atomic_lock_sncast_ops.sh reveal`. It does
-  not accept Starknet private keys on the CLI. The VM operator wrapper and
-  systemd template live under `ops/reveal-relayer/` and
+  not accept Starknet private keys on the CLI. If no `MONERO_TXID` is provided,
+  it scans the per-swap wallet for inbound transfers. It can also wait the
+  grace period and call `claim_tokens()` with the same guarded helper. The VM
+  operator wrapper and systemd template live under `ops/reveal-relayer/` and
   `ops/systemd/monero-reveal-relayer@.service`.
 - Product/API code should use explicit `SwapTerms.direction` values for
   `xmr_to_starknet` and `starknet_to_xmr`; do not infer direction from token
@@ -98,7 +102,9 @@ bun build scripts/ts/src/deploy.ts --outdir /tmp/atomic-ts-deploy-check --target
 bash -n scripts/deploy_with_sncast.sh
 bash -n scripts/atomic_lock_sncast_ops.sh
 bash -n scripts/monero_vm_tunnel.sh
-bash -n ops/reveal-relayer/run-reveal-relayer.sh ops/claim-relayer/claim-relayer-alert.sh
+bash -n ops/monero-wallet-rpc/run-wallet-rpc.sh ops/reveal-relayer/run-reveal-relayer.sh ops/claim-relayer/claim-relayer-alert.sh
+cd cairo && snforge test lock_expiry
+cd cairo && snforge test test_two_phase_unlock
 python3 -m json.tool ops/claim-relayer/claim-relayer.config.example.json >/tmp/claim-relayer-config-check.json
 python3 tools/check_secret_hygiene.py
 python3 tools/check_secret_hygiene.py --history --report-only
@@ -667,10 +673,11 @@ Operations artifacts:
   Remaining production work is having an independent operator repeat/sign off
   the handoff drill with the redacted packet before timer-backed production
   monitoring is enabled.
-- XMR-to-Starknet reveal ops: the wallet-rpc-gated reveal binary, per-swap
-  wrapper, systemd template, and runbook are in place. Remaining production
-  work is a VM dry-run/live rehearsal for a real funded XMR-to-Starknet swap
-  and independent operator signoff.
+- XMR-to-Starknet reveal ops: the wallet-rpc-gated reveal binary, wallet-scan
+  mode, post-reveal claim mode, per-swap wrapper, mainnet/stagenet wallet-rpc
+  template, systemd template, and runbook are in place. Remaining production
+  work is a VM live rehearsal for a real funded XMR-to-Starknet swap and
+  independent operator signoff.
 - Starknet test-token finalization: both live-mode STRK locks have been
   claimed and verified on Sepolia.
 - External security review: required before any meaningful-value mainnet use.
@@ -678,6 +685,7 @@ Operations artifacts:
 ## Explicit Non-Goals For This Stage
 
 - No strkXMR launch.
-- No mainnet deployment.
+- No production mainnet deployment. The existing mainnet work is a dust demo
+  only and must not be treated as the production class release.
 - No bridge custody design.
 - No direct Monero daemon or wallet-rpc process on macOS.

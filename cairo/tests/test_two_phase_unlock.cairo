@@ -272,6 +272,28 @@ mod tests {
 }
 
     #[test]
+    #[should_panic(expected: ('Lock expired',))]
+    fn test_reveal_secret_fails_after_lock_expiry() {
+        let contract = deploy_with_test_vectors();
+        let lock_until = contract.get_lock_until();
+        start_cheat_block_timestamp(contract.contract_address, lock_until + 1);
+
+        let secret = get_test_vector_secret();
+        contract.reveal_secret(secret);
+    }
+
+    #[test]
+    #[should_panic(expected: ('Lock expired',))]
+    fn test_verify_and_unlock_fails_after_lock_expiry() {
+        let contract = deploy_with_test_vectors();
+        let lock_until = contract.get_lock_until();
+        start_cheat_block_timestamp(contract.contract_address, lock_until + 1);
+
+        let secret = get_test_vector_secret();
+        contract.verify_and_unlock(secret);
+    }
+
+    #[test]
     #[should_panic(expected: ('Secret not yet revealed',))]
     fn test_claim_tokens_requires_secret_revealed() {
         // SECURITY: claim_tokens() requires secret_revealed == true

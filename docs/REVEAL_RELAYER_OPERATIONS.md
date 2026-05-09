@@ -157,6 +157,21 @@ Success requires:
   `is_secret_revealed=true`;
 - no reveal secret or ByteArray calldata chunks appear in logs.
 
+If the same relayer account should complete the Starknet side after the grace
+period, set:
+
+```bash
+REVEAL_CLAIM_AFTER_REVEAL=1
+REVEAL_CLAIM_GRACE_SECS=7200
+REVEAL_CLAIM_RETRY_INTERVAL_SECS=30
+REVEAL_CLAIM_TIMEOUT_SECS=1800
+```
+
+The service will reveal, wait for the contract grace period, then call
+`claim_tokens()` through the same guarded `sncast` helper. Leave this disabled
+when the revealer is a user wallet or a privacy helper that should claim
+separately.
+
 ## Alerting
 
 `monero-reveal-relayer@.service` reuses the existing alert script through the

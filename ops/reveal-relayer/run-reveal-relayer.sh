@@ -44,6 +44,10 @@ MONERO_CONFIRMATIONS="${MONERO_CONFIRMATIONS:-10}"
 MONERO_POLL_INTERVAL_SECS="${MONERO_POLL_INTERVAL_SECS:-20}"
 MONERO_REVEAL_TIMEOUT_SECS="${MONERO_REVEAL_TIMEOUT_SECS:-0}"
 REVEAL_DRY_RUN="${REVEAL_DRY_RUN:-0}"
+REVEAL_CLAIM_AFTER_REVEAL="${REVEAL_CLAIM_AFTER_REVEAL:-0}"
+REVEAL_CLAIM_GRACE_SECS="${REVEAL_CLAIM_GRACE_SECS:-7200}"
+REVEAL_CLAIM_RETRY_INTERVAL_SECS="${REVEAL_CLAIM_RETRY_INTERVAL_SECS:-30}"
+REVEAL_CLAIM_TIMEOUT_SECS="${REVEAL_CLAIM_TIMEOUT_SECS:-1800}"
 
 require_env STARKNET_RPC_URL
 require_env SNCAST_ACCOUNT
@@ -55,10 +59,17 @@ check_integer_env EXPECTED_MONERO_AMOUNT_PICONERO
 check_integer_env MONERO_CONFIRMATIONS
 check_integer_env MONERO_POLL_INTERVAL_SECS
 check_integer_env MONERO_REVEAL_TIMEOUT_SECS
+check_integer_env REVEAL_CLAIM_GRACE_SECS
+check_integer_env REVEAL_CLAIM_RETRY_INTERVAL_SECS
+check_integer_env REVEAL_CLAIM_TIMEOUT_SECS
 check_secret_file "$REVEAL_SECRET_FILE"
 
 if [ "$REVEAL_DRY_RUN" != "0" ] && [ "$REVEAL_DRY_RUN" != "1" ]; then
   printf 'REVEAL_DRY_RUN must be 0 or 1\n' >&2
+  exit 2
+fi
+if [ "$REVEAL_CLAIM_AFTER_REVEAL" != "0" ] && [ "$REVEAL_CLAIM_AFTER_REVEAL" != "1" ]; then
+  printf 'REVEAL_CLAIM_AFTER_REVEAL must be 0 or 1\n' >&2
   exit 2
 fi
 
@@ -74,6 +85,9 @@ args=(
   --confirmations "$MONERO_CONFIRMATIONS"
   --poll-interval-secs "$MONERO_POLL_INTERVAL_SECS"
   --timeout-secs "$MONERO_REVEAL_TIMEOUT_SECS"
+  --claim-grace-secs "$REVEAL_CLAIM_GRACE_SECS"
+  --claim-retry-interval-secs "$REVEAL_CLAIM_RETRY_INTERVAL_SECS"
+  --claim-timeout-secs "$REVEAL_CLAIM_TIMEOUT_SECS"
 )
 
 if [ -n "${SNCAST_ACCOUNTS_FILE:-}" ]; then
@@ -88,12 +102,16 @@ fi
 if [ "$REVEAL_DRY_RUN" = "1" ]; then
   args+=(--dry-run)
 fi
+if [ "$REVEAL_CLAIM_AFTER_REVEAL" = "1" ]; then
+  args+=(--claim-after-reveal)
+fi
 
-printf 'Starting reveal relayer for contract=%s monero_txid=%s expected_piconero=%s confirmations=%s dry_run=%s\n' \
+printf 'Starting reveal relayer for contract=%s monero_txid=%s expected_piconero=%s confirmations=%s dry_run=%s claim_after_reveal=%s\n' \
   "$ATOMIC_SWAP_CONTRACT_ADDRESS" \
   "${MONERO_TXID:-<scan-wallet>}" \
   "$EXPECTED_MONERO_AMOUNT_PICONERO" \
   "$MONERO_CONFIRMATIONS" \
-  "$REVEAL_DRY_RUN"
+  "$REVEAL_DRY_RUN" \
+  "$REVEAL_CLAIM_AFTER_REVEAL"
 
 exec "$REVEAL_RELAYER_BIN" "${args[@]}"

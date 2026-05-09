@@ -21,6 +21,7 @@ use zeroize::{Zeroize, Zeroizing};
 use xmr_secret_gen::monero_wallet::types::TransferInfo;
 
 const MAX_CONSECUTIVE_RPC_ERRORS: u32 = 10;
+const DEFAULT_CLAIM_GRACE_SECS: u64 = 7_200;
 
 #[derive(Parser)]
 #[command(name = "relay_reveal")]
@@ -88,6 +89,22 @@ struct Args {
     /// Verify payment/finality but do not invoke sncast.
     #[arg(long)]
     dry_run: bool,
+
+    /// After a successful reveal, wait for the grace period and claim tokens with the same account.
+    #[arg(long)]
+    claim_after_reveal: bool,
+
+    /// Seconds to wait after reveal before the first claim attempt.
+    #[arg(long, default_value_t = DEFAULT_CLAIM_GRACE_SECS)]
+    claim_grace_secs: u64,
+
+    /// Seconds between claim retries after the grace wait.
+    #[arg(long, default_value_t = 30)]
+    claim_retry_interval_secs: u64,
+
+    /// Maximum seconds to keep retrying claim after the grace wait. 0 means try once.
+    #[arg(long, default_value_t = 1_800)]
+    claim_timeout_secs: u64,
 }
 
 #[tokio::main]
@@ -128,7 +145,13 @@ async fn main() -> Result<()> {
 
     let output = reveal_with_sncast(&args, secret.as_str()).await;
     secret.zeroize();
-    output
+    output?;
+
+    if args.claim_after_reveal {
+        claim_after_grace(&args).await?;
+    }
+
+    Ok(())
 }
 
 fn load_secret(secret_file: Option<&PathBuf>) -> Result<Zeroizing<String>> {
@@ -486,6 +509,84 @@ async fn reveal_with_sncast(args: &Args, secret: &str) -> Result<()> {
     if !output.status.success() {
         bail!(
             "sncast reveal helper failed with status {}",
+            output
+                .status
+                .code()
+                .map(|code| code.to_string())
+                .unwrap_or_else(|| "signal".to_string())
+        );
+    }
+
+    Ok(())
+}
+
+async fn claim_after_grace(args: &Args) -> Result<()> {
+    info!(
+        grace_secs = args.claim_grace_secs,
+        retry_interval_secs = args.claim_retry_interval_secs,
+        timeout_secs = args.claim_timeout_secs,
+        "waiting to claim Starknet tokens after reveal"
+    );
+    sleep(Duration::from_secs(args.claim_grace_secs)).await;
+
+    let started = Instant::now();
+    loop {
+        match claim_with_sncast(args).await {
+            Ok(()) => return Ok(()),
+            Err(err) => {
+                if args.claim_timeout_secs == 0
+                    || started.elapsed().as_secs() >= args.claim_timeout_secs
+                {
+                    return Err(err).context("claim after reveal failed");
+                }
+                warn!(
+                    error = %err,
+                    retry_interval_secs = args.claim_retry_interval_secs,
+                    "claim after reveal failed; retrying"
+                );
+                sleep(Duration::from_secs(args.claim_retry_interval_secs)).await;
+            }
+        }
+    }
+}
+
+async fn claim_with_sncast(args: &Args) -> Result<()> {
+    let script_path = resolve_ops_script(&args.atomic_lock_ops_script);
+    let mut command = Command::new(&script_path);
+    command
+        .arg("claim")
+        .arg(&args.contract_address)
+        .env("STARKNET_NETWORK", &args.starknet_network)
+        .env("STARKNET_RPC_URL", &args.starknet_rpc)
+        .env("SNCAST_ACCOUNT", &args.sncast_account)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    if let Some(accounts_file) = args.sncast_accounts_file.as_ref() {
+        command.env("SNCAST_ACCOUNTS_FILE", accounts_file);
+    }
+    if let Some(token) = args.token_address.as_ref() {
+        command.env("ATOMIC_SWAP_TOKEN_ADDRESS", token);
+    }
+
+    let output = command
+        .output()
+        .await
+        .with_context(|| format!("failed to execute {}", script_path.display()))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    if !stdout.trim().is_empty() {
+        info!(output = %stdout.trim(), "sncast claim helper stdout");
+    }
+    if !stderr.trim().is_empty() {
+        warn!(output = %stderr.trim(), "sncast claim helper stderr");
+    }
+
+    if !output.status.success() {
+        bail!(
+            "sncast claim helper failed with status {}",
             output
                 .status
                 .code()

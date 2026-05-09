@@ -579,6 +579,7 @@ pub mod AtomicLock {
         pub const GRACE_PERIOD_NOT_EXPIRED: felt252 = 'Grace period not expired';
         pub const NOT_UNLOCKER: felt252 = 'Not unlocker';
         pub const SECRET_ALREADY_REVEALED: felt252 = 'Secret already revealed';
+        pub const LOCK_EXPIRED: felt252 = 'Lock expired';
         pub const DLEQ_POINT_NOT_ON_CURVE: felt252 = 'DLEQ: point not on curve';
         pub const DLEQ_SMALL_ORDER_POINT: felt252 = 'DLEQ: small order point';
         pub const MSM_LEN_MISMATCH: felt252 = 'MSM len mismatch';
@@ -980,6 +981,11 @@ pub mod AtomicLock {
         // Cannot reveal if already revealed (one-time only)
         assert(!self.secret_revealed.read(), Errors::SECRET_ALREADY_REVEALED);
 
+        // Cannot reveal after timelock expiry. Otherwise a late revealer could
+        // block the depositor refund path after expiry and claim later.
+        let now = get_block_timestamp();
+        assert(now < self.lock_until.read(), Errors::LOCK_EXPIRED);
+
         // Reconstruct adaptor point and MSM hint from storage
         let adaptor_point = storage_adaptor_point(@self);
         
@@ -1082,7 +1088,6 @@ pub mod AtomicLock {
         assert(computed == adaptor_point, 'MSM verification failed');
 
         // Phase 1 complete: Store reveal state (NO token transfer yet)
-        let now = get_block_timestamp();
         let caller = get_caller_address();
         self.secret_revealed.write(true);
         self.reveal_timestamp.write(now);

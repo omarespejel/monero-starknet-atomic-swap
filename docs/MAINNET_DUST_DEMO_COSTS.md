@@ -88,6 +88,15 @@ URLs here.
   public Monero funding address. Refresh result: `received_money=false`.
 - The reveal relayer now supports wallet-scan mode, so the mainnet demo can
   proceed without requiring the sender to provide a Monero txid.
+- Source `AtomicLock` now rejects reveals after `lock_until`. The already
+  deployed mainnet dust lock predates that source fix, so the demo relayer must
+  not be left running past the dust lock expiry. Future production/dust locks
+  should be declared from the fixed class.
+- Live VM service started at `2026-05-09T21:50Z`:
+  `monero-reveal-relayer@mainnet-dust-demo.service`. It is in wallet-scan mode
+  with `REVEAL_CLAIM_AFTER_REVEAL=1`, `REVEAL_DRY_RUN=0`, and a timeout set to
+  stop roughly 10 minutes before the dust lock expiry. Journal currently shows
+  no inbound Monero transfer visible.
 
 ## Current Totals
 
