@@ -46,6 +46,12 @@ python3 tools/generate_deploy_calldata.py \
   `claim_revealed_secrets`. For live Monero claims, run it inside the Monero VM
   or another Linux environment that has local access to the wallet-rpc wallet
   directory; host-side RPC tunneling is only acceptable for dry-runs.
+- Reveal-side XMR-to-Starknet automation should use `relay_reveal` inside the
+  Linux/Monero environment. It reads the reveal secret from a secret file or
+  `ATOMIC_SWAP_SECRET_HEX`, verifies the wallet-rpc transfer is inbound, large
+  enough, sufficiently confirmed, and not future-locked, then delegates the
+  signed Starknet reveal to `scripts/atomic_lock_sncast_ops.sh reveal`. It does
+  not accept Starknet private keys on the CLI.
 - Product/API code should use explicit `SwapTerms.direction` values for
   `xmr_to_starknet` and `starknet_to_xmr`; do not infer direction from token
   symbols, UI labels, or which party happens to run a given relayer.
@@ -74,6 +80,7 @@ cd rust && cargo test -q --test dleq_properties
 cd rust && cargo test -q --test integration_test
 cd rust && cargo test -q --test handle_secret_revealed_test
 cd rust && cargo test -q --lib swap::relayer
+cd rust && cargo test -q --bin relay_reveal
 cd rust && cargo test -q --bin claim_relayer_service
 cd rust && cargo check -q --bins
 cd rust && cargo check -q --bin claim_revealed_secrets
@@ -127,6 +134,11 @@ secret sections because they are Monero wallet-scanning material.
 The taker CLI now validates but does not echo reveal secrets, and it points to
 `scripts/atomic_lock_sncast_ops.sh reveal` instead of raw placeholder invoke
 commands.
+
+The reveal-side `relay_reveal` binary no longer uses disabled Rust Starknet
+signing or Starknet private-key CLI args. It waits on wallet-rpc, validates
+inbound payment amount/confirmations/unlock status, and invokes the same sncast
+reveal helper with redacted captured output.
 
 Sepolia rehearsal:
 

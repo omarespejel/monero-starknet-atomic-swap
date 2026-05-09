@@ -17,6 +17,7 @@ Review these surfaces first:
 - Cairo tests under `cairo/tests/`, especially real-vector DLEQ tests,
   two-phase unlock tests, token-security tests, and factory tests.
 - Rust relayer code in `rust/src/swap/relayer.rs`,
+  `rust/src/bin/relay_reveal.rs`,
   `rust/src/bin/claim_revealed_secrets.rs`, and
   `rust/src/bin/claim_relayer_service.rs`.
 - Starknet event parsing and registry discovery in `rust/src/starknet.rs`.
@@ -69,6 +70,7 @@ cargo test -q --test dleq_properties
 cargo test -q --test integration_test
 cargo test -q --test handle_secret_revealed_test
 cargo test -q --lib swap::relayer
+cargo test -q --bin relay_reveal
 cargo test -q --bin claim_relayer_service
 cargo check -q --bins
 cargo check -q --features full-integration --bins
@@ -102,6 +104,9 @@ For a handoff packet generated inside the VM:
   reentrancy cases covered by deterministic tests?
 - Can registry discovery or cursor rewind behavior duplicate, skip, or
   prematurely advance a Monero claim under RPC errors or Starknet reorgs?
+- Does the reveal-side relayer refuse txid-only evidence, wrong-direction
+  wallet transfers, short payments, insufficient confirmations, and future
+  Monero unlock times before revealing on Starknet?
 - Do generated claim-wallet files, partial spend keys, webhook URLs, and
   Starknet account keys stay out of logs, handoff packets, and tracked files?
 - Does the operator runbook give enough information for a second operator to
