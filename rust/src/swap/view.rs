@@ -9,7 +9,11 @@ use thiserror::Error;
 
 use super::driver::GRACE_PERIOD_SECS;
 use super::state::SwapState;
-use super::terms::{Chain, StarknetReceiveMode, SwapDirection, SwapTerms, SwapTermsError};
+use super::terms::{
+    Chain, StarknetPrivacySettlement, StarknetReceiveMode, SwapDirection, SwapTerms, SwapTermsError,
+};
+
+pub const PRIVACY_HELPER_ENTRYPOINT: &str = "privacy_invoke";
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -77,6 +81,31 @@ pub struct SwapPublicView {
     pub monero_txid: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub starknet_claimable_after: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub starknet_privacy_settlement: Option<StarknetPrivacySettlementView>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum StarknetPrivacySettlementStatus {
+    OpenNotePlanned,
+    HelperBound,
+    Claimable,
+    PrivateNoteFilled,
+    Cancelled,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct StarknetPrivacySettlementView {
+    pub privacy_pool_address: String,
+    pub privacy_helper_address: String,
+    pub open_note_id: String,
+    pub open_note_token: String,
+    pub open_note_amount: String,
+    pub helper_entrypoint: String,
+    pub status: StarknetPrivacySettlementStatus,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub helper_calldata: Option<Vec<String>>,
 }
 
 impl SwapPublicView {
@@ -115,6 +144,7 @@ impl SwapPublicView {
             lock_until: lock_until(state),
             monero_txid: monero_txid(state),
             starknet_claimable_after: starknet_claimable_after(state),
+            starknet_privacy_settlement: starknet_privacy_settlement(terms, state, now),
         })
     }
 }
@@ -272,5 +302,50 @@ fn starknet_claimable_after(state: &SwapState) -> Option<u64> {
             reveal_timestamp, ..
         } => Some(reveal_timestamp + GRACE_PERIOD_SECS),
         _ => None,
+    }
+}
+
+fn starknet_privacy_settlement(
+    terms: &SwapTerms,
+    state: &SwapState,
+    now: Option<u64>,
+) -> Option<StarknetPrivacySettlementView> {
+    let settlement = terms.starknet_privacy_settlement.as_ref()?;
+    Some(StarknetPrivacySettlementView {
+        privacy_pool_address: settlement.privacy_pool_address.clone(),
+        privacy_helper_address: settlement.privacy_helper_address.clone(),
+        open_note_id: settlement.open_note_id.clone(),
+        open_note_token: settlement.open_note_token.clone(),
+        open_note_amount: settlement.open_note_amount.to_string(),
+        helper_entrypoint: PRIVACY_HELPER_ENTRYPOINT.to_string(),
+        status: privacy_settlement_status(state, now),
+        helper_calldata: privacy_helper_calldata(settlement, state),
+    })
+}
+
+fn privacy_helper_calldata(
+    settlement: &StarknetPrivacySettlement,
+    state: &SwapState,
+) -> Option<Vec<String>> {
+    contract_address(state).map(|atomic_lock| vec![atomic_lock, settlement.open_note_id.clone()])
+}
+
+fn privacy_settlement_status(
+    state: &SwapState,
+    now: Option<u64>,
+) -> StarknetPrivacySettlementStatus {
+    match state {
+        SwapState::SecretRevealed {
+            reveal_timestamp, ..
+        } => {
+            if now.is_some_and(|timestamp| timestamp >= reveal_timestamp + GRACE_PERIOD_SECS) {
+                StarknetPrivacySettlementStatus::Claimable
+            } else {
+                StarknetPrivacySettlementStatus::HelperBound
+            }
+        }
+        SwapState::Completed { .. } => StarknetPrivacySettlementStatus::PrivateNoteFilled,
+        SwapState::Refunded { .. } => StarknetPrivacySettlementStatus::Cancelled,
+        _ => StarknetPrivacySettlementStatus::OpenNotePlanned,
     }
 }

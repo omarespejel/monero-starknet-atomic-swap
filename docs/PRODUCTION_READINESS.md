@@ -80,6 +80,13 @@ python3 tools/generate_deploy_calldata.py \
   the secret as the lock unlocker, waits for the normal grace period, claims the
   token, approves the bound privacy contract for the exact balance delta, and
   returns one ABI-compatible `OpenNoteDeposit` from `privacy_invoke`.
+- Private XMR-to-Starknet quotes must carry typed
+  `starknet_privacy_settlement` metadata: privacy pool, helper, open note id,
+  token, and amount. `SwapTerms.validate()` rejects private receive mode without
+  this metadata, token/amount mismatches, or privacy metadata on public/exit
+  flows. The frontend no longer accepts a free-form private-note textarea; it
+  prepares an open-note intent and sends that typed settlement object to the
+  backend.
 
 ## Verified Locally
 

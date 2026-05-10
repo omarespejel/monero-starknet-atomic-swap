@@ -16,8 +16,8 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use xmr_secret_gen::monero::{AliceKeys, BobKeys, SharedOutput};
 use xmr_secret_gen::swap::{
-    MoneroNetwork, StarknetReceiveMode, SwapDirection, SwapTerms, MIN_LOCK_DURATION_SECS,
-    TERMS_DEFAULT_MONERO_CONFIRMATIONS,
+    MoneroNetwork, StarknetPrivacySettlement, StarknetReceiveMode, SwapDirection, SwapTerms,
+    MIN_LOCK_DURATION_SECS, TERMS_DEFAULT_MONERO_CONFIRMATIONS,
 };
 use xmr_secret_gen::try_generate_swap_secret_from_bytes;
 
@@ -67,6 +67,18 @@ struct Args {
     /// Expected Monero amount, in piconero. Required to emit validated swap_terms.
     #[arg(long)]
     expected_monero_amount_piconero: Option<u64>,
+
+    /// Privacy pool contract for xmr_to_starknet + privacy_open_note terms.
+    #[arg(long)]
+    privacy_pool_address: Option<String>,
+
+    /// AtomicSwapPrivacyHelper contract for xmr_to_starknet + privacy_open_note terms.
+    #[arg(long)]
+    privacy_helper_address: Option<String>,
+
+    /// SDK-generated privacy-pool open note id for private STRK receive.
+    #[arg(long)]
+    privacy_open_note_id: Option<String>,
 
     /// Output file for swap state (JSON)
     #[arg(long, default_value = "swap_state.json")]
@@ -176,6 +188,23 @@ async fn main() -> Result<()> {
             let starknet_amount = amount
                 .parse::<u128>()
                 .context("--amount must be an integer token base-unit amount")?;
+            let starknet_privacy_settlement = match (
+                args.privacy_pool_address.as_ref(),
+                args.privacy_helper_address.as_ref(),
+                args.privacy_open_note_id.as_ref(),
+            ) {
+                (None, None, None) => None,
+                (Some(pool), Some(helper), Some(note_id)) => Some(StarknetPrivacySettlement {
+                    privacy_pool_address: pool.clone(),
+                    privacy_helper_address: helper.clone(),
+                    open_note_id: note_id.clone(),
+                    open_note_token: token.clone(),
+                    open_note_amount: starknet_amount,
+                }),
+                _ => anyhow::bail!(
+                    "--privacy-pool-address, --privacy-helper-address, and --privacy-open-note-id must be provided together"
+                ),
+            };
             let terms = SwapTerms {
                 swap_id: uuid::Uuid::new_v4().to_string(),
                 direction,
@@ -186,6 +215,7 @@ async fn main() -> Result<()> {
                 lock_duration_secs: args.lock_duration,
                 monero_confirmations: TERMS_DEFAULT_MONERO_CONFIRMATIONS,
                 starknet_receive_mode,
+                starknet_privacy_settlement,
             };
             terms.validate().context("Invalid swap terms")?;
             Some(terms)

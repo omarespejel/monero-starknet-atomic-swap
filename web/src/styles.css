@@ -33,7 +33,7 @@ body {
 
 button,
 input,
-textarea {
+select {
   font: inherit;
 }
 
@@ -182,19 +182,13 @@ a {
 }
 
 .amount-input,
-.text-input,
-.note-input {
+.text-input {
   width: 100%;
   border: 1px solid var(--line);
   background: transparent;
   color: var(--text);
   outline: none;
   padding: 12px;
-}
-
-.note-input {
-  min-height: 76px;
-  resize: vertical;
 }
 
 .asset-input {

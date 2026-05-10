@@ -17,7 +17,14 @@ fn swap_public_view_cli_outputs_sanitized_frontend_json() {
             "starknet_token": "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d",
             "lock_duration_secs": 10800u64,
             "monero_confirmations": 10u64,
-            "starknet_receive_mode": "privacy_open_note"
+            "starknet_receive_mode": "privacy_open_note",
+            "starknet_privacy_settlement": {
+                "privacy_pool_address": "0x40337b1af3c663e86e333bab5a4b28da8d4652a15a69beee2b677776ffe812a",
+                "privacy_helper_address": "0x1eabf8c477f15519b24e0f57cc74657a6cf863d10027dab9b411ce73d784d8d",
+                "open_note_id": "0x1234",
+                "open_note_token": "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d",
+                "open_note_amount": "40000000000000000000"
+            }
         }))
         .unwrap(),
     )
@@ -58,6 +65,14 @@ fn swap_public_view_cli_outputs_sanitized_frontend_json() {
 
     assert_eq!(view["next_action"], "claim_starknet_privacy_note");
     assert_eq!(view["starknet_claimable_after"], 8200);
+    assert_eq!(
+        view["starknet_privacy_settlement"]["helper_calldata"][0],
+        "0xabc"
+    );
+    assert_eq!(
+        view["starknet_privacy_settlement"]["helper_calldata"][1],
+        "0x1234"
+    );
     assert!(!stdout.contains("partial_spend_key"));
     assert!(!stdout.contains("claim_destination"));
     assert!(!stdout.contains("42424242"));

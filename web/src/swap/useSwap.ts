@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getSwapApi } from "./api";
+import { preparePrivacyOpenNoteIntent } from "./privacy";
 import type {
   CreateSwapRequest,
   QuoteRequest,
+  StarknetPrivacyOpenNoteIntent,
   StarknetReceiveMode,
   SwapDirection,
   SwapQuote,
@@ -10,6 +12,8 @@ import type {
 } from "./types";
 
 type UiPhase = "quote" | "review" | "running";
+const ALLOW_MOCK_PRIVACY_INTENT =
+  import.meta.env.VITE_SWAP_API_MODE === "mock" || !import.meta.env.VITE_SWAP_API_BASE;
 
 interface UseSwapState {
   direction: SwapDirection;
@@ -18,8 +22,7 @@ interface UseSwapState {
   setReceiveMode: (mode: StarknetReceiveMode) => void;
   amount: string;
   setAmount: (amount: string) => void;
-  privateReceiveNote: string;
-  setPrivateReceiveNote: (note: string) => void;
+  privacyOpenNoteIntent: StarknetPrivacyOpenNoteIntent | null;
   publicStarknetAddress: string;
   setPublicStarknetAddress: (address: string) => void;
   moneroReceiveAddress: string;
@@ -40,7 +43,8 @@ export function useSwap(): UseSwapState {
   const [direction, setDirection] = useState<SwapDirection>("xmr_to_starknet");
   const [receiveMode, setReceiveMode] = useState<StarknetReceiveMode>("privacy_open_note");
   const [amount, setAmount] = useState("0.005");
-  const [privateReceiveNote, setPrivateReceiveNote] = useState("");
+  const [privacyOpenNoteIntent, setPrivacyOpenNoteIntent] =
+    useState<StarknetPrivacyOpenNoteIntent | null>(null);
   const [publicStarknetAddress, setPublicStarknetAddress] = useState("");
   const [moneroReceiveAddress, setMoneroReceiveAddress] = useState("");
   const [phase, setPhase] = useState<UiPhase>("quote");
@@ -62,7 +66,11 @@ export function useSwap(): UseSwapState {
         receive_mode: direction === "xmr_to_starknet" ? receiveMode : "public_address",
       };
       const nextQuote = await api.quote(request, controller.signal);
+      const nextPrivacyIntent = await preparePrivacyOpenNoteIntent(nextQuote, {
+        allowMock: ALLOW_MOCK_PRIVACY_INTENT,
+      });
       setQuote(nextQuote);
+      setPrivacyOpenNoteIntent(nextPrivacyIntent);
       setPhase("review");
     } catch (err) {
       if (!controller.signal.aborted) {
@@ -90,7 +98,9 @@ export function useSwap(): UseSwapState {
         quote_id: quote.quote_id,
         direction: quote.direction,
         receive_mode: quote.receive_mode,
-        private_receive_note: quote.receive_mode === "privacy_open_note" ? privateReceiveNote : undefined,
+        starknet_privacy_settlement: quote.receive_mode === "privacy_open_note"
+          ? privacyOpenNoteIntent ?? undefined
+          : undefined,
         public_starknet_address: quote.receive_mode === "public_address" ? publicStarknetAddress : undefined,
         monero_receive_address: quote.direction === "starknet_to_xmr" ? moneroReceiveAddress : undefined,
       };
@@ -106,7 +116,7 @@ export function useSwap(): UseSwapState {
         setLoading(false);
       }
     }
-  }, [api, moneroReceiveAddress, privateReceiveNote, publicStarknetAddress, quote]);
+  }, [api, moneroReceiveAddress, privacyOpenNoteIntent, publicStarknetAddress, quote]);
 
   useEffect(() => {
     if (!session || session.view.terminal) {
@@ -135,6 +145,7 @@ export function useSwap(): UseSwapState {
     abortRef.current?.abort();
     setPhase("quote");
     setQuote(null);
+    setPrivacyOpenNoteIntent(null);
     setSession(null);
     setError(null);
   }, []);
@@ -146,8 +157,7 @@ export function useSwap(): UseSwapState {
     setReceiveMode,
     amount,
     setAmount,
-    privateReceiveNote,
-    setPrivateReceiveNote,
+    privacyOpenNoteIntent,
     publicStarknetAddress,
     setPublicStarknetAddress,
     moneroReceiveAddress,
@@ -162,4 +172,3 @@ export function useSwap(): UseSwapState {
     reset,
   };
 }
-

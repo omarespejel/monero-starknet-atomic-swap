@@ -9,7 +9,13 @@ import {
   unixToClock,
 } from "./format";
 import { useSwap } from "./useSwap";
-import type { SwapQuote, SwapSession, SwapUiProgressStep } from "./types";
+import type {
+  StarknetPrivacyOpenNoteIntent,
+  StarknetPrivacySettlementStatus,
+  SwapQuote,
+  SwapSession,
+  SwapUiProgressStep,
+} from "./types";
 
 function DetailRow({ label, value, tone }: { label: string; value: string; tone?: "xmr" | "strk" | "ok" | "warn" }) {
   const toneClass = tone ? `${tone}-text` : undefined;
@@ -53,6 +59,41 @@ function QuoteBox({ quote }: { quote: SwapQuote }) {
       <DetailRow label="Rate" value={quote.rate_label} />
       <DetailRow label="Expires" value={secondsUntil(quote.expires_at)} tone="warn" />
       <DetailRow label="Confirmations" value={`${quote.monero_confirmations} Monero blocks`} />
+    </dl>
+  );
+}
+
+function privacyStatusLabel(status: StarknetPrivacySettlementStatus): string {
+  switch (status) {
+    case "open_note_planned":
+      return "Open note planned";
+    case "helper_bound":
+      return "Helper bound";
+    case "claimable":
+      return "Claimable";
+    case "private_note_filled":
+      return "Private note filled";
+    case "cancelled":
+      return "Cancelled";
+  }
+}
+
+function PrivacyIntentBox({ intent }: { intent: StarknetPrivacyOpenNoteIntent | null }) {
+  if (!intent) {
+    return (
+      <div className="error-box">
+        Private STRK note unavailable.
+      </div>
+    );
+  }
+
+  return (
+    <dl className="details-box privacy-box">
+      <DetailRow label="Private receive" value="STRK open note" tone="ok" />
+      <DetailRow label="Pool" value={intent.privacy_pool_address} />
+      <DetailRow label="Helper" value={intent.privacy_helper_address} />
+      <DetailRow label="Open note" value={intent.open_note_id} />
+      <DetailRow label="Source" value={intent.source === "mock" ? "Prototype" : "Privacy SDK"} />
     </dl>
   );
 }
@@ -134,6 +175,25 @@ function SessionPanel({ session, onReset }: { session: SwapSession; onReset: () 
         ) : null}
       </dl>
 
+      {view.starknet_privacy_settlement ? (
+        <dl className="details-box privacy-box">
+          <DetailRow
+            label="Private STRK"
+            value={privacyStatusLabel(view.starknet_privacy_settlement.status)}
+            tone={view.starknet_privacy_settlement.status === "private_note_filled" ? "ok" : undefined}
+          />
+          <DetailRow label="Pool" value={view.starknet_privacy_settlement.privacy_pool_address} />
+          <DetailRow label="Helper" value={view.starknet_privacy_settlement.privacy_helper_address} />
+          <DetailRow label="Open note" value={view.starknet_privacy_settlement.open_note_id} />
+          {view.starknet_privacy_settlement.helper_calldata ? (
+            <DetailRow
+              label="Invoke"
+              value={`${view.starknet_privacy_settlement.helper_entrypoint}(${view.starknet_privacy_settlement.helper_calldata.join(", ")})`}
+            />
+          ) : null}
+        </dl>
+      ) : null}
+
       {showPayment ? <PaymentPanel session={session} /> : null}
       <ProgressList steps={view.steps} />
 
@@ -154,8 +214,8 @@ export function SwapTerminal() {
     Boolean(swap.quote) &&
     (swap.quote?.direction === "starknet_to_xmr"
       ? Boolean(swap.moneroReceiveAddress.trim())
-      : swap.receiveMode === "privacy_open_note"
-        ? Boolean(swap.privateReceiveNote.trim())
+      : swap.quote?.receive_mode === "privacy_open_note"
+        ? Boolean(swap.privacyOpenNoteIntent)
         : Boolean(swap.publicStarknetAddress.trim()));
 
   return (
@@ -258,16 +318,7 @@ export function SwapTerminal() {
             <QuoteBox quote={swap.quote} />
 
             {swap.quote.direction === "xmr_to_starknet" && receivingPrivately ? (
-              <div className="field">
-                <label htmlFor="private-note">Private receive note</label>
-                <textarea
-                  id="private-note"
-                  className="note-input"
-                  onChange={(event) => swap.setPrivateReceiveNote(event.target.value)}
-                  placeholder="Paste privacy note commitment"
-                  value={swap.privateReceiveNote}
-                />
-              </div>
+              <PrivacyIntentBox intent={swap.privacyOpenNoteIntent} />
             ) : null}
 
             {swap.quote.direction === "xmr_to_starknet" && !receivingPrivately ? (

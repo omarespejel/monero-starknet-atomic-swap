@@ -7,7 +7,7 @@
 **Trustless atomic swap protocol between Monero and Starknet using DLEQ proofs and two-party key generation.**
 
 [![Security](https://img.shields.io/badge/external%20audit-pending-yellow)](docs/EXTERNAL_REVIEW_PACKET.md)
-[![Tests](https://img.shields.io/badge/cairo-113%20passing%2C%200%20ignored-brightgreen)](#testing)
+[![Tests](https://img.shields.io/badge/cairo-120%20passing%2C%200%20ignored-brightgreen)](#testing)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 
 > **License: Apache 2.0 — Attribution and citation required.**
@@ -48,7 +48,7 @@ Testnet-ready prototype implementation of a trustless atomic swap protocol enabl
 | **Core Protocol** | ✅ Complete | Two-party keys, DLEQ proofs, scalar compatibility |
 | **Cairo Contract** | ✅ Complete | DLEQ verification, MSM checks, reentrancy protection |
 | **Rust Library** | ✅ Complete | Key generation, proof generation, Monero integration |
-| **Tests** | ✅ Passing | Cairo full suite: 113 passed, 0 ignored; targeted Rust/relayer suites passing |
+| **Tests** | ✅ Passing | Cairo full suite: 120 passed, 0 ignored; targeted Rust/relayer suites passing |
 | **Starknet Signing** | ⚠️ Maintained signer only | Use `sncast`, `scripts/deploy.ts`, or starknet.js for signed transactions; Rust placeholder signing is disabled |
 | **Deployment** | ⚠️ Sepolia rehearsed | Sepolia deploy/state/reveal/claim/refund paths rehearsed; no mainnet deployment |
 | **External Audit** | 🔄 Pending | Required before mainnet |

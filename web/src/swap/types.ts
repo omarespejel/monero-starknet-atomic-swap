@@ -27,6 +27,32 @@ export type SwapUiAction =
   | "done"
   | "refunded";
 
+export type StarknetPrivacySettlementStatus =
+  | "open_note_planned"
+  | "helper_bound"
+  | "claimable"
+  | "private_note_filled"
+  | "cancelled";
+
+export interface StarknetPrivacySettlementQuote {
+  privacy_pool_address: string;
+  privacy_helper_address: string;
+  open_note_token: string;
+  open_note_amount: string;
+  helper_entrypoint: "privacy_invoke";
+}
+
+export interface StarknetPrivacyOpenNoteIntent extends StarknetPrivacySettlementQuote {
+  open_note_id: string;
+  source: "privacy_sdk" | "mock";
+}
+
+export interface StarknetPrivacySettlementView extends StarknetPrivacySettlementQuote {
+  open_note_id: string;
+  status: StarknetPrivacySettlementStatus;
+  helper_calldata?: string[];
+}
+
 export interface SwapUiProgressStep {
   step: SwapUiStep;
   status: SwapUiStepStatus;
@@ -50,6 +76,7 @@ export interface SwapPublicView {
   lock_until?: number;
   monero_txid?: string;
   starknet_claimable_after?: number;
+  starknet_privacy_settlement?: StarknetPrivacySettlementView;
 }
 
 export interface QuoteRequest {
@@ -72,13 +99,14 @@ export interface SwapQuote {
   monero_confirmations: number;
   min_amount: string;
   max_amount: string;
+  starknet_privacy_settlement?: StarknetPrivacySettlementQuote;
 }
 
 export interface CreateSwapRequest {
   quote_id: string;
   direction: SwapDirection;
   receive_mode: StarknetReceiveMode;
-  private_receive_note?: string;
+  starknet_privacy_settlement?: StarknetPrivacyOpenNoteIntent;
   public_starknet_address?: string;
   monero_receive_address?: string;
 }
@@ -110,4 +138,3 @@ export interface SwapApi {
   createSwap(request: CreateSwapRequest, signal?: AbortSignal): Promise<SwapSession>;
   getSwap(swapId: string, signal?: AbortSignal): Promise<SwapSession>;
 }
-
