@@ -25,6 +25,7 @@ URLs here.
 | 2026-05-09 | Deploy mainnet dust `AtomicLock` via factory | `0x03d369b930632140fbefea0364feb9203984d232dbd354000091090d0651eb9e` | `9618888` | `1.8435631969256927 STRK` | | lock `0x01f84506b71bf584cbb1a0429c160a4c328942ab7f176c050b671670a4bb5d85` |
 | 2026-05-09 | Approve `40 STRK` escrow | `0x0028c89e975bb7e526c8397abbbbc73fc943b35aa6608e4cf69d13dfc2382711` | `9618921` | `0.0322856303690953 STRK` | | spender is the mainnet dust `AtomicLock` |
 | 2026-05-09 | Deposit `40 STRK` escrow | `0x014c3e58112380dc20103158b507f1f8a02e49c55cda0a8ca18d7e3583c10404` | `9618928` | `0.04718017706778135 STRK` | `98.689474416865826080 STRK` | lock balance verified as `40 STRK` |
+| 2026-05-10 | Refund expired mainnet dust `AtomicLock` | `0x0758bcb53cf45760fdccf3a55bef1ff4f0888f7d45ba387cb8a4ad8591690811` | `9654438` | `0.046981414171614784 STRK` | `138.642493002694211296 STRK` | no XMR was sent; refund receipt `execution_status=SUCCEEDED`, `finality_status=ACCEPTED_ON_L2`; post-refund lock balance verified as `0 STRK` |
 
 ## Mainnet Dust Lock
 
@@ -97,10 +98,23 @@ URLs here.
   with `REVEAL_CLAIM_AFTER_REVEAL=1`, `REVEAL_DRY_RUN=0`, and a timeout set to
   stop roughly 10 minutes before the dust lock expiry. Journal currently shows
   no inbound Monero transfer visible.
+- Cleanup at `2026-05-10T19:26Z`: host read-only state check showed
+  `is_secret_revealed=false`, `is_unlocked=false`, `get_claimable_after=0`,
+  `get_lock_until=1778435777`, and contract STRK balance `40 STRK` after the
+  lock expiry. The `monero-stagenet` VM was stopped, so no live Monero watcher
+  remained active.
+- Refund tx:
+  `0x0758bcb53cf45760fdccf3a55bef1ff4f0888f7d45ba387cb8a4ad8591690811`.
+  Receipt block `9654438`, fee `0.046981414171614784 STRK`,
+  `execution_status=SUCCEEDED`, `finality_status=ACCEPTED_ON_L2`.
+  Post-refund state: `is_secret_revealed=false`, `is_unlocked=true`,
+  `get_claimable_after=0`, `get_lock_until=1778435777`, contract STRK balance
+  `0 STRK`.
 
 ## Current Totals
 
-- Starknet fees spent: `61.31052558313417 STRK`
+- Starknet fees spent: `61.357506997305784784 STRK`
 - Monero fees spent: `0 XMR`
-- STRK principal escrowed: `40 STRK`
+- STRK principal currently escrowed: `0 STRK`
+- STRK principal refunded: `40 STRK`
 - XMR principal sent: `0 XMR`
