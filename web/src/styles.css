@@ -1,0 +1,401 @@
+:root {
+  color-scheme: dark;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  background: #070707;
+  color: #f0f0ee;
+  font-synthesis: none;
+  line-height: 1.45;
+  text-rendering: optimizeLegibility;
+  --bg: #070707;
+  --panel: #0d0d0d;
+  --line: #2a2a2a;
+  --muted: #8b8b86;
+  --text: #f0f0ee;
+  --xmr: #ff8a2b;
+  --strk: #9b8cff;
+  --ok: #4bd17d;
+  --warn: #ffcc66;
+  --bad: #ff6d6d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  border-bottom: 1px solid var(--line);
+  padding: 12px clamp(16px, 4vw, 40px);
+}
+
+.brand {
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.network {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.topbar nav {
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 4vw, 32px);
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.topbar nav a:first-child {
+  color: var(--text);
+}
+
+.swap-stage {
+  flex: 1;
+  width: 100%;
+  display: grid;
+  place-items: center;
+  padding: clamp(20px, 5vw, 56px) 16px;
+}
+
+.terminal {
+  width: min(100%, 520px);
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.terminal-header,
+.terminal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+  padding: 14px 16px;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.terminal-footer {
+  border-top: 1px solid var(--line);
+  border-bottom: 0;
+  color: var(--muted);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--muted);
+}
+
+.status-dot.active {
+  background: var(--ok);
+}
+
+.terminal-body {
+  padding: 18px;
+}
+
+.direction-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--line);
+  margin-bottom: 20px;
+}
+
+.direction-grid button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 12px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.direction-grid button + button {
+  border-left: 1px solid var(--line);
+}
+
+.direction-grid button.selected {
+  background: var(--text);
+  color: var(--bg);
+}
+
+.form-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.field label {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.amount-input,
+.text-input,
+.note-input {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  outline: none;
+  padding: 12px;
+}
+
+.note-input {
+  min-height: 76px;
+  resize: vertical;
+}
+
+.asset-input {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  border: 1px solid var(--line);
+}
+
+.asset-input input {
+  border: 0;
+  min-width: 0;
+}
+
+.asset-label {
+  display: grid;
+  place-items: center;
+  min-width: 72px;
+  padding: 0 12px;
+  border-left: 1px solid var(--line);
+}
+
+.asset-label.xmr {
+  color: var(--xmr);
+}
+
+.asset-label.strk {
+  color: var(--strk);
+}
+
+.primary-button,
+.secondary-button,
+.copy-button {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--text);
+  background: transparent;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 11px;
+}
+
+.primary-button:hover:not(:disabled) {
+  background: var(--text);
+  color: var(--bg);
+}
+
+.secondary-button {
+  border-color: var(--line);
+  color: var(--muted);
+}
+
+.copy-button {
+  width: auto;
+  min-height: 0;
+  border: 0;
+  color: var(--muted);
+  padding: 0;
+  font-size: 10px;
+}
+
+.quote-box,
+.payment-box,
+.details-box {
+  border: 1px solid var(--line);
+  padding: 14px;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  padding: 8px 0;
+  font-size: 12px;
+}
+
+.row:first-child {
+  padding-top: 0;
+}
+
+.row:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.row dt {
+  color: var(--muted);
+}
+
+.row dd {
+  margin: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.xmr-text {
+  color: var(--xmr);
+}
+
+.strk-text {
+  color: var(--strk);
+}
+
+.ok-text {
+  color: var(--ok);
+}
+
+.warn-text {
+  color: var(--warn);
+}
+
+.muted-text {
+  color: var(--muted);
+}
+
+.payment-layout {
+  display: grid;
+  gap: 18px;
+}
+
+.qr-wrap {
+  display: grid;
+  place-items: center;
+}
+
+.qr-frame {
+  background: #f0f0ee;
+  padding: 10px;
+}
+
+.address {
+  margin-top: 10px;
+  color: var(--xmr);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.progress-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.progress-step {
+  display: grid;
+  grid-template-columns: 12px 1fr;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.step-marker {
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--line);
+}
+
+.progress-step.active {
+  color: var(--text);
+}
+
+.progress-step.active .step-marker {
+  background: var(--warn);
+  border-color: var(--warn);
+}
+
+.progress-step.complete .step-marker {
+  background: var(--ok);
+  border-color: var(--ok);
+}
+
+.error-box {
+  margin-top: 14px;
+  border: 1px solid var(--bad);
+  color: var(--bad);
+  padding: 12px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.stack {
+  display: grid;
+  gap: 18px;
+}
+
+@media (max-width: 600px) {
+  .topbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .topbar nav {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .terminal-body {
+    padding: 14px;
+  }
+}
