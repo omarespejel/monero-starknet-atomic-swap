@@ -1,6 +1,6 @@
 # Production Readiness
 
-Last updated: 2026-05-09.
+Last updated: 2026-05-10.
 
 This repository is a testnet audit candidate, not a mainnet release. Do not deploy
 strkXMR or mainnet swap contracts from this tree without a separate green light,
@@ -75,6 +75,11 @@ python3 tools/generate_deploy_calldata.py \
 - The Rust swap state machine preserves Monero restore height, txid, and amount
   across finality, reveal, and claim transitions. Old JSON swap files missing
   the new optional fields remain deserializable.
+- `AtomicSwapPrivacyHelper` is the first contract-level privacy-pool integration
+  path. It binds one `AtomicLock` to one StarkWare privacy open note, reveals
+  the secret as the lock unlocker, waits for the normal grace period, claims the
+  token, approves the bound privacy contract for the exact balance delta, and
+  returns one ABI-compatible `OpenNoteDeposit` from `privacy_invoke`.
 
 ## Verified Locally
 
@@ -83,6 +88,7 @@ The latest local validation included:
 ```bash
 python3 tools/readiness_preflight.py --output /tmp/atomic-swap-readiness-preflight.json
 cd cairo && snforge test --detailed-resources
+cd cairo && snforge test test_privacy_helper
 cd rust && cargo test -q --lib
 cd rust && cargo test -q --test dleq_properties
 cd rust && cargo test -q --test integration_test
@@ -111,7 +117,30 @@ python3 tools/check_secret_hygiene.py --history --report-only
 git diff --check
 ```
 
-Known local result for Cairo: `113 passed, 0 failed, 0 ignored`.
+Known local result for Cairo: `120 passed, 0 failed, 0 ignored`.
+
+## Sepolia Privacy Helper Deployment
+
+On `2026-05-10`, `AtomicSwapPrivacyHelper` was declared and deployed on
+Sepolia for privacy-pool integration rehearsal only. This is not a `strkXMR`
+launch and not a mainnet deployment.
+
+- Class hash:
+  `0x0611fc56a5e51574e4a7b5c4c9d3173cbf3492ff1d55ecb14945793dfc7bee9e`
+- Helper address:
+  `0x01eabf8c477f15519b24e0f57cc74657a6cf863d10027dab9b411ce73d784d8d`
+- Declare tx:
+  `0x0728a3d65f55cc2e397dddd136e136111322ddad6f0a1f13ed62a520998b7d9d`
+  at block `9622729`, fee `2.595148800008659968 STRK`.
+- Deploy tx:
+  `0x0615d49ef0d3b3ed7c2f496d1a763e030ad7181d41ba6b905a3c339bc40996e8`
+  at block `9622738`, fee `0.009697280010103296 STRK`.
+- Total Sepolia helper deployment cost:
+  `2.604846080018763264 STRK`.
+- Validation: both receipts were `ACCEPTED_ON_L2` and `SUCCEEDED`.
+  Read-only smoke call `is_bound(0x1)` returned `false` / raw `["0x0"]`.
+- Deployment artifact:
+  `deployments/sepolia/privacy_helper_2026-05-10.json`.
 
 Additional backend validation for the bidirectional quote/state slice:
 

@@ -13,7 +13,8 @@ Review these surfaces first:
 
 - Cairo contracts in `cairo/src/lib.cairo`, especially `AtomicLock`,
   `AtomicLockFactory`, constructor DLEQ verification, two-phase reveal/claim,
-  refund paths, token transfer handling, and reentrancy protection.
+  refund paths, token transfer handling, reentrancy protection, and
+  `AtomicSwapPrivacyHelper` open-note settlement.
 - Cairo tests under `cairo/tests/`, especially real-vector DLEQ tests,
   two-phase unlock tests, token-security tests, and factory tests.
 - Rust relayer code in `rust/src/swap/relayer.rs`,
@@ -32,7 +33,7 @@ Review these surfaces first:
 
 - `strkXMR` token launch.
 - Mainnet deployment.
-- Privacy-pool integration.
+- Full production privacy-pool deployment and prover/backend operations.
 - Bridge custody design.
 - Production paging endpoint selection. The repo has alert hooks, but the real
   webhook/paging destination is operator-specific.

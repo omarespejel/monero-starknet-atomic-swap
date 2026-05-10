@@ -69,6 +69,69 @@ pub trait IERC20<TContractState> {
     ) -> bool;
 }
 
+/// ABI-compatible with `privacy::objects::OpenNoteDeposit` from
+/// starkware-libs/starknet-privacy. The privacy pool deserializes the raw return
+/// data from `privacy_invoke`, so keeping this shape identical avoids coupling
+/// the atomic-swap package to the privacy repository.
+#[derive(Serde, Copy, Drop, PartialEq, Debug)]
+pub struct OpenNoteDeposit {
+    pub note_id: felt252,
+    pub token: starknet::ContractAddress,
+    pub amount: u128,
+}
+
+#[starknet::interface]
+pub trait IAtomicLockPrivacyTarget<TContractState> {
+    fn reveal_secret(ref self: TContractState, secret: ByteArray) -> bool;
+    fn claim_tokens(ref self: TContractState) -> bool;
+    fn is_secret_revealed(self: @TContractState) -> bool;
+    fn is_unlocked(self: @TContractState) -> bool;
+    fn get_claimable_after(self: @TContractState) -> u64;
+}
+
+#[starknet::interface]
+pub trait IAtomicSwapHelperERC20<TContractState> {
+    fn balance_of(self: @TContractState, account: starknet::ContractAddress) -> u256;
+    fn approve(ref self: TContractState, spender: starknet::ContractAddress, amount: u256) -> bool;
+}
+
+#[starknet::interface]
+pub trait IAtomicSwapPrivacyHelper<TContractState> {
+    /// Bind an AtomicLock to one privacy-pool open note and reveal the secret.
+    ///
+    /// The helper becomes the AtomicLock unlocker because it is the direct caller
+    /// of `reveal_secret`. After the lock's grace period expires, the privacy
+    /// contract can invoke `privacy_invoke` to claim the escrow and fill the open
+    /// note atomically.
+    fn bind_and_reveal(
+        ref self: TContractState,
+        atomic_lock: starknet::ContractAddress,
+        token: starknet::ContractAddress,
+        amount: u256,
+        privacy_contract: starknet::ContractAddress,
+        note_id: felt252,
+        secret: ByteArray,
+    ) -> bool;
+
+    /// Entry point called by StarkWare privacy pool `InvokeExternal`.
+    ///
+    /// Returns one open-note deposit. The privacy contract then pulls `amount`
+    /// from this helper with `transfer_from`.
+    fn privacy_invoke(
+        ref self: TContractState,
+        atomic_lock: starknet::ContractAddress,
+        note_id: felt252,
+    ) -> Span<OpenNoteDeposit>;
+
+    fn is_bound(self: @TContractState, atomic_lock: starknet::ContractAddress) -> bool;
+    fn is_settled(self: @TContractState, atomic_lock: starknet::ContractAddress) -> bool;
+    fn get_bound_privacy_contract(
+        self: @TContractState,
+        atomic_lock: starknet::ContractAddress,
+    ) -> starknet::ContractAddress;
+    fn get_bound_note_id(self: @TContractState, atomic_lock: starknet::ContractAddress) -> felt252;
+}
+
 #[starknet::interface]
 pub trait IAtomicLockFactory<TContractState> {
     fn get_owner(self: @TContractState) -> starknet::ContractAddress;
@@ -270,6 +333,207 @@ pub mod AtomicLockFactory {
             monero_network,
             metadata_hash,
         });
+    }
+}
+
+#[starknet::contract]
+pub mod AtomicSwapPrivacyHelper {
+    use core::byte_array::ByteArray;
+    use core::integer::u256;
+    use core::num::traits::Zero;
+    use core::traits::TryInto;
+    use starknet::{ContractAddress, get_caller_address, get_contract_address};
+    use starknet::storage::{Map, StorageMapReadAccess, StorageMapWriteAccess};
+    use openzeppelin::security::ReentrancyGuardComponent;
+    use super::{
+        IAtomicLockPrivacyTargetDispatcher, IAtomicLockPrivacyTargetDispatcherTrait,
+        IAtomicSwapHelperERC20Dispatcher, IAtomicSwapHelperERC20DispatcherTrait,
+        IAtomicSwapPrivacyHelper, OpenNoteDeposit,
+    };
+
+    component!(
+        path: ReentrancyGuardComponent,
+        storage: reentrancy_guard,
+        event: ReentrancyGuardEvent
+    );
+
+    impl ReentrancyGuardInternalImpl = ReentrancyGuardComponent::InternalImpl<ContractState>;
+
+    #[storage]
+    struct Storage {
+        bound: Map<ContractAddress, bool>,
+        settled: Map<ContractAddress, bool>,
+        privacy_contracts: Map<ContractAddress, ContractAddress>,
+        tokens: Map<ContractAddress, ContractAddress>,
+        amounts: Map<ContractAddress, u256>,
+        note_ids: Map<ContractAddress, felt252>,
+        #[substorage(v0)]
+        reentrancy_guard: ReentrancyGuardComponent::Storage,
+    }
+
+    pub mod Errors {
+        pub const ZERO_LOCK: felt252 = 'ZERO_LOCK';
+        pub const ZERO_TOKEN: felt252 = 'ZERO_TOKEN';
+        pub const ZERO_AMOUNT: felt252 = 'ZERO_AMOUNT';
+        pub const AMOUNT_OVERFLOW: felt252 = 'AMOUNT_OVERFLOW';
+        pub const ZERO_PRIVACY: felt252 = 'ZERO_PRIVACY';
+        pub const ZERO_NOTE: felt252 = 'ZERO_NOTE';
+        pub const ALREADY_BOUND: felt252 = 'ALREADY_BOUND';
+        pub const NOT_BOUND: felt252 = 'NOT_BOUND';
+        pub const ALREADY_SETTLED: felt252 = 'ALREADY_SETTLED';
+        pub const WRONG_PRIVACY: felt252 = 'WRONG_PRIVACY';
+        pub const NOTE_MISMATCH: felt252 = 'NOTE_MISMATCH';
+        pub const REVEAL_FAILED: felt252 = 'REVEAL_FAILED';
+        pub const LOCK_NOT_REVEALED: felt252 = 'LOCK_NOT_REVEALED';
+        pub const CLAIM_FAILED: felt252 = 'CLAIM_FAILED';
+        pub const LOCK_NOT_UNLOCKED: felt252 = 'LOCK_NOT_UNLOCKED';
+        pub const AMOUNT_MISMATCH: felt252 = 'AMOUNT_MISMATCH';
+        pub const APPROVE_FAILED: felt252 = 'APPROVE_FAILED';
+    }
+
+    #[derive(Drop, starknet::Event)]
+    pub struct PrivateClaimBound {
+        #[key]
+        pub atomic_lock: ContractAddress,
+        #[key]
+        pub privacy_contract: ContractAddress,
+        pub note_id: felt252,
+        pub token: ContractAddress,
+        pub amount: u256,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    pub struct PrivateClaimSettled {
+        #[key]
+        pub atomic_lock: ContractAddress,
+        #[key]
+        pub privacy_contract: ContractAddress,
+        pub note_id: felt252,
+        pub token: ContractAddress,
+        pub amount: u256,
+    }
+
+    #[event]
+    #[derive(Drop, starknet::Event)]
+    pub enum Event {
+        PrivateClaimBound: PrivateClaimBound,
+        PrivateClaimSettled: PrivateClaimSettled,
+        #[flat]
+        ReentrancyGuardEvent: ReentrancyGuardComponent::Event,
+    }
+
+    #[constructor]
+    fn constructor(ref self: ContractState) {}
+
+    #[abi(embed_v0)]
+    impl AtomicSwapPrivacyHelperImpl of IAtomicSwapPrivacyHelper<ContractState> {
+        fn bind_and_reveal(
+            ref self: ContractState,
+            atomic_lock: ContractAddress,
+            token: ContractAddress,
+            amount: u256,
+            privacy_contract: ContractAddress,
+            note_id: felt252,
+            secret: ByteArray,
+        ) -> bool {
+            self.reentrancy_guard.start();
+
+            assert_nonzero_address(atomic_lock, Errors::ZERO_LOCK);
+            assert_nonzero_address(token, Errors::ZERO_TOKEN);
+            assert(!amount.is_zero(), Errors::ZERO_AMOUNT);
+            assert(amount.high == 0, Errors::AMOUNT_OVERFLOW);
+            assert_nonzero_address(privacy_contract, Errors::ZERO_PRIVACY);
+            assert(note_id != 0, Errors::ZERO_NOTE);
+            assert(!self.bound.read(atomic_lock), Errors::ALREADY_BOUND);
+            assert(!self.settled.read(atomic_lock), Errors::ALREADY_SETTLED);
+
+            self.bound.write(atomic_lock, true);
+            self.privacy_contracts.write(atomic_lock, privacy_contract);
+            self.tokens.write(atomic_lock, token);
+            self.amounts.write(atomic_lock, amount);
+            self.note_ids.write(atomic_lock, note_id);
+
+            let lock = IAtomicLockPrivacyTargetDispatcher { contract_address: atomic_lock };
+            let revealed = lock.reveal_secret(secret);
+            assert(revealed, Errors::REVEAL_FAILED);
+            assert(lock.is_secret_revealed(), Errors::LOCK_NOT_REVEALED);
+
+            self.emit(PrivateClaimBound {
+                atomic_lock, privacy_contract, note_id, token, amount,
+            });
+
+            self.reentrancy_guard.end();
+            true
+        }
+
+        fn privacy_invoke(
+            ref self: ContractState,
+            atomic_lock: ContractAddress,
+            note_id: felt252,
+        ) -> Span<OpenNoteDeposit> {
+            self.reentrancy_guard.start();
+
+            assert(self.bound.read(atomic_lock), Errors::NOT_BOUND);
+            assert(!self.settled.read(atomic_lock), Errors::ALREADY_SETTLED);
+
+            let privacy_contract = self.privacy_contracts.read(atomic_lock);
+            let caller = get_caller_address();
+            assert(caller == privacy_contract, Errors::WRONG_PRIVACY);
+
+            let expected_note_id = self.note_ids.read(atomic_lock);
+            assert(note_id == expected_note_id, Errors::NOTE_MISMATCH);
+
+            let token = self.tokens.read(atomic_lock);
+            let amount = self.amounts.read(atomic_lock);
+            assert(amount.high == 0, Errors::AMOUNT_OVERFLOW);
+
+            let self_address = get_contract_address();
+            let erc20 = IAtomicSwapHelperERC20Dispatcher { contract_address: token };
+            let balance_before = erc20.balance_of(account: self_address);
+
+            let lock = IAtomicLockPrivacyTargetDispatcher { contract_address: atomic_lock };
+            let claimed = lock.claim_tokens();
+            assert(claimed, Errors::CLAIM_FAILED);
+            assert(lock.is_unlocked(), Errors::LOCK_NOT_UNLOCKED);
+
+            let balance_after = erc20.balance_of(account: self_address);
+            assert(balance_after - balance_before == amount, Errors::AMOUNT_MISMATCH);
+
+            let approved = erc20.approve(spender: privacy_contract, amount: amount);
+            assert(approved, Errors::APPROVE_FAILED);
+
+            self.settled.write(atomic_lock, true);
+            self.emit(PrivateClaimSettled {
+                atomic_lock, privacy_contract, note_id, token, amount,
+            });
+
+            self.reentrancy_guard.end();
+            [OpenNoteDeposit { note_id, token, amount: amount.low }].span()
+        }
+
+        fn is_bound(self: @ContractState, atomic_lock: ContractAddress) -> bool {
+            self.bound.read(atomic_lock)
+        }
+
+        fn is_settled(self: @ContractState, atomic_lock: ContractAddress) -> bool {
+            self.settled.read(atomic_lock)
+        }
+
+        fn get_bound_privacy_contract(
+            self: @ContractState,
+            atomic_lock: ContractAddress,
+        ) -> ContractAddress {
+            self.privacy_contracts.read(atomic_lock)
+        }
+
+        fn get_bound_note_id(self: @ContractState, atomic_lock: ContractAddress) -> felt252 {
+            self.note_ids.read(atomic_lock)
+        }
+    }
+
+    fn assert_nonzero_address(address: ContractAddress, error: felt252) {
+        let zero: ContractAddress = 0.try_into().unwrap();
+        assert(address != zero, error);
     }
 }
 

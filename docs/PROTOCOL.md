@@ -25,8 +25,13 @@ Monero users entering Starknet.
    and sweeps XMR.
 5. After the grace period, the Starknet-token claimer claims the locked token.
 
-For the privacy-pool version, step 5 should later be replaced by a helper that
-claims into a privacy-pool open note instead of a public wallet balance.
+For the privacy-pool version, step 5 is replaced by
+`AtomicSwapPrivacyHelper`: the helper reveals the Starknet secret, becomes the
+`AtomicLock` unlocker, waits for the same grace period, claims the locked token,
+approves the privacy contract, and returns an `OpenNoteDeposit` from
+`privacy_invoke`. The StarkWare privacy contract can then pull the token into
+the already-created open note through `InvokeExternal`, so the user receives a
+private note instead of a public wallet balance.
 
 ### Starknet -> XMR
 
@@ -47,6 +52,38 @@ assignment, quote terms, and which side controls the Monero claim automation.
 Frontend/API code should render swaps from `SwapPublicView`, not directly from
 raw `SwapState`, because the raw state contains protocol/operator fields whose
 meaning changes by direction and may include local recovery metadata.
+
+## Privacy-Pool Settlement Helper
+
+`AtomicSwapPrivacyHelper` is the privacy-first Starknet settlement path for
+`XMR -> private Starknet token note`.
+
+Flow:
+
+1. The frontend/SDK creates a StarkWare privacy open note for the output token.
+2. The operator binds one `AtomicLock` to `{privacy_contract, note_id, token,
+   amount}` with `bind_and_reveal(...)`.
+3. Because the helper is the caller of `AtomicLock.reveal_secret(...)`, the
+   helper becomes the only account allowed to call `claim_tokens()`.
+4. After the AtomicLock grace period, the privacy contract calls the helper via
+   `InvokeExternal` / `privacy_invoke(atomic_lock, note_id)`.
+5. The helper claims the token, checks the exact balance delta, approves the
+   privacy contract for the exact amount, marks the lock settled, and returns
+   one `OpenNoteDeposit`.
+6. The privacy contract applies the returned deposit to the open note and pulls
+   the token from the helper with `transfer_from`.
+
+Security properties:
+
+- One `AtomicLock` can be bound once and settled once.
+- Only the bound privacy contract can call `privacy_invoke`.
+- The note id passed by the privacy contract must match the bound note id.
+- Amounts must fit in `u128`, matching StarkWare privacy note accounting.
+- The helper checks the ERC20 balance delta around `claim_tokens()` before
+  approving the privacy contract, so a malicious or mismatched lock cannot
+  silently underpay the note.
+- The helper stores token and amount at bind time because the current
+  `AtomicLock` ABI intentionally does not expose token/amount getters.
 
 ## Protocol Parameters
 

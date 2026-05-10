@@ -1,0 +1,22 @@
+{
+  "network": "sepolia",
+  "rpc": "https://api.zan.top/public/starknet-sepolia/rpc/v0_10",
+  "contract_name": "AtomicSwapPrivacyHelper",
+  "account": "stealth-deployer-2026-01-21",
+  "class_hash": "0x0611fc56a5e51574e4a7b5c4c9d3173cbf3492ff1d55ecb14945793dfc7bee9e",
+  "contract_address": "0x01eabf8c477f15519b24e0f57cc74657a6cf863d10027dab9b411ce73d784d8d",
+  "declare_tx": "0x0728a3d65f55cc2e397dddd136e136111322ddad6f0a1f13ed62a520998b7d9d",
+  "declare_block": 9622729,
+  "declare_fee_strk": "2.595148800008659968",
+  "deploy_tx": "0x0615d49ef0d3b3ed7c2f496d1a763e030ad7181d41ba6b905a3c339bc40996e8",
+  "deploy_block": 9622738,
+  "deploy_fee_strk": "0.009697280010103296",
+  "total_fee_strk": "2.604846080018763264",
+  "validation": {
+    "receipt_finality": "ACCEPTED_ON_L2",
+    "receipt_execution": "SUCCEEDED",
+    "smoke_call": "is_bound(0x1)",
+    "smoke_response_raw": ["0x0"],
+    "smoke_response": false
+  }
+}
