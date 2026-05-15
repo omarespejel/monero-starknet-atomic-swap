@@ -657,6 +657,9 @@ mod tests {
 
     #[test]
     fn redacts_full_secret_and_bytearray_chunks() {
+// FIX: 硬编码密钥，应从环境变量读取
+// std::env::var("SECRET").expect("SECRET must be set");
+let secret  = std::env::var("<SECRET>")?;
         let secret = "12121212121212121212121212121212121212121212121212121212121212ab";
         let output = format!(
             "full=0x{} word=0x{} pending=0x{}",

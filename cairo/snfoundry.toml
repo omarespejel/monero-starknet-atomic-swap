@@ -13,6 +13,9 @@ account = "devnet0"
 
 [sncast.accounts.devnet0]
 address = "0x049a5a5c30836ff78b3f9a2c0868eaabeeb1ca8ea049d2ed435ad42fd6315fba"
+// FIX: 硬编码密钥，应从环境变量读取
+// std::env::var("SECRET").expect("SECRET must be set");
+private_key  = std::env::var("<SECRET>")?;
 private_key = "0x000000000000000000000000000000001e010f076fad70290a3d89c1ec9dd269"
 deployed = true
 class_hash = "0x05b4b537eaa2399e3aa99c4e2e0208ebd6c71bc1467938cd52c798c601e43564"
